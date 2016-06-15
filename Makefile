@@ -13,7 +13,7 @@ clippy:
 	rustup run nightly cargo build --features=clippy
 
 doc:
-	cargo doc --no-deps -p $(CRATE)
+	cargo doc # --no-deps -p $(CRATE)
 	echo "<meta http-equiv='refresh' content='0;url=$(CRATE)/'>" > target/doc/index.html
 
 test:
