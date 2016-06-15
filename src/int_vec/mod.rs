@@ -1,7 +1,7 @@
 //! Bit-packed vectors of `N`-bit unsigned integers.
 
 use std::marker::PhantomData;
-use std::mem;
+use std::{fmt, mem};
 
 use num::{PrimInt, ToPrimitive};
 
@@ -336,6 +336,19 @@ impl<'a, N: 'a, Block: 'a> IntoIterator for &'a IntVec<N, Block>
     }
 }
 
+impl<N, Block> fmt::Debug for IntVec<N, Block>
+    where N: NonZero + Unsigned, Block: BlockType + fmt::Debug
+{
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        try!(write!(formatter, "IntVec<U{}>{{ ", Self::element_bits()));
+
+        for element in self {
+            try!(write!(formatter, "{:?}, ", element));
+        }
+
+        write!(formatter, "}}")
+    }
+}
 
 #[cfg(test)]
 mod test {
@@ -450,5 +463,18 @@ mod test {
         v.set(4, 5);
 
         assert_eq!(vec![1, 1, 2, 3, 5], v.iter().collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn debug() {
+        let mut v = IntVec::<U13, u16>::new(5);
+        v.set(0, 1);
+        v.set(1, 1);
+        v.set(2, 2);
+        v.set(3, 3);
+        v.set(4, 5);
+
+        assert_eq!("IntVec<U13>{ 1, 1, 2, 3, 5, }".to_owned(),
+                   format!("{:?}", v));
     }
 }
