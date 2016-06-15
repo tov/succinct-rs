@@ -171,7 +171,7 @@ impl<N, Block> IntVec<N, Block>
         let address = self.element_address(element_index);
         let margin = block_bits - address.bit_offset;
 
-        if margin <= element_bits {
+        if margin >= element_bits {
             let block = self.blocks[address.block_index];
             return block.get_bits(address.bit_offset, element_bits)
         }
@@ -209,7 +209,7 @@ impl<N, Block> IntVec<N, Block>
         let address = self.element_address(element_index);
         let margin = block_bits - address.bit_offset;
 
-        if margin <= element_bits {
+        if margin >= element_bits {
             let old_block = self.blocks[address.block_index];
             let new_block = old_block.set_bits(address.bit_offset,
                                                element_bits,
@@ -258,12 +258,85 @@ mod test {
         let mut v = IntVec::<U32, u32>::new(10);
         assert_eq!(0, v.get(0));
         assert_eq!(0, v.get(9));
+
+        v.set(0, 89);
+        assert_eq!(89, v.get(0));
+        assert_eq!(0, v.get(1));
+
+        v.set(0, 56);
+        v.set(1, 34);
+        assert_eq!(56, v.get(0));
+        assert_eq!(34, v.get(1));
+        assert_eq!(0, v.get(2));
+
+        v.set(9, 12);
+        assert_eq!(12, v.get(9));
     }
 
     #[test]
     #[should_panic]
     fn packed_oob() {
-        let mut v = IntVec::<U32, u32>::new(10);
+        let v = IntVec::<U32, u32>::new(10);
         assert_eq!(0, v.get(10));
+    }
+
+    #[test]
+    fn aligned() {
+        let mut v = IntVec::<U4>::new(20);
+        assert_eq!(0, v.get(0));
+        assert_eq!(0, v.get(9));
+
+        v.set(0, 13);
+        assert_eq!(13, v.get(0));
+        assert_eq!(0, v.get(1));
+
+        v.set(1, 15);
+        assert_eq!(13, v.get(0));
+        assert_eq!(15, v.get(1));
+        assert_eq!(0, v.get(2));
+
+        v.set(1, 4);
+        v.set(19, 9);
+        assert_eq!(13, v.get(0));
+        assert_eq!(4, v.get(1));
+        assert_eq!(0, v.get(2));
+        assert_eq!(9, v.get(19));
+    }
+
+    #[test]
+    #[should_panic]
+    fn aligned_oob() {
+        let v = IntVec::<U4>::new(20);
+        assert_eq!(0, v.get(20));
+    }
+
+    #[test]
+    fn unaligned() {
+        let mut v = IntVec::<U5>::new(20);
+        assert_eq!(0, v.get(0));
+        assert_eq!(0, v.get(9));
+
+        v.set(0, 13);
+        assert_eq!(13, v.get(0));
+        assert_eq!(0, v.get(1));
+
+        v.set(1, 15);
+        assert_eq!(13, v.get(0));
+        assert_eq!(15, v.get(1));
+        assert_eq!(0, v.get(2));
+
+        v.set(1, 4);
+        v.set(19, 9);
+        assert_eq!(13, v.get(0));
+        assert_eq!(4, v.get(1));
+        assert_eq!(0, v.get(2));
+        assert_eq!(9, v.get(19));
+    }
+
+    #[test]
+    #[should_panic]
+    fn unaligned_oob() {
+        let v = IntVec::<U5>::new(20);
+        assert_eq!(0, v.get(20));
     }
 }
