@@ -7,7 +7,7 @@ use num::PrimInt;
 /// Types that can be used for `IntVec` storage.
 pub trait BlockType: PrimInt {
     /// The number of bits in a block.
-    #[inline(always)]
+    #[inline]
     fn nbits() -> usize {
         8 * mem::size_of::<Self>()
     }

@@ -3,7 +3,7 @@
 use std::marker::PhantomData;
 use std::mem;
 
-use num::{PrimInt, CheckedMul, ToPrimitive};
+use num::{PrimInt, ToPrimitive};
 
 use typenum::{NonZero, Unsigned};
 pub use typenum::{U1, U2, U3, U4, U5, U6, U7, U8, U9, U10, U11, U12,
@@ -149,6 +149,12 @@ impl<N, Block> IntVec<N, Block>
     #[inline]
     pub fn len(&self) -> usize {
         self.n_elements
+    }
+
+    /// Is the vector empty?
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
     /// Returns the element at the given index.
