@@ -45,8 +45,7 @@ impl<Block: BlockType> IntVecBuilder<Block> {
     pub fn build(&self) -> IntVec<Block> {
         let n_blocks
             = IntVec::<Block>::compute_n_blocks(self.element_bits,
-                                                self.capacity)
-            .expect("IntVec: size overflow");
+                                                self.capacity).unwrap();
 
         let mut result = IntVec {
             blocks: Vec::with_capacity(n_blocks),

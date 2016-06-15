@@ -350,6 +350,40 @@ impl<Block: PrimInt> IntVec<Block> {
         self.blocks.reserve_exact(difference);
     }
 
+    /// Shrinks the capacity to just fit the number of elements.
+    pub fn shrink_to_fit(&mut self) {
+        let n_blocks = Self::compute_n_blocks(self.element_bits,
+                                              self.n_elements).unwrap();
+        self.blocks.truncate(n_blocks);
+        self.blocks.shrink_to_fit();
+    }
+
+    /// Shrinks to the given size.
+    ///
+    /// If `n_elements` is greater than the current size, does nothing.
+    pub fn truncate(&mut self, n_elements: usize) {
+        if n_elements <= self.n_elements {
+            self.n_elements = n_elements;
+        }
+    }
+
+    /// Returns a reference to the backing slice of blocks.
+    ///
+    /// Note that this does not respect element boundaries, and the
+    /// layout is not specified.
+    pub fn as_block_slice(&self) -> &[Block] {
+        &self.blocks
+    }
+
+    /// Returns a mutable reference to the backing slice of blocks.
+    ///
+    /// Note that this does not respect element boundaries, and the
+    /// layout is not specified.
+    pub fn as_mut_block_slice(&mut self) -> &mut [Block] {
+        &mut self.blocks
+    }
+
+
     /// Gets an iterator over the elements of the vector.
     pub fn iter(&self) -> Iter<Block> {
         Iter {
