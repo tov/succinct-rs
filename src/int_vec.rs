@@ -116,7 +116,7 @@ impl<N, Block> IntVec<N, Block>
 
         if let Some(n_bits) = n_elements.checked_mul(element_bits) {
             let mut result = n_bits / block_bits;
-            if n_bits % block_bits == 0 { result += 1 }
+            if n_bits % block_bits > 0 { result += 1 }
             result.to_usize()
         } else { None }
     }
