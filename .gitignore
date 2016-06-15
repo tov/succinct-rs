@@ -1,5 +1,4 @@
 target
 Cargo.lock
-src/raw.rs
 .idea
 *.iml
