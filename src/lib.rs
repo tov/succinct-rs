@@ -6,7 +6,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! succinct = "0.0.0"
+//! succinct = "*"
 //! ```
 //!
 //! to your `Cargo.toml` and
