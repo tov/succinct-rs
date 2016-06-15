@@ -1,6 +1,6 @@
 //! Traits for working with bit vectors.
 
-use int_vec::BlockType;
+use block_type::BlockType;
 
 /// Interface for read-only bit vector operations.
 pub trait BitVector<Block: BlockType> {

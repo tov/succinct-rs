@@ -5,12 +5,10 @@ use std::{fmt, mem};
 use num::{PrimInt, ToPrimitive};
 
 use bit_vector::{BitVector, BitVectorMut};
-
-mod block_type;
-pub use self::block_type::*;
+use block_type::BlockType;
 
 mod builder;
-pub use self::builder::*;
+pub use self::builder::IntVecBuilder;
 
 /// A vector of *k*-bit unsigned integers, where *k* is dynamic.
 ///

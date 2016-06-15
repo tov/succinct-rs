@@ -24,8 +24,13 @@
 
 extern crate num;
 
+mod block_type;
+
 pub mod int_vec;
 pub use int_vec::IntVec;
 
 pub mod bit_vector;
 pub use bit_vector::{Rank, Select};
+
+pub mod rank;
+pub use rank::RankSupport;
