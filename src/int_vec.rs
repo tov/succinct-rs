@@ -218,16 +218,19 @@ impl<N, Block> IntVec<N, Block>
             return;
         }
 
-        // let extra = element_bits - margin;
+        let extra = element_bits - margin;
 
-        // let block1 = self.blocks[address.block_index];
-        // let block2 = self.blocks[address.block_index + 1];
+        let old_block1 = self.blocks[address.block_index];
+        let old_block2 = self.blocks[address.block_index + 1];
 
-        // let high_bits = block1.get_bits(address.bit_offset, margin);
-        // let low_bits = block2.get_bits(0, extra);
+        let high_bits = element_value >> extra;
 
-        // (high_bits << extra) | low_bits
+        let new_block1 = old_block1.set_bits(address.bit_offset,
+                                             margin, high_bits);
+        let new_block2 = old_block2.set_bits(0, extra, element_value);
 
+        self.blocks[address.block_index] = new_block1;
+        self.blocks[address.block_index + 1] = new_block2;
     }
 
     /// Gets the bit at the given position.
@@ -246,3 +249,21 @@ impl<N, Block> IntVec<N, Block>
     }
 }
 
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn packed() {
+        let mut v = IntVec::<U32, u32>::new(10);
+        assert_eq!(0, v.get(0));
+        assert_eq!(0, v.get(9));
+    }
+
+    #[test]
+    #[should_panic]
+    fn packed_oob() {
+        let mut v = IntVec::<U32, u32>::new(10);
+        assert_eq!(0, v.get(10));
+    }
+}
