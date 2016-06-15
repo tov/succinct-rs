@@ -9,10 +9,10 @@ pub trait BitVector<Block: BlockType> {
 
     /// The length of the bit vector in bits.
     ///
-    /// Default implementation is `self.block_len() * 8`.
+    /// Default implementation is `self.block_len() * Block::nbits()`.
     #[inline]
     fn bit_len(&self) -> usize {
-        self.block_len() * 8
+        self.block_len() * Block::nbits()
     }
 
     /// Gets the value of the block at `position`
@@ -85,4 +85,37 @@ pub trait Rank {
 pub trait Select {
     /// Returns the position of the `index`th 1 bit.
     fn select(&self, index: usize) -> usize;
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn bit_len() {
+        let v = vec![ 0u32; 4 ];
+        assert_eq!(128, v.bit_len());
+    }
+
+    #[test]
+    fn block_len() {
+        let v = vec![ 0u32; 4 ];
+        assert_eq!(4, v.block_len());
+    }
+
+    #[test]
+    fn set_get_bit() {
+        let mut v = vec![ 0b10101010u8; 4 ];
+        assert!(  v.get_bit(0));
+        assert!(! v.get_bit(1));
+        assert!(  v.get_bit(2));
+        assert!(! v.get_bit(3));
+
+        v.set_bit(2, false);
+
+        assert!(  v.get_bit(0));
+        assert!(! v.get_bit(1));
+        assert!(! v.get_bit(2));
+        assert!(! v.get_bit(3));
+    }
 }

@@ -25,4 +25,7 @@
 extern crate num;
 
 pub mod int_vec;
-pub use self::int_vec::IntVec;
+pub use int_vec::IntVec;
+
+pub mod bit_vector;
+pub use bit_vector::{Rank, Select};

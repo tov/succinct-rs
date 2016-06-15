@@ -4,6 +4,8 @@ use std::{fmt, mem};
 
 use num::{PrimInt, ToPrimitive};
 
+use bit_vector::{BitVector, BitVectorMut};
+
 mod block_type;
 pub use self::block_type::*;
 
@@ -98,16 +100,6 @@ impl<Block: PrimInt> IntVec<Block> {
                 block_index: (bit_index / block_bits) as usize,
                 bit_offset: (bit_index % block_bits) as usize,
             }
-        }
-    }
-
-    #[inline]
-    fn bit_address(&self, bit_index: usize) -> Address {
-        // TODO: bounds check (since the slice might have extra space)
-
-        Address {
-            block_index: bit_index / Self::block_bits(),
-            bit_offset: bit_index % Self::block_bits(),
         }
     }
 
@@ -258,21 +250,6 @@ impl<Block: PrimInt> IntVec<Block> {
         }
     }
 
-    /// Gets the bit at the given position.
-    pub fn get_bit(&self, bit_index: usize) -> bool {
-        let address = self.bit_address(bit_index);
-        let block = self.blocks[address.block_index];
-        block.get_bit(address.bit_offset)
-    }
-
-    /// Sets the bit at the given position.
-    pub fn set_bit(&mut self, bit_index: usize, bit_value: bool) {
-        let address = self.bit_address(bit_index);
-        let old_block = self.blocks[address.block_index];
-        let new_block = old_block.set_bit(address.bit_offset, bit_value);
-        self.blocks[address.block_index] = new_block;
-    }
-
     /// The number of elements the vector can hold without reallocating.
     pub fn capacity(&self) -> usize {
         self.blocks.capacity() / self.element_bits
@@ -383,6 +360,10 @@ impl<Block: PrimInt> IntVec<Block> {
         &mut self.blocks
     }
 
+    /// Sets the size to 0 while retaining the allocated storage.
+    pub fn clear(&mut self) {
+        self.n_elements = 0;
+    }
 
     /// Gets an iterator over the elements of the vector.
     pub fn iter(&self) -> Iter<Block> {
@@ -424,6 +405,26 @@ impl<Block: PrimInt> IntVec<Block> {
 
     // TODO: fn align(&mut self) chooses element_bits...
 
+}
+
+impl<Block: BlockType> BitVector<Block> for IntVec<Block> {
+    fn block_len(&self) -> usize {
+        self.blocks.len()
+    }
+
+    fn bit_len(&self) -> usize {
+        self.element_bits * self.n_elements
+    }
+
+    fn get_block(&self, position: usize) -> Block {
+        self.blocks[position]
+    }
+}
+
+impl<Block: BlockType> BitVectorMut<Block> for IntVec<Block> {
+    fn set_block(&mut self, position: usize, value: Block) {
+        self.blocks[position] = value;
+    }
 }
 
 /// An iterator over the elements of an [`IntVec`](struct.IntVec.html).
@@ -651,5 +652,28 @@ mod test {
     fn value_overflow() {
         let mut v = IntVec::new(3);
         v.push(78); // 78 is too big
+    }
+
+    #[test]
+    fn bit_vector() {
+        use bit_vector::*;
+
+        let mut v = IntVec::new(1);
+        v.push(1);
+        v.push(0);
+        v.push(0);
+        v.push(1);
+
+        assert!(  v.get_bit(0));
+        assert!(! v.get_bit(1));
+        assert!(! v.get_bit(2));
+        assert!(  v.get_bit(3));
+
+        v.set_bit(1, true);
+
+        assert!(  v.get_bit(0));
+        assert!(  v.get_bit(1));
+        assert!(! v.get_bit(2));
+        assert!(  v.get_bit(3));
     }
 }
