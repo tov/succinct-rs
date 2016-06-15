@@ -12,7 +12,9 @@ if git status --porcelain | grep .; then
 fi
 
 find process -type f | sed 's@process/@@' | while read file; do
+    rm -f "$file"
     sed "s/@VERSION@/$VERSION/" "process/$file" > "$file"
+    chmod a-w "$file"
     git add "$file"
 done
 
