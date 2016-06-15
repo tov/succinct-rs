@@ -1,44 +1,33 @@
-//! Bit-packed vectors of `N`-bit unsigned integers.
+//! Bit-packed vectors of *k*-bit unsigned integers.
 
-use std::marker::PhantomData;
 use std::{fmt, mem};
 
 use num::{PrimInt, ToPrimitive};
 
-use typenum::{NonZero, Unsigned};
-pub use typenum::{U1, U2, U3, U4, U5, U6, U7, U8, U9, U10, U11, U12,
-                  U13, U14, U15, U16, U17, U18, U19, U20, U21, U22, U23,
-                  U24, U25, U26, U27, U28, U29, U30, U31, U32, U33, U34,
-                  U35, U36, U37, U38, U39, U40, U41, U42, U43, U44, U45,
-                  U46, U47, U48, U49, U50, U51, U52, U53, U54, U55, U56,
-                  U57, U58, U59, U60, U61, U62, U63, U64, };
-
 mod block_type;
 pub use self::block_type::*;
 
-/// A vector of `N`-bit unsigned integers.
+/// A vector of *k*-bit unsigned integers, where *k* is dynamic.
 ///
-/// `Block` gives the representation type. `N` must not exceed the number
-/// of bits in `Block`.
+/// Construct with [`IntVec::new`](#method.new).
+/// `Block` gives the representation type. The element size *k* can
+/// never exceed the number of bits in `Block`.
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct IntVec<N: NonZero + Unsigned, Block: BlockType = usize> {
-    blocks: Box<[Block]>,
+pub struct IntVec<Block: BlockType = usize> {
+    blocks: Vec<Block>,
     n_elements: usize,
-    marker: PhantomData<N>,
+    element_bits: usize,
 }
 
-/// A `IntVec` of `1`-bit integers is a bit vector.
-pub type BitVec<Block = usize> = IntVec<U1, Block>;
-
+/// The address of a bit, as an index to a block and the index of a bit
+/// in that block.
 #[derive(Clone, Copy, Debug)]
 struct Address {
     block_index: usize,
     bit_offset: usize,
 }
 
-impl<N, Block> IntVec<N, Block>
-        where N: NonZero + Unsigned, Block: PrimInt {
-
+impl<Block: PrimInt> IntVec<Block> {
     #[inline]
     fn block_bytes() -> usize {
         mem::size_of::<Block>()
@@ -52,20 +41,47 @@ impl<N, Block> IntVec<N, Block>
 
     /// The number of bits per elements.
     #[inline]
-    pub fn element_bits() -> usize {
-        N::to_usize()
+    pub fn element_bits(&self) -> usize {
+        self.element_bits
     }
 
     /// True if elements are packed one per block.
     #[inline]
-    pub fn is_packed() -> bool {
-        Self::element_bits() == Self::block_bits()
+    pub fn is_packed(&self) -> bool {
+        self.element_bits() == Self::block_bits()
     }
 
     /// True if elements are aligned within blocks.
     #[inline]
-    pub fn is_aligned() -> bool {
-        Self::block_bits() % Self::element_bits() == 0
+    pub fn is_aligned(&self) -> bool {
+        Self::block_bits() % self.element_bits() == 0
+    }
+
+    // TODO: fn align(&mut self) chooses element_bits...
+
+    // Computes the block size. Performs sufficient overflow checks that
+    // we shouldn’t have to repeat them each time we index, even though
+    // it’s nearly the same calculation.
+    #[inline]
+    fn compute_block_size(element_bits: usize, n_elements: usize)
+                          -> Option<usize> {
+
+        // We perform the size calculation explicitly in u64. This
+        // is because we use a bit size, which limits us to 1/8 of a
+        // 32-bit address space when usize is 32 bits. Instead, we
+        // perform the calculation in 64 bits and check for overflow.
+        let n_elements   = n_elements as u64;
+        let element_bits = element_bits as u64;
+        let block_bits   = Self::block_bits() as u64;
+
+        debug_assert!(block_bits >= element_bits,
+                      "Element bits cannot exceed block bits");
+
+        if let Some(n_bits) = n_elements.checked_mul(element_bits) {
+            let mut result = n_bits / block_bits;
+            if n_bits % block_bits > 0 { result += 1 }
+            result.to_usize()
+        } else { None }
     }
 
     #[inline]
@@ -74,14 +90,20 @@ impl<N, Block> IntVec<N, Block>
         assert!(element_index < self.n_elements,
                 "IntVec: index out of bounds.");
 
-        if Self::is_packed() {
+        // Special fast path: if the elements are laid out one per
+        // block, everything is easy.
+        if self.is_packed() {
             Address {
                 block_index: element_index,
                 bit_offset: 0,
             }
         } else {
+            // As before we perform the index calculation explicitly in
+            // u64. The bounds check at the top of this method, combined
+            // with the overflow checks at construction time, mean we don’t
+            // need to worry about overflows here.
             let element_index = element_index as u64;
-            let element_bits  = Self::element_bits() as u64;
+            let element_bits  = self.element_bits() as u64;
             let block_bits    = Self::block_bits() as u64;
 
             let bit_index     = element_index * element_bits;
@@ -103,45 +125,40 @@ impl<N, Block> IntVec<N, Block>
         }
     }
 
-    // Computes the block size while carefully avoiding overflow.
-    // Provided we can do this without overflowing at construction time,
-    // we shouldn’t have to check for overflow for indexing after that.
-    #[inline]
-    fn compute_block_size(n_elements: usize) -> Option<usize> {
-        let n_elements   = n_elements as u64;
-        let element_bits = Self::element_bits() as u64;
-        let block_bits   = Self::block_bits() as u64;
-
-        debug_assert!(block_bits >= element_bits,
-                      "Element bits cannot exceed block bits");
-
-        if let Some(n_bits) = n_elements.checked_mul(element_bits) {
-            let mut result = n_bits / block_bits;
-            if n_bits % block_bits > 0 { result += 1 }
-            result.to_usize()
-        } else { None }
-    }
-
-    /// Creates a new vector to hold the given number of elements.
+    /// Creates a new integer vector.
+    ///
+    /// # Arguments
+    ///
+    ///  - `element_bits` — the size of each element in bits; hence
+    ///    elements range from `0` to `2.pow(element_bits) - 1`.
+    ///
+    ///  - `n_elements` — the number of elements.
+    ///
+    /// # Result
+    ///
+    /// The new integer vector.
     ///
     /// # Panics
     ///
     /// Panics if any of:
     ///
-    ///   - `block_bits() < N`;
-    ///   - `n_elements * N` doesn’t fit in a `u64`; or
-    ///   - `ceiling(n_elements * N / block_bits())` doesn’t fit in a `usize`.
-    pub fn new(n_elements: usize) -> Self {
-        let block_size = Self::compute_block_size(n_elements)
+    ///   - `block_bits() < element_bits`;
+    ///   - `n_elements * element_bits` doesn’t fit in a `u64`; or
+    ///   - `n_elements * element_bits / block_bits()` (but with the
+    ///     division rounded up doesn’t fit in a `usize`.
+    ///
+    /// where `block_bits()` is the size of the `Block` type parameter.
+    pub fn new(element_bits: usize, n_elements: usize) -> Self {
+        let block_size = Self::compute_block_size(element_bits, n_elements)
             .expect("IntVec: size overflow");
 
         let mut vec = Vec::with_capacity(n_elements);
         vec.resize(block_size, Block::zero());
 
         IntVec {
-            blocks: vec.into_boxed_slice(),
+            blocks: vec,
             n_elements: n_elements,
-            marker: PhantomData,
+            element_bits: element_bits,
         }
     }
 
@@ -159,11 +176,11 @@ impl<N, Block> IntVec<N, Block>
 
     /// Returns the element at the given index.
     pub fn get(&self, element_index: usize) -> Block {
-        if Self::is_packed() {
+        if self.is_packed() {
             return self.blocks[element_index];
         }
 
-        let element_bits = Self::element_bits();
+        let element_bits = self.element_bits();
 
         if element_bits == 1 {
             if self.get_bit(element_index) {
@@ -196,15 +213,15 @@ impl<N, Block> IntVec<N, Block>
 
     /// Sets the element at the given index.
     pub fn set(&mut self, element_index: usize, element_value: Block) {
-        if Self::is_packed() {
+        if self.is_packed() {
             self.blocks[element_index] = element_value;
             return;
         }
 
-        debug_assert!(element_value < Block::one() << Self::element_bits(),
-                      "IntVec::set: value overflow");
+        let element_bits = self.element_bits();
 
-        let element_bits = Self::element_bits();
+        debug_assert!(element_value < Block::one() << element_bits,
+                      "IntVec::set: value overflow");
 
         if element_bits == 1 {
             self.set_bit(element_index, element_value == Block::one());
@@ -256,7 +273,7 @@ impl<N, Block> IntVec<N, Block>
     }
 
     /// Gets an iterator over the elements of the vector.
-    pub fn iter(&self) -> Iter<N, Block> {
+    pub fn iter(&self) -> Iter<Block> {
         Iter {
             vec: self,
             start: 0,
@@ -266,17 +283,13 @@ impl<N, Block> IntVec<N, Block>
 }
 
 /// An iterator over the elements of an [`IntVec`](struct.IntVec.html).
-pub struct Iter<'a, N: 'a, Block: 'a = usize>
-    where N: NonZero + Unsigned, Block: BlockType
-{
-    vec: &'a IntVec<N, Block>,
+pub struct Iter<'a, Block: BlockType + 'a = usize> {
+    vec: &'a IntVec<Block>,
     start: usize,
     limit: usize,
 }
 
-impl<'a, N, Block> Iterator for Iter<'a, N, Block>
-    where N: NonZero + Unsigned, Block: BlockType
-{
+impl<'a, Block: BlockType> Iterator for Iter<'a, Block> {
     type Item = Block;
     fn next(&mut self) -> Option<Self::Item> {
         if self.start < self.limit {
@@ -305,17 +318,13 @@ impl<'a, N, Block> Iterator for Iter<'a, N, Block>
     }
 }
 
-impl<'a, N, Block> ExactSizeIterator for Iter<'a, N, Block>
-    where N: NonZero + Unsigned, Block: BlockType
-{
+impl<'a, Block: BlockType> ExactSizeIterator for Iter<'a, Block> {
     fn len(&self) -> usize {
         self.limit - self.start
     }
 }
 
-impl<'a, N, Block> DoubleEndedIterator for Iter<'a, N, Block>
-    where N: NonZero + Unsigned, Block: BlockType
-{
+impl<'a, Block: BlockType> DoubleEndedIterator for Iter<'a, Block> {
     fn next_back(&mut self) -> Option<Self::Item> {
         if self.start < self.limit {
             self.limit -= 1;
@@ -325,28 +334,26 @@ impl<'a, N, Block> DoubleEndedIterator for Iter<'a, N, Block>
     }
 }
 
-impl<'a, N: 'a, Block: 'a> IntoIterator for &'a IntVec<N, Block>
-    where N: NonZero + Unsigned, Block: BlockType
-{
+impl<'a, Block: BlockType + 'a> IntoIterator for &'a IntVec<Block> {
     type Item = Block;
-    type IntoIter = Iter<'a, N, Block>;
+    type IntoIter = Iter<'a, Block>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
-impl<N, Block> fmt::Debug for IntVec<N, Block>
-    where N: NonZero + Unsigned, Block: BlockType + fmt::Debug
-{
+impl<Block> fmt::Debug for IntVec<Block>
+        where Block: BlockType + fmt::Debug {
+
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        try!(write!(formatter, "IntVec<U{}>{{ ", Self::element_bits()));
+        try!(write!(formatter, "IntVec {{ element_bits: {}, elements: {{ ", self.element_bits()));
 
         for element in self {
             try!(write!(formatter, "{:?}, ", element));
         }
 
-        write!(formatter, "}}")
+        write!(formatter, "}} }}")
     }
 }
 
@@ -356,13 +363,13 @@ mod test {
 
     #[test]
     fn create_empty() {
-        let v = IntVec::<U4>::new(0);
+        let v: IntVec = IntVec::new(4, 0);
         assert!(v.is_empty());
     }
 
     #[test]
     fn packed() {
-        let mut v = IntVec::<U32, u32>::new(10);
+        let mut v = IntVec::<u32>::new(32, 10);
         assert_eq!(10, v.len());
 
         assert_eq!(0, v.get(0));
@@ -385,13 +392,13 @@ mod test {
     #[test]
     #[should_panic]
     fn packed_oob() {
-        let v = IntVec::<U32, u32>::new(10);
+        let v = IntVec::<u32>::new(32, 10);
         assert_eq!(0, v.get(10));
     }
 
     #[test]
     fn aligned() {
-        let mut v = IntVec::<U4>::new(20);
+        let mut v = IntVec::new(4, 20);
         assert_eq!(20, v.len());
 
         assert_eq!(0, v.get(0));
@@ -417,13 +424,13 @@ mod test {
     #[test]
     #[should_panic]
     fn aligned_oob() {
-        let v = IntVec::<U4>::new(20);
+        let v = IntVec::new(4, 20);
         assert_eq!(0, v.get(20));
     }
 
     #[test]
     fn unaligned() {
-        let mut v = IntVec::<U5>::new(20);
+        let mut v = IntVec::new(5, 20);
         assert_eq!(20, v.len());
 
         assert_eq!(0, v.get(0));
@@ -449,13 +456,13 @@ mod test {
     #[test]
     #[should_panic]
     fn unaligned_oob() {
-        let v = IntVec::<U5>::new(20);
+        let v = IntVec::new(5, 20);
         assert_eq!(0, v.get(20));
     }
 
     #[test]
     fn iter() {
-        let mut v = IntVec::<U13, u16>::new(5);
+        let mut v = IntVec::<u16>::new(13, 5);
         v.set(0, 1);
         v.set(1, 1);
         v.set(2, 2);
@@ -467,14 +474,14 @@ mod test {
 
     #[test]
     fn debug() {
-        let mut v = IntVec::<U13, u16>::new(5);
+        let mut v = IntVec::<u16>::new(13, 5);
         v.set(0, 1);
         v.set(1, 1);
         v.set(2, 2);
         v.set(3, 3);
         v.set(4, 5);
 
-        assert_eq!("IntVec<U13>{ 1, 1, 2, 3, 5, }".to_owned(),
+        assert_eq!("IntVec { element_bits: 13, elements: { 1, 1, 2, 3, 5, } }".to_owned(),
                    format!("{:?}", v));
     }
 }

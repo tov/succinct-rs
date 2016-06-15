@@ -23,7 +23,6 @@
 #![cfg_attr(feature = "clippy", plugin(clippy))]
 
 extern crate num;
-extern crate typenum;
 
 pub mod int_vec;
 pub use self::int_vec::IntVec;
