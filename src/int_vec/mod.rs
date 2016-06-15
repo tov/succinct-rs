@@ -13,7 +13,8 @@ pub use typenum::{U1, U2, U3, U4, U5, U6, U7, U8, U9, U10, U11, U12,
                   U46, U47, U48, U49, U50, U51, U52, U53, U54, U55, U56,
                   U57, U58, U59, U60, U61, U62, U63, U64, };
 
-use block_type::BlockType;
+mod block_type;
+pub use self::block_type::*;
 
 /// A vector of `N`-bit unsigned integers.
 ///
