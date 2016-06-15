@@ -290,6 +290,19 @@ impl<'a, N, Block> Iterator for Iter<'a, N, Block>
         let len = self.len();
         (len, Some(len))
     }
+
+    fn count(self) -> usize {
+        self.len()
+    }
+
+    fn last(mut self) -> Option<Self::Item> {
+        self.next_back()
+    }
+
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        self.start = self.start.checked_add(n).unwrap_or(self.limit);
+        self.next()
+    }
 }
 
 impl<'a, N, Block> ExactSizeIterator for Iter<'a, N, Block>
@@ -425,5 +438,17 @@ mod test {
     fn unaligned_oob() {
         let v = IntVec::<U5>::new(20);
         assert_eq!(0, v.get(20));
+    }
+
+    #[test]
+    fn iter() {
+        let mut v = IntVec::<U13, u16>::new(5);
+        v.set(0, 1);
+        v.set(1, 1);
+        v.set(2, 2);
+        v.set(3, 3);
+        v.set(4, 5);
+
+        assert_eq!(vec![1, 1, 2, 3, 5], v.iter().collect::<Vec<_>>());
     }
 }
