@@ -20,7 +20,7 @@ pub use self::block_type::*;
 ///
 /// `Block` gives the representation type. `N` must not exceed the number
 /// of bits in `Block`.
-#[derive(Clone)]
+#[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct IntVec<N: NonZero + Unsigned, Block: BlockType = usize> {
     blocks: Box<[Block]>,
     n_elements: usize,
@@ -254,15 +254,91 @@ impl<N, Block> IntVec<N, Block>
         let new_block = old_block.set_bit(address.bit_offset, bit_value);
         self.blocks[address.block_index] = new_block;
     }
+
+    /// Gets an iterator over the elements of the vector.
+    pub fn iter(&self) -> Iter<N, Block> {
+        Iter {
+            vec: self,
+            start: 0,
+            limit: self.len()
+        }
+    }
 }
+
+/// An iterator over the elements of an [`IntVec`](struct.IntVec.html).
+pub struct Iter<'a, N: 'a, Block: 'a = usize>
+    where N: NonZero + Unsigned, Block: BlockType
+{
+    vec: &'a IntVec<N, Block>,
+    start: usize,
+    limit: usize,
+}
+
+impl<'a, N, Block> Iterator for Iter<'a, N, Block>
+    where N: NonZero + Unsigned, Block: BlockType
+{
+    type Item = Block;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.start < self.limit {
+            let result = self.vec.get(self.start);
+            self.start += 1;
+            Some(result)
+        } else { None }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.len();
+        (len, Some(len))
+    }
+}
+
+impl<'a, N, Block> ExactSizeIterator for Iter<'a, N, Block>
+    where N: NonZero + Unsigned, Block: BlockType
+{
+    fn len(&self) -> usize {
+        self.limit - self.start
+    }
+}
+
+impl<'a, N, Block> DoubleEndedIterator for Iter<'a, N, Block>
+    where N: NonZero + Unsigned, Block: BlockType
+{
+    fn next_back(&mut self) -> Option<Self::Item> {
+        if self.start < self.limit {
+            self.limit -= 1;
+            Some(self.vec.get(self.limit))
+        } else { None }
+
+    }
+}
+
+impl<'a, N: 'a, Block: 'a> IntoIterator for &'a IntVec<N, Block>
+    where N: NonZero + Unsigned, Block: BlockType
+{
+    type Item = Block;
+    type IntoIter = Iter<'a, N, Block>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
 
 #[cfg(test)]
 mod test {
     use super::*;
 
     #[test]
+    fn create_empty() {
+        let v = IntVec::<U4>::new(0);
+        assert!(v.is_empty());
+    }
+
+    #[test]
     fn packed() {
         let mut v = IntVec::<U32, u32>::new(10);
+        assert_eq!(10, v.len());
+
         assert_eq!(0, v.get(0));
         assert_eq!(0, v.get(9));
 
@@ -290,6 +366,8 @@ mod test {
     #[test]
     fn aligned() {
         let mut v = IntVec::<U4>::new(20);
+        assert_eq!(20, v.len());
+
         assert_eq!(0, v.get(0));
         assert_eq!(0, v.get(9));
 
@@ -320,6 +398,8 @@ mod test {
     #[test]
     fn unaligned() {
         let mut v = IntVec::<U5>::new(20);
+        assert_eq!(20, v.len());
+
         assert_eq!(0, v.get(0));
         assert_eq!(0, v.get(9));
 
