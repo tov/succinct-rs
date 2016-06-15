@@ -22,6 +22,16 @@ pub struct IntVec<Block: BlockType = usize> {
     element_bits: usize,
 }
 
+/// Describes how to initialize the memory of an `IntVec`.
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Fill<Block: BlockType = usize> {
+    /// Initialize each block—not each element—to the value.
+    Block(Block),
+    /// Initialize each element to the value. (What should happen to
+    /// extra bits? Mask out or panic?)
+    Element(Block),
+}
+
 /// The address of a bit, as an index to a block and the index of a bit
 /// in that block.
 #[derive(Clone, Copy, Debug)]
@@ -31,12 +41,13 @@ struct Address {
 }
 
 impl<Block: PrimInt> IntVec<Block> {
-    // Computes the block size. Performs sufficient overflow checks that
-    // we shouldn’t have to repeat them each time we index, even though
-    // it’s nearly the same calculation.
+    // Computes the number of blocks from the number of elements.
+    // Performs sufficient overflow checks that we shouldn’t have to
+    // repeat them each time we index, even though it’s nearly the
+    // same calculation.
     #[inline]
-    fn compute_block_size(element_bits: usize, n_elements: usize)
-                          -> Result<usize, &'static str> {
+    fn compute_n_blocks(element_bits: usize, n_elements: usize)
+                        -> Result<usize, &'static str> {
 
         // We perform the size calculation explicitly in u64. This
         // is because we use a bit size, which limits us to 1/8 of a
@@ -126,7 +137,7 @@ impl<Block: PrimInt> IntVec<Block> {
     ///
     /// where `block_bits()` is the size of the `Block` type parameter.
     pub fn is_okay_size(element_bits: usize, n_elements: usize) -> bool {
-        Self::compute_block_size(element_bits, n_elements).is_ok()
+        Self::compute_n_blocks(element_bits, n_elements).is_ok()
     }
 
     /// Returns the number of elements in the vector.
@@ -272,6 +283,29 @@ impl<Block: PrimInt> IntVec<Block> {
         self.blocks.len() / self.element_bits
     }
 
+    /// Resizes to the given number of elements, filling if necessary.
+    pub fn resize(&mut self, n_elements: usize, fill: Fill<Block>) {
+        if n_elements <= self.n_elements {
+            self.n_elements = n_elements;
+        } else {
+            match fill {
+                Fill::Block(block) => {
+                    let n_blocks = Self::compute_n_blocks(self.element_bits,
+                                                          n_elements)
+                        .unwrap();
+                    self.blocks.resize(n_blocks, block);
+                    self.n_elements = n_elements;
+                }
+
+                Fill::Element(element) => {
+                    for _ in self.n_elements .. n_elements {
+                        self.push(element);
+                    }
+                }
+            }
+        }
+    }
+
     /// Reserves capacity for at least `additional` more elements to be
     /// inserted in the given `IntVec<Block>`.
     ///
@@ -287,8 +321,8 @@ impl<Block: PrimInt> IntVec<Block> {
     pub fn reserve(&mut self, additional: usize) {
         let goal_elements = self.len().checked_add(additional)
             .expect("IntVec::reserve: size overflow");
-        let goal_blocks = Self::compute_block_size(self.element_bits,
-                                                   goal_elements)
+        let goal_blocks = Self::compute_n_blocks(self.element_bits,
+                                                 goal_elements)
             .unwrap();
         let difference = self.blocks.capacity().saturating_sub(goal_blocks);
         self.blocks.reserve(difference);
@@ -309,8 +343,8 @@ impl<Block: PrimInt> IntVec<Block> {
     pub fn reserve_exact(&mut self, additional: usize) {
         let goal_elements = self.len().checked_add(additional)
             .expect("IntVec::reserve: size overflow");
-        let goal_blocks = Self::compute_block_size(self.element_bits,
-                                                   goal_elements)
+        let goal_blocks = Self::compute_n_blocks(self.element_bits,
+                                                 goal_elements)
             .unwrap();
         let difference = self.blocks.capacity().saturating_sub(goal_blocks);
         self.blocks.reserve_exact(difference);

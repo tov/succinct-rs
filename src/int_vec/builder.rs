@@ -26,6 +26,8 @@ impl<Block: BlockType> IntVecBuilder<Block> {
     /// Creates a new `IntVecBuilder` with `element_bits` bits per
     /// elements.
     pub fn new(element_bits: usize) -> Self {
+        assert!(element_bits != 0,
+                "IntVecBuilder: cannot have 0-bit elements.");
         IntVecBuilder {
             element_bits: element_bits,
             n_elements: 0,
@@ -41,28 +43,18 @@ impl<Block: BlockType> IntVecBuilder<Block> {
     ///
     /// Panics if the size conditions of [`IntVec::<Block>::is_okay_size()`](struct.IntVec.html#method.is_okay_size) are not met.
     pub fn build(&self) -> IntVec<Block> {
-        let block_size
-            = IntVec::<Block>::compute_block_size(self.element_bits,
-                                                  self.capacity)
+        let n_blocks
+            = IntVec::<Block>::compute_n_blocks(self.element_bits,
+                                                self.capacity)
             .expect("IntVec: size overflow");
 
         let mut result = IntVec {
-            blocks: Vec::with_capacity(block_size),
-            n_elements: self.n_elements,
+            blocks: Vec::with_capacity(n_blocks),
+            n_elements: 0,
             element_bits: self.element_bits,
         };
 
-        match self.fill {
-            Fill::Block(block) => {
-                // TODO: This fills to capacity, not to size
-                result.blocks.resize(block_size, block);
-            }
-            Fill::Element(element) => {
-                for _ in 0 .. self.n_elements {
-                    result.push(element);
-                }
-            }
-        }
+        result.resize(self.n_elements, self.fill);
 
         result
     }
@@ -119,14 +111,4 @@ impl<Block: BlockType> IntVecBuilder<Block> {
         self.fill = Fill::Element(element);
         self
     }
-}
-
-/// Describes how to initialize the memory of an `IntVec`.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Fill<Block: BlockType = usize> {
-    /// Initialize each block—not each element—to the value.
-    Block(Block),
-    /// Initialize each element to the value. (What should happen to
-    /// extra bits? Mask out or panic?)
-    Element(Block),
 }
