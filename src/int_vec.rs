@@ -13,21 +13,7 @@ pub use typenum::{U1, U2, U3, U4, U5, U6, U7, U8, U9, U10, U11, U12,
                   U46, U47, U48, U49, U50, U51, U52, U53, U54, U55, U56,
                   U57, U58, U59, U60, U61, U62, U63, U64, };
 
-pub trait BlockType: PrimInt {
-    #[inline]
-    fn element_mask(element_bits: usize) -> Self {
-        (Self::one() << element_bits) - Self::one()
-    }
-
-    #[inline]
-    fn get_bits(self, start: usize, len: usize) -> Self {
-        let block_bits = 8 * mem::size_of::<Self>();
-        let limit      = start + len;
-        (self >> (block_bits - limit)) & Self::element_mask(len)
-    }
-}
-
-impl<Block: PrimInt> BlockType for Block { }
+use block_type::BlockType;
 
 /// A vector of `N`-bit unsigned integers.
 ///
@@ -39,6 +25,9 @@ pub struct IntVec<N: NonZero + Unsigned, Block: BlockType = usize> {
     n_elements: usize,
     marker: PhantomData<N>,
 }
+
+/// A `IntVec` of `1`-bit integers is a bit vector.
+pub type BitVec<Block = usize> = IntVec<U1, Block>;
 
 #[derive(Clone, Copy, Debug)]
 struct Address {
@@ -103,6 +92,16 @@ impl<N, Block> IntVec<N, Block>
         }
     }
 
+    #[inline]
+    fn bit_address(&self, bit_index: usize) -> Address {
+        // TODO: bounds check (since the slice might have extra space)
+
+        Address {
+            block_index: bit_index / Self::block_bits(),
+            bit_offset: bit_index % Self::block_bits(),
+        }
+    }
+
     // Computes the block size while carefully avoiding overflow.
     // Provided we can do this without overflowing at construction time,
     // we shouldn’t have to check for overflow for indexing after that.
@@ -112,8 +111,8 @@ impl<N, Block> IntVec<N, Block>
         let element_bits = Self::element_bits() as u64;
         let block_bits   = Self::block_bits() as u64;
 
-        assert!(block_bits >= element_bits,
-                "Element bits cannot exceed block bits");
+        debug_assert!(block_bits >= element_bits,
+                      "Element bits cannot exceed block bits");
 
         if let Some(n_bits) = n_elements.checked_mul(element_bits) {
             let mut result = n_bits / block_bits;
@@ -157,8 +156,17 @@ impl<N, Block> IntVec<N, Block>
             return self.blocks[element_index];
         }
 
-        let block_bits = Self::block_bits();
         let element_bits = Self::element_bits();
+
+        if element_bits == 1 {
+            if self.get_bit(element_index) {
+                return Block::one();
+            } else {
+                return Block::zero();
+            }
+        }
+
+        let block_bits = Self::block_bits();
 
         let address = self.element_address(element_index);
         let margin = block_bits - address.bit_offset;
@@ -179,5 +187,62 @@ impl<N, Block> IntVec<N, Block>
         (high_bits << extra) | low_bits
     }
 
+    /// Sets the element at the given index.
+    pub fn set(&mut self, element_index: usize, element_value: Block) {
+        if Self::is_packed() {
+            self.blocks[element_index] = element_value;
+            return;
+        }
+
+        debug_assert!(element_value < Block::one() << Self::element_bits(),
+                      "IntVec::set: value overflow");
+
+        let element_bits = Self::element_bits();
+
+        if element_bits == 1 {
+            self.set_bit(element_index, element_value == Block::one());
+            return;
+        }
+
+        let block_bits = Self::block_bits();
+
+        let address = self.element_address(element_index);
+        let margin = block_bits - address.bit_offset;
+
+        if margin <= element_bits {
+            let old_block = self.blocks[address.block_index];
+            let new_block = old_block.set_bits(address.bit_offset,
+                                               element_bits,
+                                               element_value);
+            self.blocks[address.block_index] = new_block;
+            return;
+        }
+
+        // let extra = element_bits - margin;
+
+        // let block1 = self.blocks[address.block_index];
+        // let block2 = self.blocks[address.block_index + 1];
+
+        // let high_bits = block1.get_bits(address.bit_offset, margin);
+        // let low_bits = block2.get_bits(0, extra);
+
+        // (high_bits << extra) | low_bits
+
+    }
+
+    /// Gets the bit at the given position.
+    pub fn get_bit(&self, bit_index: usize) -> bool {
+        let address = self.bit_address(bit_index);
+        let block = self.blocks[address.block_index];
+        block.get_bit(address.bit_offset)
+    }
+
+    /// Sets the bit at the given position.
+    pub fn set_bit(&mut self, bit_index: usize, bit_value: bool) {
+        let address = self.bit_address(bit_index);
+        let old_block = self.blocks[address.block_index];
+        let new_block = old_block.set_bit(address.bit_offset, bit_value);
+        self.blocks[address.block_index] = new_block;
+    }
 }
 

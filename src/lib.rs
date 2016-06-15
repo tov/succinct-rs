@@ -25,4 +25,5 @@
 extern crate num;
 extern crate typenum;
 
+pub mod block_type;
 pub mod int_vec;
