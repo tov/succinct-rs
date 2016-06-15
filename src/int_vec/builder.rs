@@ -46,14 +46,25 @@ impl<Block: BlockType> IntVecBuilder<Block> {
                                                   self.capacity)
             .expect("IntVec: size overflow");
 
-        let mut vec = Vec::with_capacity(block_size);
-        vec.resize(block_size, Block::zero());
-
-        IntVec {
-            blocks: vec,
+        let mut result = IntVec {
+            blocks: Vec::with_capacity(block_size),
             n_elements: self.n_elements,
             element_bits: self.element_bits,
+        };
+
+        match self.fill {
+            Fill::Block(block) => {
+                // TODO: This fills to capacity, not to size
+                result.blocks.resize(block_size, block);
+            }
+            Fill::Element(element) => {
+                for _ in 0 .. self.n_elements {
+                    result.push(element);
+                }
+            }
         }
+
+        result
     }
 
     /// Sets the element size to `element_bits`.

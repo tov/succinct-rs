@@ -280,7 +280,10 @@ impl<Block: PrimInt> IntVec<Block> {
     ///
     /// # Panics
     ///
-    /// Panics if the size conditions of [`IntVec::<Block>::is_okay_size()`](struct.IntVec.html#method.is_okay_size) are not met. This will happen if the new capacity overflows `usize` or the total number of bits overflows `u64`.
+    /// Panics if the size conditions of
+    /// [`IntVec::<Block>::is_okay_size()`](struct.IntVec.html#method.is_okay_size)
+    /// are not met. This will happen if the new capacity overflows `usize`
+    /// or the total number of bits overflows `u64`.
     pub fn reserve(&mut self, additional: usize) {
         let goal_elements = self.len().checked_add(additional)
             .expect("IntVec::reserve: size overflow");
@@ -299,7 +302,10 @@ impl<Block: PrimInt> IntVec<Block> {
     ///
     /// # Panics
     ///
-    /// Panics if the size conditions of [`IntVec::<Block>::is_okay_size()`](struct.IntVec.html#method.is_okay_size) are not met. This will happen if the new capacity overflows `usize` or the total number of bits overflows `u64`.
+    /// Panics if the size conditions of
+    /// [`IntVec::<Block>::is_okay_size()`](struct.IntVec.html#method.is_okay_size)
+    /// are not met. This will happen if the new capacity overflows `usize`
+    /// or the total number of bits overflows `u64`.
     pub fn reserve_exact(&mut self, additional: usize) {
         let goal_elements = self.len().checked_add(additional)
             .expect("IntVec::reserve: size overflow");
