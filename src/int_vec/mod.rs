@@ -5,6 +5,7 @@ use std::{fmt, mem};
 use num::{PrimInt, ToPrimitive};
 
 use storage::{BitStore, BitStoreMut, BlockType};
+use space_usage::SpaceUsage;
 
 pub mod builder;
 pub use self::builder::IntVecBuilder;
@@ -518,6 +519,15 @@ impl<Block> fmt::Debug for IntVec<Block>
         }
 
         write!(formatter, "}} }}")
+    }
+}
+
+impl<A: BlockType> SpaceUsage for IntVec<A> {
+    #[inline]
+    fn is_statically_sized() -> bool { false }
+
+    fn dynamic_bytes(&self) -> usize {
+        self.blocks.capacity() * mem::size_of::<A>()
     }
 }
 
