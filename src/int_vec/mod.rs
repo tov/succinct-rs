@@ -10,9 +10,12 @@ use block_type::BlockType;
 mod builder;
 pub use self::builder::IntVecBuilder;
 
-/// A vector of *k*-bit unsigned integers, where *k* is dynamic.
+/// A vector of *k*-bit unsigned integers, where *k* is determined at
+/// run time.
 ///
-/// Construct with [`IntVec::new`](#method.new).
+/// Construct with [`IntVec::new`](#method.new), or for more control,
+/// [`IntVecBuilder`](struct.IntVecBuilder.html).
+///
 /// `Block` gives the representation type. The element size *k* can
 /// never exceed the number of bits in `Block`.
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
@@ -178,6 +181,11 @@ impl<Block: PrimInt> IntVec<Block> {
     }
 
     /// Sets the element at the given index.
+    ///
+    /// # Panics
+    ///
+    /// Debug mode only: Panics if `element_value` is too large to
+    /// fit in the element size. (TODO: What’s the right thing here?)
     pub fn set(&mut self, element_index: u64, element_value: Block) {
         if self.is_packed() {
             self.blocks[element_index as usize] = element_value;
