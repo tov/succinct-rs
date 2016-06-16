@@ -2,19 +2,33 @@
 
 use std::marker::PhantomData;
 
-use bit_vector::{BitVector, Rank};
-use block_type::BlockType;
+use storage::{BitStore, BlockType};
 use int_vec::{IntVec, IntVecBuilder};
 
-/// Add-on to `BitVector` to support fast rank queries.
+/// Interface for types that support rank queries.
+pub trait Rank {
+    /// Returns the rank at a given position.
+    ///
+    /// This is the number of 1s up to and including that position.
+    fn rank(&self, position: u64) -> u64;
+
+    /// Returns the rank of 0s at a given position.
+    ///
+    /// This is the number of 0s up to and including that position.
+    fn rank0(&self, position: u64) -> u64 {
+        position + 1 - self.rank(position)
+    }
+}
+
+/// Add-on to `BitStore` to support fast rank queries.
 ///
 /// Construct with `RankSupport::new`.
 #[derive(Clone, Debug)]
-pub struct RankSupport<'a, Block, BV: 'a + ?Sized>
+pub struct RankSupport<'a, Block, Store: 'a + ?Sized>
     where Block: BlockType,
-          BV: BitVector<Block>
+          Store: BitStore<Block>
 {
-    bit_store: &'a BV,
+    bit_store: &'a Store,
     large_block_size: usize,
     large_block_ranks: IntVec<u64>,
     small_block_ranks: IntVec<u64>,
@@ -27,11 +41,11 @@ fn ceil_log2<Block: BlockType>(block: Block) -> usize {
     Block::nbits() - (block - Block::one()).leading_zeros() as usize
 }
 
-impl<'a, Block, BV: 'a + ?Sized> RankSupport<'a, Block, BV>
-    where Block: BlockType, BV: BitVector<Block>
+impl<'a, Block, Store: 'a + ?Sized> RankSupport<'a, Block, Store>
+    where Block: BlockType, Store: BitStore<Block>
 {
     /// Creates a new rank support structure for the given bit vector.
-    pub fn new(bits: &'a BV) -> Self {
+    pub fn new(bits: &'a Store) -> Self {
         let n = bits.bit_len();
         let lg_n = ceil_log2(n);
         let lg2_n = lg_n * lg_n;
@@ -87,8 +101,8 @@ impl<'a, Block, BV: 'a + ?Sized> RankSupport<'a, Block, BV>
     }
 }
 
-impl<'a, Block, BV: 'a + ?Sized> Rank for RankSupport<'a, Block, BV>
-    where Block: BlockType, BV: BitVector<Block>
+impl<'a, Block, Store: 'a + ?Sized> Rank for RankSupport<'a, Block, Store>
+    where Block: BlockType, Store: BitStore<Block>
 {
     fn rank(&self, position: u64) -> u64 {
         let small_block_size = Block::nbits() as u64;
@@ -111,7 +125,6 @@ impl<'a, Block, BV: 'a + ?Sized> Rank for RankSupport<'a, Block, BV>
 #[cfg(test)]
 mod test {
     use super::*;
-    use bit_vector::Rank;
 
     #[test]
     fn rank() {

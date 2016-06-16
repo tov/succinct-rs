@@ -4,10 +4,9 @@ use std::{fmt, mem};
 
 use num::{PrimInt, ToPrimitive};
 
-use bit_vector::{BitVector, BitVectorMut};
-use block_type::BlockType;
+use storage::{BitStore, BitStoreMut, BlockType};
 
-mod builder;
+pub mod builder;
 pub use self::builder::IntVecBuilder;
 
 /// A vector of *k*-bit unsigned integers, where *k* is determined at
@@ -413,7 +412,7 @@ impl<Block: PrimInt> IntVec<Block> {
 
 }
 
-impl<Block: BlockType> BitVector<Block> for IntVec<Block> {
+impl<Block: BlockType> BitStore<Block> for IntVec<Block> {
     fn block_len(&self) -> usize {
         self.blocks.len()
     }
@@ -427,7 +426,7 @@ impl<Block: BlockType> BitVector<Block> for IntVec<Block> {
     }
 }
 
-impl<Block: BlockType> BitVectorMut<Block> for IntVec<Block> {
+impl<Block: BlockType> BitStoreMut<Block> for IntVec<Block> {
     fn set_block(&mut self, position: usize, value: Block) {
         self.blocks[position] = value;
     }
@@ -674,7 +673,7 @@ mod test {
 
     #[test]
     fn bit_vector() {
-        use bit_vector::*;
+        use storage::*;
 
         let mut v = IntVec::new(1);
         v.push(1);

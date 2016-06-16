@@ -1,7 +1,9 @@
+//! API for configuring and building `IntVec`s.
+
 use std::marker::PhantomData;
 
 use super::*;
-use block_type::BlockType;
+use storage::BlockType;
 
 /// Builder for configuring and constructing an `IntVec`.
 #[derive(Clone, Debug)]
