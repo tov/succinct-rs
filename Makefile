@@ -27,8 +27,8 @@ upload-doc:
 
 release:
 	bin/prepare_release.sh $(VERSION)
-	make upload-doc
 	cargo publish
+	make upload-doc
 
 clean:
 	cargo clean
