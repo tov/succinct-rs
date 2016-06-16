@@ -27,11 +27,11 @@ extern crate num;
 mod block_type;
 pub use block_type::*;
 
-mod int_vec;
+pub mod int_vec;
 pub use int_vec::{IntVec, IntVecBuilder};
 
-mod bit_vector;
+pub mod bit_vector;
 pub use bit_vector::{Rank, Select};
 
-mod rank;
+pub mod rank;
 pub use rank::RankSupport;
