@@ -1,7 +1,8 @@
 #!/bin/sh
 
 PROJ_ROOT="$(dirname "$0")/.."
-VERSION=$(cat "$PROJ_ROOT"/.VERSION)
+VERSION_FILE="$PROJ_ROOT"/.VERSION
+VERSION=$(cat "$VERSION_FILE")
 
 find process -type f | sed 's@process/@@' | while read file; do
     rm -f "$file"
