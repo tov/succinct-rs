@@ -16,7 +16,8 @@ pub struct BinSearchSelect<'a, Rank: RankSupport + 'a> {
 }
 
 /// Creates a new binary search select support based on a rank support.
-impl<'a, Rank: RankSupport + 'a> BinSearchSelect<'a, Rank> {
+impl<'a, Rank: RankSupport + 'a>
+BinSearchSelect<'a, Rank> {
     /// Creates a new binary search selection support given a rank
     /// support.
     pub fn new(rank_support: &'a Rank) -> Self {
@@ -29,7 +30,8 @@ impl<'a, Rank: RankSupport + 'a> BinSearchSelect<'a, Rank> {
     }
 }
 
-impl<'a, Rank: RankSupport + 'a> BitStore for BinSearchSelect<'a, Rank> {
+impl<'a, Rank: RankSupport + 'a>
+BitStore for BinSearchSelect<'a, Rank> {
     type Block = Rank::Block;
 
     fn block_len(&self) -> usize {
@@ -49,13 +51,15 @@ impl<'a, Rank: RankSupport + 'a> BitStore for BinSearchSelect<'a, Rank> {
     }
 }
 
-impl<'a, Rank: RankSupport + 'a> RankSupport for BinSearchSelect<'a, Rank> {
+impl<'a, Rank: RankSupport + 'a>
+RankSupport for BinSearchSelect<'a, Rank> {
     fn rank(&self, index: u64) -> u64 {
         self.rank_support.rank(index)
     }
 }
 
-impl<'a, Rank: RankSupport + 'a> SelectSupport for BinSearchSelect<'a, Rank> {
+impl<'a, Rank: RankSupport + 'a>
+SelectSupport for BinSearchSelect<'a, Rank> {
     fn select(&self, index: u64) -> Option<u64> {
         // To find the `index`th 1, we find the position where
         // the rank goes to `index + 1`.

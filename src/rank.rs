@@ -37,7 +37,8 @@ fn ceil_log2<Block: BlockType>(block: Block) -> usize {
     Block::nbits() - (block - Block::one()).leading_zeros() as usize
 }
 
-impl<'a, Store: BitStore + ?Sized + 'a> JacobsonRank<'a, Store> {
+impl<'a, Store: BitStore + ?Sized + 'a>
+JacobsonRank<'a, Store> {
     /// Creates a new rank support structure for the given bit vector.
     pub fn new(bits: &'a Store) -> Self {
         let n = bits.bit_len();
@@ -94,7 +95,8 @@ impl<'a, Store: BitStore + ?Sized + 'a> JacobsonRank<'a, Store> {
     }
 }
 
-impl<'a, Store: ?Sized + BitStore + 'a> BitStore for JacobsonRank<'a, Store> {
+impl<'a, Store: ?Sized + BitStore + 'a>
+BitStore for JacobsonRank<'a, Store> {
     type Block = Store::Block;
 
     fn block_len(&self) -> usize {
@@ -115,7 +117,8 @@ impl<'a, Store: ?Sized + BitStore + 'a> BitStore for JacobsonRank<'a, Store> {
 }
 
 impl<'a, Store: ?Sized + BitStore + 'a>
-RankSupport for JacobsonRank<'a, Store> {
+RankSupport for
+JacobsonRank<'a, Store> {
     fn rank(&self, position: u64) -> u64 {
         // Rank for any position past the end is the rank of the
         // last position.
