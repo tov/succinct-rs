@@ -6,3 +6,7 @@ pub trait Select {
     fn select(&self, index: u64) -> u64;
 }
 
+pub struct BinSearchSelect {
+
+
+}

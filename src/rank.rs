@@ -1,6 +1,6 @@
 //! Data structure to support fast rank queries.
 
-use std::marker::PhantomData;
+use num::PrimInt;
 
 use storage::{BitStore, BlockType};
 use int_vec::{IntVec, IntVecBuilder};
@@ -22,17 +22,13 @@ pub trait Rank {
 
 /// Add-on to `BitStore` to support fast rank queries.
 ///
-/// Construct with `RankSupport::new`.
+/// Construct with `JacobsonRank::new`.
 #[derive(Clone, Debug)]
-pub struct RankSupport<'a, Block, Store: 'a + ?Sized>
-    where Block: BlockType,
-          Store: BitStore<Block>
-{
+pub struct JacobsonRank<'a, Store: ?Sized + BitStore + 'a> {
     bit_store: &'a Store,
     large_block_size: usize,
     large_block_ranks: IntVec<u64>,
     small_block_ranks: IntVec<u64>,
-    marker: PhantomData<Block>
 }
 
 fn ceil_log2<Block: BlockType>(block: Block) -> usize {
@@ -41,16 +37,14 @@ fn ceil_log2<Block: BlockType>(block: Block) -> usize {
     Block::nbits() - (block - Block::one()).leading_zeros() as usize
 }
 
-impl<'a, Block, Store: 'a + ?Sized> RankSupport<'a, Block, Store>
-    where Block: BlockType, Store: BitStore<Block>
-{
+impl<'a, Store: BitStore + ?Sized + 'a> JacobsonRank<'a, Store> {
     /// Creates a new rank support structure for the given bit vector.
     pub fn new(bits: &'a Store) -> Self {
         let n = bits.bit_len();
         let lg_n = ceil_log2(n);
         let lg2_n = lg_n * lg_n;
 
-        let small_block_size: usize = Block::nbits();
+        let small_block_size: usize = Store::Block::nbits();
         let small_per_large = (lg2_n + small_block_size - 1) / small_block_size;
         let large_block_size = small_block_size * small_per_large;
         let large_block_count = n / large_block_size as u64;
@@ -91,21 +85,18 @@ impl<'a, Block, Store: 'a + ?Sized> RankSupport<'a, Block, Store>
         let excess_rank = current_rank - last_large_rank;
         small_block_ranks.push(excess_rank);
 
-        RankSupport {
+        JacobsonRank {
             bit_store: bits,
             large_block_size: large_block_size,
             large_block_ranks: large_block_ranks,
             small_block_ranks: small_block_ranks,
-            marker: PhantomData,
         }
     }
 }
 
-impl<'a, Block, Store: 'a + ?Sized> Rank for RankSupport<'a, Block, Store>
-    where Block: BlockType, Store: BitStore<Block>
-{
+impl<'a, Store: ?Sized + BitStore + 'a> Rank for JacobsonRank<'a, Store> {
     fn rank(&self, position: u64) -> u64 {
-        let small_block_size = Block::nbits() as u64;
+        let small_block_size = Store::Block::nbits() as u64;
 
         let large_block = position / self.large_block_size as u64;
         let small_block = position / small_block_size;
@@ -129,7 +120,7 @@ mod test {
     #[test]
     fn rank() {
         let vec = vec![ 0b10000000000000001110000000000000u32; 1024 ];
-        let ranker = RankSupport::new(&*vec);
+        let ranker = JacobsonRank::new(&*vec);
 
         assert_eq!(1, ranker.rank(0));
         assert_eq!(1, ranker.rank(1));

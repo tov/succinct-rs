@@ -412,7 +412,9 @@ impl<Block: PrimInt> IntVec<Block> {
 
 }
 
-impl<Block: BlockType> BitStore<Block> for IntVec<Block> {
+impl<Block: BlockType> BitStore for IntVec<Block> {
+    type Block = Block;
+
     fn block_len(&self) -> usize {
         self.blocks.len()
     }
@@ -426,7 +428,7 @@ impl<Block: BlockType> BitStore<Block> for IntVec<Block> {
     }
 }
 
-impl<Block: BlockType> BitStoreMut<Block> for IntVec<Block> {
+impl<Block: BlockType> BitStoreMut for IntVec<Block> {
     fn set_block(&mut self, position: usize, value: Block) {
         self.blocks[position] = value;
     }

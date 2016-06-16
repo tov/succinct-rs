@@ -96,7 +96,10 @@ pub trait BlockType: PrimInt {
 impl<Block: PrimInt> BlockType for Block { }
 
 /// Interface for read-only bit vector operations.
-pub trait BitStore<Block: BlockType> {
+pub trait BitStore {
+    /// The type of each block of storage.
+    type Block: BlockType;
+
     /// The length of the bit vector in blocks.
     fn block_len(&self) -> usize;
 
@@ -105,17 +108,17 @@ pub trait BitStore<Block: BlockType> {
     /// Default implementation is `self.block_len() * Block::nbits()`.
     #[inline]
     fn bit_len(&self) -> u64 {
-        self.block_len() as u64 * Block::nbits() as u64
+        self.block_len() as u64 * Self::Block::nbits() as u64
     }
 
     /// Gets the value of the block at `position`
-    fn get_block(&self, position: usize) -> Block;
+    fn get_block(&self, position: usize) -> Self::Block;
 
     /// Gets the bit at `position`
     #[inline]
     fn get_bit(&self, position: u64) -> bool {
         assert!(position < self.bit_len(), "BitStore::get: out of bounds");
-        let block_bits = Block::nbits() as u64;
+        let block_bits = Self::Block::nbits() as u64;
         let block_index = (position / block_bits).to_usize().unwrap();
         let bit_offset = (position % block_bits) as usize;
         self.get_block(block_index).get_bit(bit_offset)
@@ -123,15 +126,15 @@ pub trait BitStore<Block: BlockType> {
 }
 
 /// Interface for mutable bit vector operations.
-pub trait BitStoreMut<Block: BlockType> : BitStore<Block> {
+pub trait BitStoreMut : BitStore {
     /// Sets the block at `position` to `value`.
-    fn set_block(&mut self, position: usize, value: Block);
+    fn set_block(&mut self, position: usize, value: Self::Block);
 
     /// Sets the bit at `position` to `value`.
     #[inline]
     fn set_bit(&mut self, position: u64, value: bool) {
         assert!(position < self.bit_len(), "BitStore::set: out of bounds");
-        let block_bits = Block::nbits() as u64;
+        let block_bits = Self::Block::nbits() as u64;
         let block_index = (position / block_bits).to_usize().unwrap();
         let bit_offset = (position % block_bits) as usize;
         let old_block = self.get_block(block_index);
@@ -140,7 +143,9 @@ pub trait BitStoreMut<Block: BlockType> : BitStore<Block> {
     }
 }
 
-impl<Block: BlockType> BitStore<Block> for [Block] {
+impl<Block: BlockType> BitStore for [Block] {
+    type Block = Block;
+
     #[inline]
     fn block_len(&self) -> usize {
         self.len()
@@ -152,7 +157,7 @@ impl<Block: BlockType> BitStore<Block> for [Block] {
     }
 }
 
-impl<Block: BlockType> BitStoreMut<Block> for [Block] {
+impl<Block: BlockType> BitStoreMut for [Block] {
     #[inline]
     fn set_block(&mut self, position: usize, value: Block) {
         self[position] = value;
