@@ -12,7 +12,8 @@ pub trait BlockType: PrimInt {
         8 * mem::size_of::<Self>()
     }
 
-    /// The bit mask consisting of 0s followed by `element_bits` ones.
+    /// The bit mask consisting of `Self::nbits() - element_bits` zeroes
+    /// followed by `element_bits` ones.
     ///
     /// # Precondition
     ///
@@ -30,13 +31,13 @@ pub trait BlockType: PrimInt {
 
     /// The bit mask with the `bit_index`th bit set.
     ///
+    /// Bits are index in big-endian style based at 0.
+    ///
     /// # Precondition
     ///
-    /// `bit_index` < Self::nbits()`
+    /// `bit_index < Self::nbits()`
     #[inline]
     fn nth_mask(bit_index: usize) -> Self {
-        debug_assert!(bit_index < Self::nbits());
-
         Self::one() << (Self::nbits() - bit_index - 1)
     }
 
@@ -77,14 +78,12 @@ pub trait BlockType: PrimInt {
     /// Extracts the value of the `bit_index`th bit.
     #[inline]
     fn get_bit(self, bit_index: usize) -> bool {
-        debug_assert!(bit_index <= Self::nbits());
         self & Self::nth_mask(bit_index) != Self::zero()
     }
 
     /// Sets the value of the `bit_index`th bit to true.
     #[inline]
     fn set_bit(self, bit_index: usize, bit_value: bool) -> Self {
-        debug_assert!(bit_index <= Self::nbits());
         if bit_value {
             self | Self::nth_mask(bit_index)
         } else {
