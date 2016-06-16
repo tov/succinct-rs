@@ -23,6 +23,7 @@ fi
 rm -f "$VERSION_FILE"
 echo "$VERSION" > "$VERSION_FILE"
 chmod a-w "$VERSION_FILE"
+git add "$VERSION_FILE"
 
 "$PROJ_ROOT"/bin/preprocess.sh
 
