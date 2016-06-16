@@ -10,7 +10,7 @@ use int_vec::{IntVec, IntVecBuilder};
 ///
 /// Construct with `RankSupport::new`.
 #[derive(Clone, Debug)]
-pub struct RankSupport<'a, Block, BV: 'a>
+pub struct RankSupport<'a, Block, BV: 'a + ?Sized>
     where Block: BlockType,
           BV: BitVector<Block>
 {
@@ -27,7 +27,7 @@ fn ceil_log2<Block: BlockType>(block: Block) -> usize {
     Block::nbits() - (block - Block::one()).leading_zeros() as usize
 }
 
-impl<'a, Block, BV: 'a> RankSupport<'a, Block, BV>
+impl<'a, Block, BV: 'a + ?Sized> RankSupport<'a, Block, BV>
     where Block: BlockType, BV: BitVector<Block>
 {
     /// Creates a new rank support structure for the given bit vector.
@@ -87,7 +87,7 @@ impl<'a, Block, BV: 'a> RankSupport<'a, Block, BV>
     }
 }
 
-impl<'a, Block, BV: 'a> Rank for RankSupport<'a, Block, BV>
+impl<'a, Block, BV: 'a + ?Sized> Rank for RankSupport<'a, Block, BV>
     where Block: BlockType, BV: BitVector<Block>
 {
     fn rank(&self, position: u64) -> u64 {
@@ -100,9 +100,37 @@ impl<'a, Block, BV: 'a> Rank for RankSupport<'a, Block, BV>
         let large_rank = self.large_block_ranks.get(large_block);
         let small_rank = self.small_block_ranks.get(small_block);
         let bits_rank  =
-            (self.bit_store.get_block(small_block as usize)
-             >> (small_block_size - bit_offset) as usize).count_ones() as u64;
+            self.bit_store.get_block(small_block as usize)
+                .unsigned_shr((small_block_size - bit_offset - 1) as u32)
+                .count_ones() as u64;
 
         large_rank + small_rank + bits_rank
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use bit_vector::Rank;
+
+    #[test]
+    fn rank() {
+        let vec = vec![ 0b10000000000000001110000000000000u32; 1024 ];
+        let ranker = RankSupport::new(&*vec);
+
+        assert_eq!(1, ranker.rank(0));
+        assert_eq!(1, ranker.rank(1));
+        assert_eq!(1, ranker.rank(2));
+        assert_eq!(1, ranker.rank(7));
+        assert_eq!(2, ranker.rank(16));
+        assert_eq!(3, ranker.rank(17));
+        assert_eq!(4, ranker.rank(18));
+        assert_eq!(4, ranker.rank(19));
+        assert_eq!(4, ranker.rank(20));
+
+        assert_eq!(16, ranker.rank(4 * 32 - 1));
+        assert_eq!(17, ranker.rank(4 * 32));
+        assert_eq!(2048, ranker.rank(512 * 32 - 1));
+        assert_eq!(2049, ranker.rank(512 * 32));
     }
 }
