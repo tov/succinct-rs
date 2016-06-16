@@ -43,3 +43,6 @@ pub use rank::{RankSupport, JacobsonRank};
 
 mod select;
 pub use select::{SelectSupport, BinSearchSelect};
+
+mod space_usage;
+pub use space_usage::{SpaceUsage};
