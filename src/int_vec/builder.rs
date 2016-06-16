@@ -9,9 +9,9 @@ pub struct IntVecBuilder<Block: BlockType = usize> {
     /// The number of bits in each element.
     element_bits: usize,
     /// The initial number of elements.
-    n_elements: usize,
+    n_elements: u64,
     /// The number of elements to allocate storage for.
-    capacity: usize,
+    capacity: u64,
     /// How to initialize the elements.
     fill: Fill<Block>,
     marker: PhantomData<Block>,
@@ -71,7 +71,7 @@ impl<Block: BlockType> IntVecBuilder<Block> {
     ///
     /// If `n_elements()` finds that `capacity()` has been set to a
     /// lower value, it adjust `capacity()` upward.
-    pub fn n_elements(&mut self, n_elements: usize) -> &mut Self {
+    pub fn n_elements(&mut self, n_elements: u64) -> &mut Self {
         self.n_elements = n_elements;
         if self.n_elements > self.capacity {
             self.capacity = self.n_elements;
@@ -84,7 +84,7 @@ impl<Block: BlockType> IntVecBuilder<Block> {
     ///
     /// If `capacity()` finds that `n_elements()` has been set to a
     /// higher value, it adjust `n_elements()` downward.
-    pub fn capacity(&mut self, capacity: usize) -> &mut Self {
+    pub fn capacity(&mut self, capacity: u64) -> &mut Self {
         self.capacity = capacity;
         if self.capacity < self.n_elements {
             self.n_elements = capacity;

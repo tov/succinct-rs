@@ -18,7 +18,7 @@ pub use self::builder::IntVecBuilder;
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct IntVec<Block: BlockType = usize> {
     blocks: Vec<Block>,
-    n_elements: usize,
+    n_elements: u64,
     element_bits: usize,
 }
 
@@ -46,14 +46,13 @@ impl<Block: PrimInt> IntVec<Block> {
     // repeat them each time we index, even though it’s nearly the
     // same calculation.
     #[inline]
-    fn compute_n_blocks(element_bits: usize, n_elements: usize)
+    fn compute_n_blocks(element_bits: usize, n_elements: u64)
                         -> Result<usize, &'static str> {
 
         // We perform the size calculation explicitly in u64. This
         // is because we use a bit size, which limits us to 1/8 of a
         // 32-bit address space when usize is 32 bits. Instead, we
         // perform the calculation in 64 bits and check for overflow.
-        let n_elements   = n_elements as u64;
         let element_bits = element_bits as u64;
         let block_bits   = Self::block_bits() as u64;
 
@@ -71,7 +70,7 @@ impl<Block: PrimInt> IntVec<Block> {
     }
 
     #[inline]
-    fn element_address(&self, element_index: usize) -> Address {
+    fn element_address(&self, element_index: u64) -> Address {
         // Because of the underlying slice, this bounds checks twice.
         assert!(element_index < self.n_elements,
                 "IntVec: index out of bounds.");
@@ -80,7 +79,7 @@ impl<Block: PrimInt> IntVec<Block> {
         // block, everything is easy.
         if self.is_packed() {
             Address {
-                block_index: element_index,
+                block_index: element_index as usize,
                 bit_offset: 0,
             }
         } else {
@@ -88,7 +87,6 @@ impl<Block: PrimInt> IntVec<Block> {
             // u64. The bounds check at the top of this method, combined
             // with the overflow checks at construction time, mean we don’t
             // need to worry about overflows here.
-            let element_index = element_index as u64;
             let element_bits  = self.element_bits() as u64;
             let block_bits    = Self::block_bits() as u64;
 
@@ -126,13 +124,13 @@ impl<Block: PrimInt> IntVec<Block> {
     ///     division rounded up) doesn’t fit in a `usize`.
     ///
     /// where `block_bits()` is the size of the `Block` type parameter.
-    pub fn is_okay_size(element_bits: usize, n_elements: usize) -> bool {
+    pub fn is_okay_size(element_bits: usize, n_elements: u64) -> bool {
         Self::compute_n_blocks(element_bits, n_elements).is_ok()
     }
 
     /// Returns the number of elements in the vector.
     #[inline]
-    pub fn len(&self) -> usize {
+    pub fn len(&self) -> u64 {
         self.n_elements
     }
 
@@ -143,9 +141,9 @@ impl<Block: PrimInt> IntVec<Block> {
     }
 
     /// Returns the element at the given index.
-    pub fn get(&self, element_index: usize) -> Block {
+    pub fn get(&self, element_index: u64) -> Block {
         if self.is_packed() {
-            return self.blocks[element_index];
+            return self.blocks[element_index as usize];
         }
 
         let element_bits = self.element_bits();
@@ -180,9 +178,9 @@ impl<Block: PrimInt> IntVec<Block> {
     }
 
     /// Sets the element at the given index.
-    pub fn set(&mut self, element_index: usize, element_value: Block) {
+    pub fn set(&mut self, element_index: u64, element_value: Block) {
         if self.is_packed() {
-            self.blocks[element_index] = element_value;
+            self.blocks[element_index as usize] = element_value;
             return;
         }
 
@@ -249,17 +247,19 @@ impl<Block: PrimInt> IntVec<Block> {
     }
 
     /// The number of elements the vector can hold without reallocating.
-    pub fn capacity(&self) -> usize {
-        self.blocks.capacity() / self.element_bits
+    pub fn capacity(&self) -> u64 {
+        let total_bits = self.blocks.capacity() as u64 * Block::nbits() as u64;
+        total_bits / self.element_bits as u64
     }
 
     /// How many elements the backing vector has expanded to store.
-    fn backing_len(&self) -> usize {
-        self.blocks.len() / self.element_bits
+    fn backing_len(&self) -> u64 {
+        let total_bits = self.blocks.len() as u64 * Block::nbits() as u64;
+        total_bits / self.element_bits as u64
     }
 
     /// Resizes to the given number of elements, filling if necessary.
-    pub fn resize(&mut self, n_elements: usize, fill: Fill<Block>) {
+    pub fn resize(&mut self, n_elements: u64, fill: Fill<Block>) {
         if n_elements <= self.n_elements {
             self.n_elements = n_elements;
         } else {
@@ -291,9 +291,9 @@ impl<Block: PrimInt> IntVec<Block> {
     ///
     /// Panics if the size conditions of
     /// [`IntVec::<Block>::is_okay_size()`](struct.IntVec.html#method.is_okay_size)
-    /// are not met. This will happen if the new capacity overflows `usize`
-    /// or the total number of bits overflows `u64`.
-    pub fn reserve(&mut self, additional: usize) {
+    /// are not met. This will happen if the total number of bits
+    /// overflows `u64`.
+    pub fn reserve(&mut self, additional: u64) {
         let goal_elements = self.len().checked_add(additional)
             .expect("IntVec::reserve: size overflow");
         let goal_blocks = Self::compute_n_blocks(self.element_bits,
@@ -313,9 +313,9 @@ impl<Block: PrimInt> IntVec<Block> {
     ///
     /// Panics if the size conditions of
     /// [`IntVec::<Block>::is_okay_size()`](struct.IntVec.html#method.is_okay_size)
-    /// are not met. This will happen if the new capacity overflows `usize`
-    /// or the total number of bits overflows `u64`.
-    pub fn reserve_exact(&mut self, additional: usize) {
+    /// are not met. This will happen if the total number of bits
+    /// overflows `u64`.
+    pub fn reserve_exact(&mut self, additional: u64) {
         let goal_elements = self.len().checked_add(additional)
             .expect("IntVec::reserve: size overflow");
         let goal_blocks = Self::compute_n_blocks(self.element_bits,
@@ -336,7 +336,7 @@ impl<Block: PrimInt> IntVec<Block> {
     /// Shrinks to the given size.
     ///
     /// If `n_elements` is greater than the current size, does nothing.
-    pub fn truncate(&mut self, n_elements: usize) {
+    pub fn truncate(&mut self, n_elements: u64) {
         if n_elements <= self.n_elements {
             self.n_elements = n_elements;
         }
@@ -410,8 +410,8 @@ impl<Block: BlockType> BitVector<Block> for IntVec<Block> {
         self.blocks.len()
     }
 
-    fn bit_len(&self) -> usize {
-        self.element_bits * self.n_elements
+    fn bit_len(&self) -> u64 {
+        (self.element_bits as u64) * (self.n_elements as u64)
     }
 
     fn get_block(&self, position: usize) -> Block {
@@ -428,8 +428,8 @@ impl<Block: BlockType> BitVectorMut<Block> for IntVec<Block> {
 /// An iterator over the elements of an [`IntVec`](struct.IntVec.html).
 pub struct Iter<'a, Block: BlockType + 'a = usize> {
     vec: &'a IntVec<Block>,
-    start: usize,
-    limit: usize,
+    start: u64,
+    limit: u64,
 }
 
 impl<'a, Block: BlockType> Iterator for Iter<'a, Block> {
@@ -442,6 +442,16 @@ impl<'a, Block: BlockType> Iterator for Iter<'a, Block> {
         } else { None }
     }
 
+    #[cfg(target_pointer_width = "32")]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        if let Some(len) = (self.limit - self.start).to_usize() {
+            (len, Some(len))
+        } else {
+            (0, None)
+        }
+    }
+
+    #[cfg(target_pointer_width = "64")]
     fn size_hint(&self) -> (usize, Option<usize>) {
         let len = self.len();
         (len, Some(len))
@@ -456,14 +466,15 @@ impl<'a, Block: BlockType> Iterator for Iter<'a, Block> {
     }
 
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        self.start = self.start.checked_add(n).unwrap_or(self.limit);
+        self.start = self.start.checked_add(n as u64).unwrap_or(self.limit);
         self.next()
     }
 }
 
+#[cfg(target_pointer_width = "64")]
 impl<'a, Block: BlockType> ExactSizeIterator for Iter<'a, Block> {
     fn len(&self) -> usize {
-        self.limit - self.start
+        (self.limit - self.start) as usize
     }
 }
 
@@ -490,7 +501,8 @@ impl<Block> fmt::Debug for IntVec<Block>
         where Block: BlockType + fmt::Debug {
 
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        try!(write!(formatter, "IntVec {{ element_bits: {}, elements: {{ ", self.element_bits()));
+        try!(write!(formatter, "IntVec {{ element_bits: {}, elements: {{ ",
+                    self.element_bits()));
 
         for element in self {
             try!(write!(formatter, "{:?}, ", element));

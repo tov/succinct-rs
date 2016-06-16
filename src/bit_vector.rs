@@ -1,5 +1,7 @@
 //! Traits for working with bit vectors.
 
+use num::ToPrimitive;
+
 use block_type::BlockType;
 
 /// Interface for read-only bit vector operations.
@@ -11,8 +13,8 @@ pub trait BitVector<Block: BlockType> {
     ///
     /// Default implementation is `self.block_len() * Block::nbits()`.
     #[inline]
-    fn bit_len(&self) -> usize {
-        self.block_len() * Block::nbits()
+    fn bit_len(&self) -> u64 {
+        self.block_len() as u64 * Block::nbits() as u64
     }
 
     /// Gets the value of the block at `position`
@@ -20,11 +22,11 @@ pub trait BitVector<Block: BlockType> {
 
     /// Gets the bit at `position`
     #[inline]
-    fn get_bit(&self, position: usize) -> bool {
+    fn get_bit(&self, position: u64) -> bool {
         assert!(position < self.bit_len(), "BitVector::get: out of bounds");
-        let block_bits = Block::nbits();
-        let block_index = position / block_bits;
-        let bit_offset = position % block_bits;
+        let block_bits = Block::nbits() as u64;
+        let block_index = (position / block_bits).to_usize().unwrap();
+        let bit_offset = (position % block_bits) as usize;
         self.get_block(block_index).get_bit(bit_offset)
     }
 }
@@ -36,11 +38,11 @@ pub trait BitVectorMut<Block: BlockType> : BitVector<Block> {
 
     /// Sets the bit at `position` to `value`.
     #[inline]
-    fn set_bit(&mut self, position: usize, value: bool) {
+    fn set_bit(&mut self, position: u64, value: bool) {
         assert!(position < self.bit_len(), "BitVector::set: out of bounds");
-        let block_bits = Block::nbits();
-        let block_index = position / block_bits;
-        let bit_offset = position % block_bits;
+        let block_bits = Block::nbits() as u64;
+        let block_index = (position / block_bits).to_usize().unwrap();
+        let bit_offset = (position % block_bits) as usize;
         let old_block = self.get_block(block_index);
         let new_block = old_block.set_bit(bit_offset, value);
         self.set_block(block_index, new_block);
@@ -71,12 +73,12 @@ pub trait Rank {
     /// Returns the rank at a given position.
     ///
     /// This is the number of 1s up to and including that position.
-    fn rank(&self, position: usize) -> usize;
+    fn rank(&self, position: u64) -> u64;
 
     /// Returns the rank of 0s at a given position.
     ///
     /// This is the number of 0s up to and including that position.
-    fn rank0(&self, position: usize) -> usize {
+    fn rank0(&self, position: u64) -> u64 {
         position + 1 - self.rank(position)
     }
 }
@@ -84,7 +86,7 @@ pub trait Rank {
 /// Interface for types that support select queries.
 pub trait Select {
     /// Returns the position of the `index`th 1 bit.
-    fn select(&self, index: usize) -> usize;
+    fn select(&self, index: u64) -> u64;
 }
 
 #[cfg(test)]
