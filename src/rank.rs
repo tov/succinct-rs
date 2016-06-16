@@ -6,7 +6,7 @@ use storage::{BitStore, BlockType};
 use int_vec::{IntVec, IntVecBuilder};
 
 /// Interface for types that support rank queries.
-pub trait Rank {
+pub trait Rank : BitStore {
     /// Returns the rank at a given position.
     ///
     /// This is the number of 1s up to and including that position.
@@ -50,8 +50,8 @@ impl<'a, Store: BitStore + ?Sized + 'a> JacobsonRank<'a, Store> {
         let large_block_count = n / large_block_size as u64;
         let small_block_count = large_block_size as u64 * large_block_count;
 
-        let large_meta_size = lg_n;
-        let small_meta_size = ceil_log2(large_block_size);
+        let large_meta_size = ceil_log2(n + 1);
+        let small_meta_size = ceil_log2(large_block_size + 1);
 
         let mut large_block_ranks =
             IntVecBuilder::new(large_meta_size)
@@ -94,8 +94,32 @@ impl<'a, Store: BitStore + ?Sized + 'a> JacobsonRank<'a, Store> {
     }
 }
 
+impl<'a, Store: ?Sized + BitStore + 'a> BitStore for JacobsonRank<'a, Store> {
+    type Block = Store::Block;
+
+    fn block_len(&self) -> usize {
+        self.bit_store.block_len()
+    }
+
+    fn bit_len(&self) -> u64 {
+        self.bit_store.bit_len()
+    }
+
+    fn get_block(&self, index: usize) -> Self::Block {
+        self.bit_store.get_block(index)
+    }
+
+    fn get_bit(&self, index: u64) -> bool {
+        self.bit_store.get_bit(index)
+    }
+}
+
 impl<'a, Store: ?Sized + BitStore + 'a> Rank for JacobsonRank<'a, Store> {
     fn rank(&self, position: u64) -> u64 {
+        // Rank for any position past the end is the rank of the
+        // last position.
+        let position = ::std::cmp::min(position, self.bit_len() - 1);
+
         let small_block_size = Store::Block::nbits() as u64;
 
         let large_block = position / self.large_block_size as u64;
@@ -136,5 +160,7 @@ mod test {
         assert_eq!(17, ranker.rank(4 * 32));
         assert_eq!(2048, ranker.rank(512 * 32 - 1));
         assert_eq!(2049, ranker.rank(512 * 32));
+
+        assert_eq!(4096, ranker.rank(1000000));
     }
 }
