@@ -5,7 +5,7 @@
 //!   - [integer vectors](struct.IntVec.html) with arbitrary-sized
 //!     (1- to 64-bit) elements;
 //!   - constant-time [rank](struct.JacobsonRank.html) queries; and
-//!   - `lg lg n`-time [select](struct.BinSearchSelect.html) queries
+//!   - *O*(lg lg *n*)-time [select](struct.BinSearchSelect.html) queries
 //!     based on binary search over ranks.
 //!
 //! # Usage

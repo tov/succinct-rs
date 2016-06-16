@@ -9,7 +9,7 @@ This library is a very early work in progress. So far we have:
 
   - integer vectors with arbitrary-sized (1- to 64-bit) elements;
   - constant-time rank queries; and
-  - `lg lg n`-time select queries based on binary search over ranks.
+  - *O*(lg lg *n*)-time select queries based on binary search over ranks.
 
 ## Usage
 
