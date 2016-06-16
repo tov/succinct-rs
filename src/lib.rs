@@ -24,14 +24,14 @@
 
 extern crate num;
 
-pub mod int_vec;
+mod int_vec;
 pub use int_vec::{IntVec, IntVecBuilder};
 
-pub mod storage;
-pub use storage::{BitStore, BlockType};
+mod storage;
+pub use storage::{BitStore, BitStoreMut, BlockType};
 
-pub mod rank;
+mod rank;
 pub use rank::{RankSupport, JacobsonRank};
 
-pub mod select;
+mod select;
 pub use select::{SelectSupport, BinSearchSelect};
