@@ -96,16 +96,12 @@ impl<'a, Block, BV: 'a> Rank for RankSupport<'a, Block, BV>
         let large_block = position / self.large_block_size as u64;
         let small_block = position / small_block_size;
         let bit_offset  = position % small_block_size;
-        // TODO: This isn't right, need to shift left by
-        // small_block_size - bit_offset
-        let bit_mask    = !((Block::one()
-                             << (small_block_size - bit_offset) as usize) -
-                            Block::one());
 
         let large_rank = self.large_block_ranks.get(large_block);
         let small_rank = self.small_block_ranks.get(small_block);
-        let bits_rank  = (self.bit_store.get_block(small_block as usize)
-                            & bit_mask).count_ones() as u64;
+        let bits_rank  =
+            (self.bit_store.get_block(small_block as usize)
+             >> (small_block_size - bit_offset) as usize).count_ones() as u64;
 
         large_rank + small_rank + bits_rank
     }
