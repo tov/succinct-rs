@@ -6,7 +6,7 @@ use storage::{BitStore, BlockType};
 use int_vec::{IntVec, IntVecBuilder};
 
 /// Interface for types that support rank queries.
-pub trait Rank : BitStore {
+pub trait RankSupport : BitStore {
     /// Returns the rank at a given position.
     ///
     /// This is the number of 1s up to and including that position.
@@ -114,7 +114,8 @@ impl<'a, Store: ?Sized + BitStore + 'a> BitStore for JacobsonRank<'a, Store> {
     }
 }
 
-impl<'a, Store: ?Sized + BitStore + 'a> Rank for JacobsonRank<'a, Store> {
+impl<'a, Store: ?Sized + BitStore + 'a>
+RankSupport for JacobsonRank<'a, Store> {
     fn rank(&self, position: u64) -> u64 {
         // Rank for any position past the end is the rank of the
         // last position.
@@ -144,23 +145,23 @@ mod test {
     #[test]
     fn rank() {
         let vec = vec![ 0b10000000000000001110000000000000u32; 1024 ];
-        let ranker = JacobsonRank::new(&*vec);
+        let rank = JacobsonRank::new(&*vec);
 
-        assert_eq!(1, ranker.rank(0));
-        assert_eq!(1, ranker.rank(1));
-        assert_eq!(1, ranker.rank(2));
-        assert_eq!(1, ranker.rank(7));
-        assert_eq!(2, ranker.rank(16));
-        assert_eq!(3, ranker.rank(17));
-        assert_eq!(4, ranker.rank(18));
-        assert_eq!(4, ranker.rank(19));
-        assert_eq!(4, ranker.rank(20));
+        assert_eq!(1, rank.rank(0));
+        assert_eq!(1, rank.rank(1));
+        assert_eq!(1, rank.rank(2));
+        assert_eq!(1, rank.rank(7));
+        assert_eq!(2, rank.rank(16));
+        assert_eq!(3, rank.rank(17));
+        assert_eq!(4, rank.rank(18));
+        assert_eq!(4, rank.rank(19));
+        assert_eq!(4, rank.rank(20));
 
-        assert_eq!(16, ranker.rank(4 * 32 - 1));
-        assert_eq!(17, ranker.rank(4 * 32));
-        assert_eq!(2048, ranker.rank(512 * 32 - 1));
-        assert_eq!(2049, ranker.rank(512 * 32));
+        assert_eq!(16, rank.rank(4 * 32 - 1));
+        assert_eq!(17, rank.rank(4 * 32));
+        assert_eq!(2048, rank.rank(512 * 32 - 1));
+        assert_eq!(2049, rank.rank(512 * 32));
 
-        assert_eq!(4096, ranker.rank(1000000));
+        assert_eq!(4096, rank.rank(1000000));
     }
 }

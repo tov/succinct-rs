@@ -1,25 +1,25 @@
 //! Data structure to support fast select queries.
 
-use rank::Rank;
+use rank::RankSupport;
 use storage::BitStore;
 
 /// Interface for types that support select queries.
-pub trait Select : BitStore {
+pub trait SelectSupport : BitStore {
     /// Returns the position of the `index`th 1 bit.
     fn select(&self, index: u64) -> Option<u64>;
 }
 
 /// Performs a select query by binary searching rank queries.
-pub struct BinSearchSelect<'a, R: Rank + 'a> {
-    rank_support: &'a R,
+pub struct BinSearchSelect<'a, Rank: RankSupport + 'a> {
+    rank_support: &'a Rank,
     max_rank: u64,
 }
 
 /// Creates a new binary search select support based on a rank support.
-impl<'a, R: Rank + 'a> BinSearchSelect<'a, R> {
+impl<'a, Rank: RankSupport + 'a> BinSearchSelect<'a, Rank> {
     /// Creates a new binary search selection support given a rank
     /// support.
-    pub fn new(rank_support: &'a R) -> Self {
+    pub fn new(rank_support: &'a Rank) -> Self {
         let max_index = rank_support.bit_len() - 1;
         let max_rank = rank_support.rank(max_index);
         BinSearchSelect {
@@ -29,8 +29,8 @@ impl<'a, R: Rank + 'a> BinSearchSelect<'a, R> {
     }
 }
 
-impl<'a, R: Rank + 'a> BitStore for BinSearchSelect<'a, R> {
-    type Block = R::Block;
+impl<'a, Rank: RankSupport + 'a> BitStore for BinSearchSelect<'a, Rank> {
+    type Block = Rank::Block;
 
     fn block_len(&self) -> usize {
         self.rank_support.block_len()
@@ -49,13 +49,13 @@ impl<'a, R: Rank + 'a> BitStore for BinSearchSelect<'a, R> {
     }
 }
 
-impl<'a, R: Rank + 'a> Rank for BinSearchSelect<'a, R> {
+impl<'a, Rank: RankSupport + 'a> RankSupport for BinSearchSelect<'a, Rank> {
     fn rank(&self, index: u64) -> u64 {
         self.rank_support.rank(index)
     }
 }
 
-impl<'a, R: Rank + 'a> Select for BinSearchSelect<'a, R> {
+impl<'a, Rank: RankSupport + 'a> SelectSupport for BinSearchSelect<'a, Rank> {
     fn select(&self, index: u64) -> Option<u64> {
         // To find the `index`th 1, we find the position where
         // the rank goes to `index + 1`.
@@ -93,8 +93,7 @@ impl<'a, R: Rank + 'a> Select for BinSearchSelect<'a, R> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use rank::JacobsonRank;
-    use rank::Rank;
+    use rank::*;
 
     #[test]
     fn select1() {

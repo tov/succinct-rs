@@ -31,7 +31,7 @@ pub mod storage;
 pub use storage::{BitStore, BlockType};
 
 pub mod rank;
-pub use rank::{Rank, JacobsonRank};
+pub use rank::{RankSupport, JacobsonRank};
 
 pub mod select;
-pub use select::{Select, BinSearchSelect};
+pub use select::{SelectSupport, BinSearchSelect};
