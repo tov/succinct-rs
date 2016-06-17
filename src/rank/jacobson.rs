@@ -23,6 +23,11 @@ fn ceil_log2<Block: BlockType>(block: Block) -> usize {
     Block::nbits() - (block - Block::one()).leading_zeros() as usize
 }
 
+#[inline]
+fn ceil_div<Block: BlockType>(dividend: Block, divisor: Block) -> Block {
+    (dividend + divisor - Block::one()) / divisor
+}
+
 impl<'a, Store: BitStore + ?Sized + 'a>
 JacobsonRank<'a, Store> {
     /// Creates a new rank support structure for the given bit vector.
@@ -31,14 +36,14 @@ JacobsonRank<'a, Store> {
         let lg_n = ceil_log2(n);
         let lg2_n = lg_n * lg_n;
 
-        let small_block_size: usize = Store::Block::nbits();
-        let small_per_large = (lg2_n + small_block_size - 1) / small_block_size;
-        let large_block_size = small_block_size * small_per_large;
-        let large_block_count = n / large_block_size as u64;
-        let small_block_count = large_block_size as u64 * large_block_count;
+        let small_block_size  = Store::Block::nbits();
+        let small_per_large   = ceil_div(lg2_n, small_block_size);
+        let large_block_size  = small_block_size * small_per_large;
+        let large_block_count = n / large_block_size as u64 + 1;
+        let small_block_count = n / small_block_size as u64 + 1;
 
-        let large_meta_size = ceil_log2(n + 1);
-        let small_meta_size = ceil_log2(large_block_size + 1);
+        let large_meta_size   = ceil_log2(n + 1);
+        let small_meta_size   = ceil_log2(large_block_size + 1);
 
         let mut large_block_ranks =
             IntVecBuilder::new(large_meta_size)
