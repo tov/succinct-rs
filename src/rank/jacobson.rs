@@ -102,8 +102,7 @@ BitStore for JacobsonRank<'a, Store> {
 }
 
 impl<'a, Store: ?Sized + BitStore + 'a>
-RankSupport for
-JacobsonRank<'a, Store> {
+RankSupport for JacobsonRank<'a, Store> {
     fn rank(&self, position: u64) -> u64 {
         // Rank for any position past the end is the rank of the
         // last position.
