@@ -106,7 +106,7 @@ macro_rules! impl_tuple_space_usage {
 
             #[inline]
             fn is_stack_only() -> bool {
-                return $( $tv::is_stack_only() )&*;
+                $( $tv::is_stack_only() )&*
             }
         }
     }
