@@ -51,6 +51,10 @@ RankSupport for BinSearchSelect<'a, Rank> {
     }
 }
 
+// If we had access to the representation of the rank structure, we
+// could search level by level rather than at arbitrary bit addresses.
+// But then this algorithm would be tied to that representation.
+
 impl<'a, Rank: RankSupport + 'a>
 SelectSupport for BinSearchSelect<'a, Rank> {
     fn select(&self, index: u64) -> Option<u64> {
