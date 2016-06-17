@@ -169,4 +169,21 @@ mod test {
 
         assert_eq!(4096, rank.rank(1000000));
     }
+
+    // This test is a sanity check that we aren’t taking up too much
+    // space with the metadata.
+    #[test]
+    fn space() {
+        use space_usage::*;
+
+        for i in 0 .. 50 {
+            let vec = vec![ 0b10000000000000001110000000000000u32;
+                            1000 + i ];
+            let rank = JacobsonRank::new(&*vec);
+
+            assert!((rank.total_bytes() as f64 / vec.total_bytes() as f64)
+                        < 0.5);
+        }
+
+    }
 }
