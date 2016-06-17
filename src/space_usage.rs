@@ -5,10 +5,11 @@ use std::mem;
 /// Types that know how to compute their space usage.
 ///
 /// The space usage is split into two portions, the static portion
-/// (returned by `static_bytes` and the dynamic portion (returned by
-/// `dynamic_bytes`). The static portion is the statically-known size
-/// for every object of its type; the dynamic portion is the additional
-/// allocation that depends on run-time factors.
+/// (returned by `stack_bytes` and the dynamic portion (returned by
+/// `heap_bytes`). The static portion is the statically-known size
+/// for every object of its type, allocated on the stack; the dynamic
+/// portion is the additional heap allocation that may depend on run-time
+/// factors.
 ///
 /// Examples:
 ///
@@ -20,11 +21,8 @@ use std::mem;
 ///
 ///  - The size of a vector includes a static portion, the vector struct
 ///  on the stack, and a dynamic portion, the heap array holding its
+///  elements, including both the static and dynamic sizes of the
 ///  elements.
-///
-///  - The static size of a box includes its own stack space and the
-///  static size of its contents (stored on the heap); the dynamic size
-///  is the dynamic size of the contents.
 
 pub trait SpaceUsage: Sized {
     /// Computes the size of the receiver in bytes.
@@ -33,17 +31,17 @@ pub trait SpaceUsage: Sized {
     /// memory that it owns.
     ///
     /// The default implementation returns
-    /// `Self::static_bytes() + self.dynamic_bytes()`.
+    /// `Self::stack_bytes() + self.heap_bytes()`.
     #[inline]
     fn total_bytes(&self) -> usize {
-        Self::static_bytes() + self.dynamic_bytes()
+        Self::stack_bytes() + self.heap_bytes()
     }
 
     /// Is the size of this type known statically?
     ///
-    /// If this method returns true then `dynamic_bytes` should always
+    /// If this method returns true then `heap_bytes` should always
     /// return 0.
-    fn is_statically_sized() -> bool;
+    fn is_stack_only() -> bool;
 
     /// Calculates the static portion of the size of this type.
     ///
@@ -53,7 +51,7 @@ pub trait SpaceUsage: Sized {
     ///
     /// The default implementation returns `std::mem::size_of::<Self>()`.
     #[inline]
-    fn static_bytes() -> usize {
+    fn stack_bytes() -> usize {
         mem::size_of::<Self>()
     }
 
@@ -61,12 +59,12 @@ pub trait SpaceUsage: Sized {
     ///
     /// This is the memory used by (or owned by) the object, not
     /// including any portion of its size that is known statically and
-    /// included in `static_bytes`. This is typically for containers
+    /// included in `stack_bytes`. This is typically for containers
     /// that heap allocate varying amounts of memory.
     ///
     /// The default implementation returns `0`.
     #[inline]
-    fn dynamic_bytes(&self) -> usize {
+    fn heap_bytes(&self) -> usize {
         0
     }
 }
@@ -77,7 +75,7 @@ macro_rules! impl_static_space_usage {
     {
         impl SpaceUsage for $t {
             #[inline]
-            fn is_statically_sized() -> bool { true }
+            fn is_stack_only() -> bool { true }
         }
     }
 }
@@ -101,14 +99,14 @@ macro_rules! impl_tuple_space_usage {
     {
         impl<$( $tv: SpaceUsage ),+> SpaceUsage for ($( $tv, )+) {
             #[allow(non_snake_case)]
-            fn dynamic_bytes(&self) -> usize {
+            fn heap_bytes(&self) -> usize {
                 let &($( ref $tv, )+) = self;
-                0 $( + $tv.dynamic_bytes() )+
+                0 $( + $tv.heap_bytes() )+
             }
 
             #[inline]
-            fn is_statically_sized() -> bool {
-                return $( $tv::is_statically_sized() )&*;
+            fn is_stack_only() -> bool {
+                return $( $tv::is_stack_only() )&*;
             }
         }
     }
@@ -129,31 +127,77 @@ impl_tuple_space_usage!(A, B, C, D, E, F, G, H, I, J, K, L);
 
 impl<A: SpaceUsage> SpaceUsage for Vec<A> {
     #[inline]
-    fn is_statically_sized() -> bool {
-        false
-    }
+    fn is_stack_only() -> bool { false }
 
-    fn dynamic_bytes(&self) -> usize {
-        if A::is_statically_sized() {
-            self.capacity() * A::static_bytes()
-        } else {
-            let mut result = 0;
+    fn heap_bytes(&self) -> usize {
+        let mut result = self.capacity() * A::stack_bytes();
+
+        if ! A::is_stack_only() {
             for each in self {
-                result += each.dynamic_bytes()
+                result += each.total_bytes();
             }
-            result
         }
+
+        result
     }
 }
 
 impl<A: SpaceUsage> SpaceUsage for Box<A> {
     #[inline]
-    fn is_statically_sized() -> bool {
-        A::is_statically_sized()
+    fn is_stack_only() -> bool { false }
+
+    fn stack_bytes() -> usize {
+        mem::size_of::<Self>()
     }
 
-    fn dynamic_bytes(&self) -> usize {
+    fn heap_bytes(&self) -> usize {
         use std::ops::Deref;
-        self.deref().dynamic_bytes()
+        self.deref().total_bytes()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use std::mem::size_of;
+
+    #[test]
+    fn is_stack_only() {
+        assert!(  u32::is_stack_only());
+        assert!(  isize::is_stack_only());
+        assert!(! Vec::<u64>::is_stack_only());
+        assert!(! Vec::<Vec<u64>>::is_stack_only());
+        assert!(  <(u32, u32, u32)>::is_stack_only());
+        assert!(! <(u32, Vec<u32>, u32)>::is_stack_only());
+    }
+
+    #[test]
+    fn int_size() {
+        assert_eq!(2, 0u16.total_bytes());
+        assert_eq!(4, 0u32.total_bytes());
+        assert_eq!(8, 0i64.total_bytes());
+    }
+
+    #[test]
+    fn tuple_size() {
+        assert_eq!(8, (0u32, 0u32).total_bytes());
+        // This isn’t guaranteed to work, but it does for now:
+        assert_eq!(12, (0u32, 0u8, 0u32).total_bytes());
+    }
+
+    #[test]
+    fn vec_size() {
+        let v = Vec::<u64>::with_capacity(8);
+        assert_eq!(8, v.capacity());
+        assert_eq!(64, v.heap_bytes());
+        assert_eq!(64 + size_of::<Vec<u64>>(),
+                   v.total_bytes());
+
+        let w: Vec<Vec<u64>> = vec![v.clone(), v.clone()];
+        assert_eq!(2, w.capacity());
+        // TODO: why doesn't this pass?:
+        // assert_eq!(128 + 2 * size_of::<Vec<u64>>() +
+        //                size_of::<Vec<Vec<u64>>>(),
+        //            w.total_bytes());
     }
 }

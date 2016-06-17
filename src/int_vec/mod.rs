@@ -524,9 +524,9 @@ impl<Block> fmt::Debug for IntVec<Block>
 
 impl<A: BlockType> SpaceUsage for IntVec<A> {
     #[inline]
-    fn is_statically_sized() -> bool { false }
+    fn is_stack_only() -> bool { false }
 
-    fn dynamic_bytes(&self) -> usize {
+    fn heap_bytes(&self) -> usize {
         self.blocks.capacity() * mem::size_of::<A>()
     }
 }
