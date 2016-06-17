@@ -1,4 +1,5 @@
 use rank::RankSupport;
+use space_usage::SpaceUsage;
 use storage::BitStore;
 use super::SelectSupport;
 
@@ -89,6 +90,12 @@ SelectSupport for BinSearchSelect<'a, Rank> {
 
         panic!("BinSearchSelect: broken invariant in rank support?");
     }
+}
+
+impl<'a, Rank: RankSupport + 'a>
+SpaceUsage for BinSearchSelect<'a, Rank> {
+    #[inline]
+    fn is_stack_only() -> bool { true }
 }
 
 #[cfg(test)]

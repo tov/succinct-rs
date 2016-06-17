@@ -1,7 +1,8 @@
 use num::PrimInt;
 
-use storage::{BitStore, BlockType};
 use int_vec::{IntVec, IntVecBuilder};
+use space_usage::SpaceUsage;
+use storage::{BitStore, BlockType};
 
 use super::RankSupport;
 
@@ -122,6 +123,17 @@ RankSupport for JacobsonRank<'a, Store> {
                 .count_ones() as u64;
 
         large_rank + small_rank + bits_rank
+    }
+}
+
+impl<'a, Store: ?Sized + BitStore + 'a>
+SpaceUsage for JacobsonRank<'a, Store> {
+    #[inline]
+    fn is_stack_only() -> bool { false }
+
+    fn heap_bytes(&self) -> usize {
+        self.large_block_ranks.heap_bytes()
+            + self.small_block_ranks.heap_bytes()
     }
 }
 
