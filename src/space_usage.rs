@@ -125,7 +125,7 @@ impl_tuple_space_usage!(A, B, C, D, E, F, G, H, I, J);
 impl_tuple_space_usage!(A, B, C, D, E, F, G, H, I, J, K);
 impl_tuple_space_usage!(A, B, C, D, E, F, G, H, I, J, K, L);
 
-impl<A: SpaceUsage> SpaceUsage for Vec<A> {
+impl<A: SpaceUsage + ::std::fmt::Debug> SpaceUsage for Vec<A> {
     #[inline]
     fn is_stack_only() -> bool { false }
 
@@ -134,7 +134,7 @@ impl<A: SpaceUsage> SpaceUsage for Vec<A> {
 
         if ! A::is_stack_only() {
             for each in self {
-                result += each.total_bytes();
+                result += each.heap_bytes();
             }
         }
 
@@ -192,12 +192,16 @@ mod test {
         assert_eq!(64, v.heap_bytes());
         assert_eq!(64 + size_of::<Vec<u64>>(),
                    v.total_bytes());
+    }
 
-        let w: Vec<Vec<u64>> = vec![v.clone(), v.clone()];
+    #[test]
+    fn vec_vec_size() {
+        let v1 = Vec::<u64>::with_capacity(8);
+        let v2 = Vec::<u64>::with_capacity(8);
+        let w = vec![v1, v2];
         assert_eq!(2, w.capacity());
-        // TODO: why doesn't this pass?:
-        // assert_eq!(128 + 2 * size_of::<Vec<u64>>() +
-        //                size_of::<Vec<Vec<u64>>>(),
-        //            w.total_bytes());
+        assert_eq!(128 + 2 * size_of::<Vec<u64>>() +
+                      size_of::<Vec<Vec<u64>>>(),
+                   w.total_bytes());
     }
 }
