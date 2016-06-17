@@ -12,6 +12,11 @@ build:
 clippy:
 	rustup run nightly cargo build --features=clippy
 
+stable beta nightly:
+	mkdir -p target.$@
+	rm -f target
+	ln -s target.$@ target
+
 doc:
 	cargo doc # --no-deps -p $(CRATE)
 	echo "<meta http-equiv='refresh' content='0;url=$(CRATE)/'>" > target/doc/index.html
