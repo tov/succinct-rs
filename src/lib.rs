@@ -14,7 +14,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! succinct = "0.2.0"
+//! succinct = "0.2.1"
 //! ```
 //!
 //! to your `Cargo.toml` and
@@ -45,4 +45,4 @@ mod select;
 pub use select::{SelectSupport, BinSearchSelect};
 
 mod space_usage;
-pub use space_usage::{SpaceUsage};
+pub use space_usage::SpaceUsage;
