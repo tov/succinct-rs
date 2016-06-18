@@ -43,6 +43,16 @@ struct Address {
     bit_offset: usize,
 }
 
+impl Address {
+    fn new(bit_index: u64, block_bits: usize) -> Self {
+        let block_bits = block_bits as u64;
+        Address {
+            block_index: (bit_index / block_bits) as usize,
+            bit_offset: (bit_index % block_bits) as usize,
+        }
+    }
+}
+
 impl<Block: PrimInt> IntVec<Block> {
     // Computes the number of blocks from the number of elements.
     // Performs sufficient overflow checks that we shouldn’t have to
@@ -73,33 +83,35 @@ impl<Block: PrimInt> IntVec<Block> {
     }
 
     #[inline]
-    fn element_address(&self, element_index: u64) -> Address {
+    fn compute_address_random(&self, bit_offset: u64, element_bits: usize,
+                              element_index: u64) -> Address {
+        let bits_index = element_index
+            .checked_mul(element_bits as u64)
+            .expect("IntVec: index overflow")
+            .checked_add(bit_offset)
+            .expect("IntVec: index overflow");
+
+        let bits_limit = bits_index + element_bits as u64;
+        assert!(bits_limit <= (Self::block_bits() * self.blocks.len()) as u64,
+                "IntVec: index out of bounds.");
+
+        Address::new(bits_index, Self::block_bits())
+    }
+
+    #[inline]
+    fn compute_address(&self, element_index: u64) -> Address {
         // Because of the underlying slice, this bounds checks twice.
         assert!(element_index < self.n_elements,
                 "IntVec: index out of bounds.");
 
-        // Special fast path: if the elements are laid out one per
-        // block, everything is easy.
-        if self.is_packed() {
-            Address {
-                block_index: element_index as usize,
-                bit_offset: 0,
-            }
-        } else {
-            // As before we perform the index calculation explicitly in
-            // u64. The bounds check at the top of this method, combined
-            // with the overflow checks at construction time, mean we don’t
-            // need to worry about overflows here.
-            let element_bits  = self.element_bits() as u64;
-            let block_bits    = Self::block_bits() as u64;
+        // As before we perform the index calculation explicitly in
+        // u64. The bounds check at the top of this method, combined
+        // with the overflow checks at construction time, mean we don’t
+        // need to worry about overflows here.
+        let element_bits  = self.element_bits() as u64;
+        let bit_index     = element_index * element_bits;
 
-            let bit_index     = element_index * element_bits;
-
-            Address {
-                block_index: (bit_index / block_bits) as usize,
-                bit_offset: (bit_index % block_bits) as usize,
-            }
-        }
+        Address::new(bit_index, Self::block_bits())
     }
 
     /// Creates a new integer vector.
@@ -143,25 +155,8 @@ impl<Block: PrimInt> IntVec<Block> {
         self.len() == 0
     }
 
-    /// Returns the element at the given index.
-    pub fn get(&self, element_index: u64) -> Block {
-        if self.is_packed() {
-            return self.blocks[element_index as usize];
-        }
-
-        let element_bits = self.element_bits();
-
-        if element_bits == 1 {
-            if self.get_bit(element_index) {
-                return Block::one();
-            } else {
-                return Block::zero();
-            }
-        }
-
+    fn get_address(&self, address: Address, element_bits: usize) -> Block {
         let block_bits = Self::block_bits();
-
-        let address = self.element_address(element_index);
         let margin = block_bits - address.bit_offset;
 
         if margin >= element_bits {
@@ -180,31 +175,56 @@ impl<Block: PrimInt> IntVec<Block> {
         (high_bits << extra) | low_bits
     }
 
-    /// Sets the element at the given index.
+    /// Returns the element at the given index.
     ///
     /// # Panics
     ///
-    /// Debug mode only: Panics if `element_value` is too large to
-    /// fit in the element size. (TODO: What’s the right thing here?)
-    pub fn set(&mut self, element_index: u64, element_value: Block) {
+    /// Panics if `element_index` is out of bounds.
+    pub fn get(&self, element_index: u64) -> Block {
         if self.is_packed() {
-            self.blocks[element_index as usize] = element_value;
-            return;
+            return self.blocks[element_index as usize];
         }
 
         let element_bits = self.element_bits();
 
-        debug_assert!(element_value < Block::one() << element_bits,
-                      "IntVec::set: value overflow");
-
         if element_bits == 1 {
-            self.set_bit(element_index, element_value == Block::one());
-            return;
+            if self.get_bit(element_index) {
+                return Block::one();
+            } else {
+                return Block::zero();
+            }
         }
 
-        let block_bits = Self::block_bits();
+        let address = self.compute_address(element_index);
+        self.get_address(address, element_bits)
+    }
 
-        let address = self.element_address(element_index);
+    /// Returns the element at a given index, also given an arbitrary
+    /// element size and bit offset.
+    ///
+    /// This computes the location of the `element_index`th element
+    /// supposing that elements are `element_bits` side, then adds
+    /// `bit_offset` additional bits and returns the `element_bits`-bit
+    /// value found at that location.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the referenced bits are out of bounds. Bounds are
+    /// considered to the end of the support array, even if that goes
+    /// past the last element of the `IntArray`.
+    pub fn get_random(&self,
+                      bit_offset: u64,
+                      element_bits: usize,
+                      element_index: u64) -> Block {
+        let address = self.compute_address_random(bit_offset,
+                                                  element_bits,
+                                                  element_index);
+        self.get_address(address, element_bits)
+    }
+
+    fn set_address(&mut self, address: Address, element_bits: usize,
+                   element_value: Block) {
+        let block_bits = Self::block_bits();
         let margin = block_bits - address.bit_offset;
 
         if margin >= element_bits {
@@ -229,6 +249,62 @@ impl<Block: PrimInt> IntVec<Block> {
 
         self.blocks[address.block_index] = new_block1;
         self.blocks[address.block_index + 1] = new_block2;
+    }
+
+    /// Sets the element at the given index.
+    ///
+    /// # Panics
+    ///
+    ///   - Panics if `element_index` is out of bounds.
+    ///
+    ///   - Debug mode only: Panics if `element_value` is too large to
+    ///     fit in the element size. (TODO: What’s the right thing here?)
+    pub fn set(&mut self, element_index: u64, element_value: Block) {
+        if self.is_packed() {
+            self.blocks[element_index as usize] = element_value;
+            return;
+        }
+
+        let element_bits = self.element_bits();
+
+        debug_assert!(element_value < Block::one() << element_bits,
+                      "IntVec::set: value overflow");
+
+        if element_bits == 1 {
+            self.set_bit(element_index, element_value == Block::one());
+            return;
+        }
+
+        let address = self.compute_address(element_index);
+        self.set_address(address, element_bits, element_value);
+    }
+
+
+    /// Sets the element at a given index to a given value, also given
+    /// an arbitrary element size and bit offset.
+    ///
+    /// This computes the location of the `element_index`th element
+    /// supposing that elements are `element_bits` side, then adds
+    /// `bit_offset` additional bits and modifies the `element_bits`-bit
+    /// value found at that location.
+    ///
+    /// # Panics
+    ///
+    ///   - Panics if the referenced bits are out of bounds. Bounds are
+    ///     considered to the end of the support array, even if that goes
+    ///     past the last element of the `IntArray`.
+    ///
+    ///   - Debug mode only: Panics if `element_value` is too large to
+    ///     fit in the element size. (TODO: What’s the right thing here?)
+    pub fn set_random(&mut self, bit_offset: u64, element_bits: usize,
+                      element_index: u64, element_value: Block) {
+        debug_assert!(element_value < Block::one() << element_bits,
+                      "IntVec::set_random: value overflow");
+
+        let address = self.compute_address_random(bit_offset,
+                                                  element_bits,
+                                                  element_index);
+        self.set_address(address, element_bits, element_value);
     }
 
     /// Pushes an element onto the end of the vector, increasing the
@@ -380,15 +456,10 @@ impl<Block: PrimInt> IntVec<Block> {
         }
     }
 
-    #[inline]
-    fn block_bytes() -> usize {
-        mem::size_of::<Block>()
-    }
-
     /// The number of bits per block of storage.
     #[inline]
     pub fn block_bits() -> usize {
-        8 * Self::block_bytes()
+        Block::nbits()
     }
 
     /// The number of bits per elements.
