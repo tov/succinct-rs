@@ -4,25 +4,28 @@ use std::mem;
 
 /// Types that know how to compute their space usage.
 ///
-/// The space usage is split into two portions, the static portion
-/// (returned by `stack_bytes` and the dynamic portion (returned by
-/// `heap_bytes`). The static portion is the statically-known size
-/// for every object of its type, allocated on the stack; the dynamic
-/// portion is the additional heap allocation that may depend on run-time
-/// factors.
+/// We calculate the space usage is split into two portions, the heap
+/// portion (returned by `heap_bytes` and the stack portion (returned by
+/// `stack_bytes`). The stack portion is the statically-known size for
+/// every object of its type as allocated on the stack; the dynamic
+/// portion is the additional heap allocation that may depend on
+/// run-time factors.
 ///
 /// Examples:
 ///
-///  - The size of primitive types like `u32` and `usize` is statically
-///  known.
+///  - Primitive types like `u32` and `usize` are stack-only.
 ///
-///  - The size of a tuple type is statically known when the sizes of
-///  all its components are.
+///  - A tuple or struct type is stack-only when all its components are.
+///    Its heap portion is the sum of their heap portions, but its stack
+///    portion may exceed the sum of their stack portions because of
+///    alignment and padding.
 ///
-///  - The size of a vector includes a static portion, the vector struct
-///  on the stack, and a dynamic portion, the heap array holding its
-///  elements, including both the static and dynamic sizes of the
-///  elements.
+///  - The size of a vector includes a stack portion, the vector struct
+///    itself, and a heap portion, the array holding its elements. The
+///    heap portion of a vector includes the stack portions of its
+///    elements. (Should they be called something else for this reason? I
+///    considered static/dynamic, but `Box` shows why that doesn’t express
+///    exactly the right property.)
 
 pub trait SpaceUsage: Sized {
     /// Computes the size of the receiver in bytes.
@@ -43,22 +46,23 @@ pub trait SpaceUsage: Sized {
     /// return 0.
     fn is_stack_only() -> bool;
 
-    /// Calculates the static portion of the size of this type.
+    /// Calculates the stack portion of the size of this type.
     ///
-    /// This is the minimum size that all objects of this type occupy,
-    /// not counting storage that objects of the type might allocate
-    /// dynamically.
+    /// This is the size of the immediate storage that all objects of
+    /// this type occupy; it excludes storage that objects of the
+    /// type might allocate dynamically.
     ///
     /// The default implementation returns `std::mem::size_of::<Self>()`.
+
     #[inline]
     fn stack_bytes() -> usize {
         mem::size_of::<Self>()
     }
 
-    /// Calculates the dynamic portion of the size of an object.
+    /// Calculates the heap portion of the size of an object.
     ///
-    /// This is the memory used by (or owned by) the object, not
-    /// including any portion of its size that is known statically and
+    /// This is the memory used by (or, rather, owned by) the object, not
+    /// including any portion of its size that is
     /// included in `stack_bytes`. This is typically for containers
     /// that heap allocate varying amounts of memory.
     ///
@@ -70,7 +74,7 @@ pub trait SpaceUsage: Sized {
 }
 
 #[macro_export]
-macro_rules! impl_static_space_usage {
+macro_rules! impl_stack_only_space_usage {
     ( $t:ty ) =>
     {
         impl SpaceUsage for $t {
@@ -80,19 +84,19 @@ macro_rules! impl_static_space_usage {
     }
 }
 
-impl_static_space_usage!(());
-impl_static_space_usage!(u8);
-impl_static_space_usage!(u16);
-impl_static_space_usage!(u32);
-impl_static_space_usage!(u64);
-impl_static_space_usage!(usize);
-impl_static_space_usage!(i8);
-impl_static_space_usage!(i16);
-impl_static_space_usage!(i32);
-impl_static_space_usage!(i64);
-impl_static_space_usage!(isize);
-impl_static_space_usage!(f32);
-impl_static_space_usage!(f64);
+impl_stack_only_space_usage!(());
+impl_stack_only_space_usage!(u8);
+impl_stack_only_space_usage!(u16);
+impl_stack_only_space_usage!(u32);
+impl_stack_only_space_usage!(u64);
+impl_stack_only_space_usage!(usize);
+impl_stack_only_space_usage!(i8);
+impl_stack_only_space_usage!(i16);
+impl_stack_only_space_usage!(i32);
+impl_stack_only_space_usage!(i64);
+impl_stack_only_space_usage!(isize);
+impl_stack_only_space_usage!(f32);
+impl_stack_only_space_usage!(f64);
 
 macro_rules! impl_tuple_space_usage {
     ( $( $tv:ident ),+ ) =>
