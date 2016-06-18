@@ -17,33 +17,22 @@ pub struct JacobsonRank<'a, Store: ?Sized + BitStore + 'a> {
     small_block_ranks: IntVec<u64>,
 }
 
-fn ceil_log2<Block: BlockType>(block: Block) -> usize {
-    if block <= Block::one() { return 0; }
-
-    Block::nbits() - (block - Block::one()).leading_zeros() as usize
-}
-
-#[inline]
-fn ceil_div<Block: BlockType>(dividend: Block, divisor: Block) -> Block {
-    (dividend + divisor - Block::one()) / divisor
-}
-
 impl<'a, Store: BitStore + ?Sized + 'a>
 JacobsonRank<'a, Store> {
     /// Creates a new rank support structure for the given bit vector.
     pub fn new(bits: &'a Store) -> Self {
         let n = bits.bit_len();
-        let lg_n = ceil_log2(n);
+        let lg_n = n.ceil_log2();
         let lg2_n = lg_n * lg_n;
 
         let small_block_size  = Store::Block::nbits();
-        let small_per_large   = ceil_div(lg2_n, small_block_size);
+        let small_per_large   = lg2_n.ceil_div(small_block_size);
         let large_block_size  = small_block_size * small_per_large;
         let large_block_count = n / large_block_size as u64 + 1;
         let small_block_count = n / small_block_size as u64 + 1;
 
-        let large_meta_size   = ceil_log2(n + 1);
-        let small_meta_size   = ceil_log2(large_block_size + 1);
+        let large_meta_size   = (n + 1).ceil_log2();
+        let small_meta_size   = (large_block_size + 1).ceil_log2();
 
         let mut large_block_ranks =
             IntVecBuilder::new(large_meta_size)
@@ -137,8 +126,7 @@ BitRankSupport for JacobsonRank<'a, Store> {
         let small_rank = self.small_block_ranks.get(small_block);
         let bits_rank  =
             self.bit_store.get_block(small_block as usize)
-                .unsigned_shr((small_block_size - bit_offset - 1) as u32)
-                .count_ones() as u64;
+                .rank1(bit_offset as usize) as u64;
 
         large_rank + small_rank + bits_rank
     }

@@ -19,7 +19,7 @@ pub trait BlockType: PrimInt {
     ///
     /// `element_bits <= Self::nbits()`
     #[inline]
-    fn element_mask(element_bits: usize) -> Self {
+    fn low_mask(element_bits: usize) -> Self {
         debug_assert!(element_bits <= Self::nbits());
 
         if element_bits == Self::nbits() {
@@ -53,7 +53,7 @@ pub trait BlockType: PrimInt {
         let limit      = start + len;
         debug_assert!(limit <= Self::nbits());
 
-        (self >> (Self::nbits() - limit)) & Self::element_mask(len)
+        (self >> (Self::nbits() - limit)) & Self::low_mask(len)
     }
 
     /// Sets `len` bits to `value` starting at offset `start`.
@@ -69,7 +69,7 @@ pub trait BlockType: PrimInt {
         debug_assert!(limit <= Self::nbits());
 
         let after_bits = Self::nbits() - limit;
-        let mask = Self::element_mask(len) << after_bits;
+        let mask = Self::low_mask(len) << after_bits;
         let shifted_value = value << after_bits;
 
         (self & !mask) | (shifted_value & mask)
@@ -89,6 +89,33 @@ pub trait BlockType: PrimInt {
         } else {
             self & !Self::nth_mask(bit_index)
         }
+    }
+
+    /// Returns the smallest number `n` such that `2.pow(n) >= self`.
+    #[inline]
+    fn ceil_log2(self) -> usize {
+        if self <= Self::one() { return 0; }
+        Self::nbits() - (self - Self::one()).leading_zeros() as usize
+    }
+
+    /// Returns the largest number `n` such that `2.pow(n) <= self`.
+    #[inline]
+    fn floor_log2(self) -> usize {
+        if self <= Self::one() { return 0; }
+        Self::nbits() - 1 - self.leading_zeros() as usize
+    }
+
+    /// Returns the smallest number `n` such that `n * divisor >= self`.
+    #[inline]
+    fn ceil_div(self, divisor: Self) -> Self {
+        (self + divisor - Self::one()) / divisor
+    }
+
+    /// Returns the total count of ones up through the `index`th digit,
+    /// big-endian style.
+    fn rank1(self, index: usize) -> usize {
+        self.unsigned_shr((Self::nbits() - index - 1) as u32)
+            .count_ones() as usize
     }
 }
 
@@ -168,9 +195,9 @@ mod test {
     use super::*;
 
     #[test]
-    fn element_mask() {
-        assert_eq!(0b00011111, u8::element_mask(5));
-        assert_eq!(0b0011111111111111, u16::element_mask(14));
+    fn low_mask() {
+        assert_eq!(0b00011111, u8::low_mask(5));
+        assert_eq!(0b0011111111111111, u16::low_mask(14));
     }
 
     #[test]
