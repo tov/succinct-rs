@@ -111,7 +111,7 @@ mod test {
 
     #[test]
     fn select1() {
-        let vec = vec![ 0b10000000000000001110000000000000u32; 1024 ];
+        let vec = vec![ 0b00000000000001110000000000000001u32; 1024 ];
         let rank = JacobsonRank::new(&*vec);
         let select = BinSearchSelect::new(&rank);
 
@@ -143,7 +143,7 @@ mod test {
 
     #[test]
     fn select2() {
-        let vec = vec![ 0b01010101010101010101010101010101u32; 1024 ];
+        let vec = vec![ 0b10101010101010101010101010101010u32; 1024 ];
         let rank = JacobsonRank::new(&*vec);
         let select = BinSearchSelect::new(&rank);
 

@@ -38,6 +38,7 @@ pub mod vector;
 pub use vector::{IntVec, IntVecBuilder};
 
 pub mod storage;
+pub mod stream;
 
 pub mod rank;
 pub use rank::{JacobsonRank};

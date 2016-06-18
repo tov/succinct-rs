@@ -31,14 +31,14 @@ pub trait BlockType: PrimInt {
 
     /// The bit mask with the `bit_index`th bit set.
     ///
-    /// Bits are index in big-endian style based at 0.
+    /// Bits are index in little-endian style based at 0.
     ///
     /// # Precondition
     ///
     /// `bit_index < Self::nbits()`
     #[inline]
     fn nth_mask(bit_index: usize) -> Self {
-        Self::one() << (Self::nbits() - bit_index - 1)
+        Self::one() << bit_index
     }
 
     /// Extracts `len` bits starting at bit offset `start`.
@@ -53,7 +53,7 @@ pub trait BlockType: PrimInt {
         let limit      = start + len;
         debug_assert!(limit <= Self::nbits());
 
-        (self >> (Self::nbits() - limit)) & Self::low_mask(len)
+        (self >> start) & Self::low_mask(len)
     }
 
     /// Sets `len` bits to `value` starting at offset `start`.
@@ -68,9 +68,8 @@ pub trait BlockType: PrimInt {
         let limit      = start + len;
         debug_assert!(limit <= Self::nbits());
 
-        let after_bits = Self::nbits() - limit;
-        let mask = Self::low_mask(len) << after_bits;
-        let shifted_value = value << after_bits;
+        let mask = Self::low_mask(len) << start;
+        let shifted_value = value << start;
 
         (self & !mask) | (shifted_value & mask)
     }
@@ -112,10 +111,9 @@ pub trait BlockType: PrimInt {
     }
 
     /// Returns the total count of ones up through the `index`th digit,
-    /// big-endian style.
+    /// little-endian style.
     fn rank1(self, index: usize) -> usize {
-        self.unsigned_shr((Self::nbits() - index - 1) as u32)
-            .count_ones() as usize
+        (self & Self::low_mask(index + 1)).count_ones() as usize
     }
 }
 
@@ -202,10 +200,11 @@ mod test {
 
     #[test]
     fn nth_mask() {
-        assert_eq!(0b10000000, u8::nth_mask(0));
-        assert_eq!(0b01000000, u8::nth_mask(1));
-        assert_eq!(0b00100000, u8::nth_mask(2));
-        assert_eq!(0b00000001, u8::nth_mask(7));
+        assert_eq!(0b10000000, u8::nth_mask(7));
+        assert_eq!(0b01000000, u8::nth_mask(6));
+        assert_eq!(0b00100000, u8::nth_mask(5));
+        assert_eq!(0b00000010, u8::nth_mask(1));
+        assert_eq!(0b00000001, u8::nth_mask(0));
     }
 
     #[test]
@@ -213,11 +212,11 @@ mod test {
         assert_eq!(0b0,
                    0b0100110001110000u16.get_bits(0, 0));
         assert_eq!(0b010,
-                   0b0100110001110000u16.get_bits(0, 3));
+                   0b0100110001110000u16.get_bits(13, 3));
         assert_eq!(    0b110001,
-                   0b0100110001110000u16.get_bits(4, 6));
+                   0b0100110001110000u16.get_bits(6, 6));
         assert_eq!(           0b10000,
-                   0b0100110001110000u16.get_bits(11, 5));
+                   0b0100110001110000u16.get_bits(0, 5));
         assert_eq!(0b0100110001110000,
                    0b0100110001110000u16.get_bits(0, 16));
     }
@@ -225,13 +224,13 @@ mod test {
     #[test]
     fn set_bits() {
         assert_eq!(0b0111111111000001,
-                   0b0110001111000001u16.set_bits(3, 3, 0b111));
+                   0b0110001111000001u16.set_bits(10, 3, 0b111));
         assert_eq!(0b0101110111000001,
-                   0b0110001111000001u16.set_bits(2, 5, 0b01110));
+                   0b0110001111000001u16.set_bits(9, 5, 0b01110));
         assert_eq!(0b0110001111000001,
-                   0b0110001111000001u16.set_bits(2, 0, 0b01110));
+                   0b0110001111000001u16.set_bits(14, 0, 0b01110));
         assert_eq!(0b0110001110101010,
-                   0b0110001111000001u16.set_bits(8, 8, 0b10101010));
+                   0b0110001111000001u16.set_bits(0, 8, 0b10101010));
         assert_eq!(0b0000000000000010,
                    0b0110001111000001u16.set_bits(0, 16, 0b10));
     }
@@ -243,21 +242,78 @@ mod test {
         assert!(! 0b00000000u8.get_bit(2));
         assert!(! 0b00000000u8.get_bit(3));
         assert!(! 0b00000000u8.get_bit(7));
-        assert!(  0b10101010u8.get_bit(0));
-        assert!(! 0b10101010u8.get_bit(1));
-        assert!(  0b10101010u8.get_bit(2));
-        assert!(! 0b10101010u8.get_bit(3));
-        assert!(! 0b10101010u8.get_bit(7));
+        assert!(! 0b10101010u8.get_bit(0));
+        assert!(  0b10101010u8.get_bit(1));
+        assert!(! 0b10101010u8.get_bit(2));
+        assert!(  0b10101010u8.get_bit(3));
+        assert!(  0b10101010u8.get_bit(7));
     }
 
     #[test]
     fn set_bit() {
-        assert_eq!(0b00100000, 0b00000000u8.set_bit(2, true));
-        assert_eq!(0b00000000, 0b00000000u8.set_bit(2, false));
-        assert_eq!(0b10101010, 0b10101010u8.set_bit(0, true));
-        assert_eq!(0b00101010, 0b10101010u8.set_bit(0, false));
-        assert_eq!(0b10101011, 0b10101010u8.set_bit(7, true));
-        assert_eq!(0b10101010, 0b10101010u8.set_bit(7, false));
+        assert_eq!(0b00100000, 0b00000000u8.set_bit(5, true));
+        assert_eq!(0b00000000, 0b00000000u8.set_bit(5, false));
+        assert_eq!(0b10101010, 0b10101010u8.set_bit(7, true));
+        assert_eq!(0b00101010, 0b10101010u8.set_bit(7, false));
+        assert_eq!(0b10101011, 0b10101010u8.set_bit(0, true));
+        assert_eq!(0b10101010, 0b10101010u8.set_bit(0, false));
+    }
+
+    #[test]
+    fn floor_log2() {
+        assert_eq!(0, 1.floor_log2());
+        assert_eq!(1, 2.floor_log2());
+        assert_eq!(1, 3.floor_log2());
+        assert_eq!(2, 4.floor_log2());
+        assert_eq!(2, 5.floor_log2());
+        assert_eq!(2, 7.floor_log2());
+        assert_eq!(3, 8.floor_log2());
+    }
+
+    #[test]
+    fn ceil_log2() {
+        assert_eq!(0, 1.ceil_log2());
+        assert_eq!(1, 2.ceil_log2());
+        assert_eq!(2, 3.ceil_log2());
+        assert_eq!(2, 4.ceil_log2());
+        assert_eq!(3, 5.ceil_log2());
+        assert_eq!(3, 7.ceil_log2());
+        assert_eq!(3, 8.ceil_log2());
+        assert_eq!(4, 9.ceil_log2());
+    }
+
+    #[test]
+    fn ceil_div() {
+        assert_eq!(6, 12.ceil_div(2));
+        assert_eq!(4, 12.ceil_div(3));
+        assert_eq!(3, 12.ceil_div(4));
+        assert_eq!(3, 12.ceil_div(5));
+        assert_eq!(2, 12.ceil_div(6));
+        assert_eq!(2, 12.ceil_div(7));
+        assert_eq!(2, 12.ceil_div(11));
+        assert_eq!(1, 12.ceil_div(12));
+    }
+
+    #[test]
+    fn rank1() {
+        assert_eq!(0, 0b00000000u8.rank1(0));
+        assert_eq!(0, 0b00000000u8.rank1(7));
+        assert_eq!(1, 0b01010101u8.rank1(0));
+        assert_eq!(1, 0b01010101u8.rank1(1));
+        assert_eq!(2, 0b01010101u8.rank1(2));
+        assert_eq!(2, 0b01010101u8.rank1(3));
+
+        assert_eq!(3, 0b00001111u8.rank1(2));
+        assert_eq!(4, 0b00001111u8.rank1(3));
+        assert_eq!(4, 0b00001111u8.rank1(4));
+        assert_eq!(4, 0b00001111u8.rank1(5));
+        assert_eq!(4, 0b00001111u8.rank1(7));
+
+        assert_eq!(0, 0b11110000u8.rank1(0));
+        assert_eq!(0, 0b11110000u8.rank1(3));
+        assert_eq!(1, 0b11110000u8.rank1(4));
+        assert_eq!(2, 0b11110000u8.rank1(5));
+        assert_eq!(4, 0b11110000u8.rank1(7));
     }
 
     #[test]
@@ -275,17 +331,17 @@ mod test {
     #[test]
     fn store_set_get_bit() {
         let mut v = vec![ 0b10101010u8; 4 ];
-        assert!(  v.get_bit(0));
-        assert!(! v.get_bit(1));
-        assert!(  v.get_bit(2));
-        assert!(! v.get_bit(3));
-
-        v.set_bit(2, false);
-
-        assert!(  v.get_bit(0));
-        assert!(! v.get_bit(1));
+        assert!(! v.get_bit(0));
+        assert!(  v.get_bit(1));
         assert!(! v.get_bit(2));
-        assert!(! v.get_bit(3));
+        assert!(  v.get_bit(3));
+
+        v.set_bit(2, true);
+
+        assert!(! v.get_bit(0));
+        assert!(  v.get_bit(1));
+        assert!(  v.get_bit(2));
+        assert!(  v.get_bit(3));
     }
 }
 
