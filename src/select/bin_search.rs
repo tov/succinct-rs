@@ -1,3 +1,4 @@
+use util::binary_search_function;
 use rank::{BitRankSupport, RankSupport};
 use space_usage::SpaceUsage;
 use storage::BitStore;
@@ -72,38 +73,8 @@ macro_rules! impl_select_support_b {
         impl<'a, Rank: BitRankSupport + 'a>
         $select_support for BinSearchSelect<'a, Rank> {
             fn $select(&self, index: u64) -> Option<u64> {
-                // To find the `index`th 1, we find the position where
-                // the rank goes to `index + 1`.
-                let rank = index + 1;
-
-                let max_index = self.bit_len() - 1;
-                let max_rank = self.rank1(max_index);
-                if rank > max_rank { return None; }
-
-                let mut start = 0;
-                let mut limit = self.bit_len();
-
-                // Search in [start, limit):
-                while start < limit {
-                    // Calculate average without risking overflow:
-                    let mid = start/2 + limit/2 + (start % 2 + limit % 2)/2;
-                    debug_assert!(start <= mid && mid < limit);
-
-                    let mid_rank = self.$rank(mid);
-                    let pre_mid_rank = if mid == 0 {0} else {self.$rank(mid - 1)};
-
-                    if mid_rank == rank && pre_mid_rank == rank - 1 {
-                        return Some(mid)
-                    } else if pre_mid_rank > rank {
-                        limit = mid - 1;
-                    } else if pre_mid_rank == rank {
-                        limit = mid;
-                    } else if mid_rank < rank {
-                        start = mid + 1;
-                    }
-                }
-
-                panic!("BinSearchSelect: broken invariant in rank support?");
+                binary_search_function(0, self.bit_len(), index + 1,
+                                       |i| self.$rank(i))
             }
         }
     }

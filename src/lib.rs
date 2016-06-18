@@ -32,6 +32,8 @@
 
 extern crate num;
 
+mod util;
+
 mod int_vec;
 pub use int_vec::{IntVec, IntVecBuilder};
 
