@@ -10,7 +10,7 @@ pub use self::jacobson::*;
 /// Associated type `Over` gives the type that we can query about. For
 /// example, `RankSupport<Over=bool>` lets us rank `0` and `1`, whereas
 /// `RankSupport<Over=u8>` will rank arbitrary bytes.
-pub trait RankSupport : BitStore {
+pub trait RankSupport {
     /// The type of value to rank.
     type Over;
 
@@ -22,7 +22,7 @@ pub trait RankSupport : BitStore {
 }
 
 /// Convenience trait for `RankSupport` over `bool`.
-pub trait BitRankSupport : RankSupport<Over = bool> {
+pub trait BitRankSupport : BitStore + RankSupport<Over = bool> {
     /// Returns the rank of 1 at the given position.
     ///
     /// This is the number of occurrences of 0 up to that position.
