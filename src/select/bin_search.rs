@@ -1,22 +1,22 @@
-use rank::RankSupport;
+use rank::{BitRankSupport, RankSupport};
 use space_usage::SpaceUsage;
 use storage::BitStore;
 use super::SelectSupport;
 
 /// Performs a select query by binary searching rank queries.
-pub struct BinSearchSelect<'a, Rank: RankSupport + 'a> {
+pub struct BinSearchSelect<'a, Rank: 'a> {
     rank_support: &'a Rank,
     max_rank: u64,
 }
 
 /// Creates a new binary search select support based on a rank support.
-impl<'a, Rank: RankSupport + 'a>
+impl<'a, Rank: BitRankSupport + 'a>
 BinSearchSelect<'a, Rank> {
     /// Creates a new binary search selection support given a rank
     /// support.
     pub fn new(rank_support: &'a Rank) -> Self {
         let max_index = rank_support.bit_len() - 1;
-        let max_rank = rank_support.rank(max_index);
+        let max_rank = rank_support.rank1(max_index);
         BinSearchSelect {
             rank_support: rank_support,
             max_rank: max_rank,
@@ -47,8 +47,16 @@ BitStore for BinSearchSelect<'a, Rank> {
 
 impl<'a, Rank: RankSupport + 'a>
 RankSupport for BinSearchSelect<'a, Rank> {
-    fn rank(&self, index: u64) -> u64 {
-        self.rank_support.rank(index)
+    type Over = Rank::Over;
+    fn rank(&self, index: u64, value: Self::Over) -> u64 {
+        self.rank_support.rank(index, value)
+    }
+}
+
+impl<'a, Rank: BitRankSupport + 'a>
+BitRankSupport for BinSearchSelect<'a, Rank> {
+    fn rank1(&self, index: u64) -> u64 {
+        self.rank_support.rank1(index)
     }
 }
 
@@ -56,7 +64,7 @@ RankSupport for BinSearchSelect<'a, Rank> {
 // could search level by level rather than at arbitrary bit addresses.
 // But then this algorithm would be tied to that representation.
 
-impl<'a, Rank: RankSupport + 'a>
+impl<'a, Rank: BitRankSupport + 'a>
 SelectSupport for BinSearchSelect<'a, Rank> {
     fn select(&self, index: u64) -> Option<u64> {
         // To find the `index`th 1, we find the position where
@@ -74,8 +82,8 @@ SelectSupport for BinSearchSelect<'a, Rank> {
             let mid = start/2 + limit/2 + (start % 2 + limit % 2)/2;
             debug_assert!(start <= mid && mid < limit);
 
-            let mid_rank = self.rank(mid);
-            let pre_mid_rank = if mid == 0 {0} else {self.rank(mid - 1)};
+            let mid_rank = self.rank1(mid);
+            let pre_mid_rank = if mid == 0 {0} else {self.rank1(mid - 1)};
 
             if mid_rank == rank && pre_mid_rank == rank - 1 {
                 return Some(mid)
@@ -92,7 +100,7 @@ SelectSupport for BinSearchSelect<'a, Rank> {
     }
 }
 
-impl<'a, Rank: RankSupport + 'a>
+impl<'a, Rank: BitRankSupport + 'a>
 SpaceUsage for BinSearchSelect<'a, Rank> {
     #[inline]
     fn is_stack_only() -> bool { true }
@@ -110,16 +118,16 @@ mod test {
         let rank = JacobsonRank::new(&*vec);
         let select = BinSearchSelect::new(&rank);
 
-        assert_eq!(1, select.rank(0));
-        assert_eq!(1, select.rank(1));
-        assert_eq!(1, select.rank(2));
-        assert_eq!(1, select.rank(15));
-        assert_eq!(2, select.rank(16));
-        assert_eq!(3, select.rank(17));
-        assert_eq!(4, select.rank(18));
-        assert_eq!(4, select.rank(19));
-        assert_eq!(4, select.rank(20));
-        assert_eq!(5, select.rank(32));
+        assert_eq!(1, select.rank1(0));
+        assert_eq!(1, select.rank1(1));
+        assert_eq!(1, select.rank1(2));
+        assert_eq!(1, select.rank1(15));
+        assert_eq!(2, select.rank1(16));
+        assert_eq!(3, select.rank1(17));
+        assert_eq!(4, select.rank1(18));
+        assert_eq!(4, select.rank1(19));
+        assert_eq!(4, select.rank1(20));
+        assert_eq!(5, select.rank1(32));
 
         assert_eq!(Some(0), select.select(0));
         assert_eq!(Some(16), select.select(1));

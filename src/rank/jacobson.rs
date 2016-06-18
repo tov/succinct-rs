@@ -4,7 +4,7 @@ use int_vec::{IntVec, IntVecBuilder};
 use space_usage::SpaceUsage;
 use storage::{BitStore, BlockType};
 
-use super::RankSupport;
+pub use super::{RankSupport, BitRankSupport};
 
 /// Add-on to `BitStore` to support fast rank queries.
 ///
@@ -109,7 +109,16 @@ BitStore for JacobsonRank<'a, Store> {
 
 impl<'a, Store: ?Sized + BitStore + 'a>
 RankSupport for JacobsonRank<'a, Store> {
-    fn rank(&self, position: u64) -> u64 {
+    type Over = bool;
+
+    fn rank(&self, position: u64, value: bool) -> u64 {
+        if value {self.rank1(position)} else {self.rank0(position)}
+    }
+}
+
+impl<'a, Store: ?Sized + BitStore + 'a>
+BitRankSupport for JacobsonRank<'a, Store> {
+    fn rank1(&self, position: u64) -> u64 {
         // Rank for any position past the end is the rank of the
         // last position.
         let position = ::std::cmp::min(position, self.bit_len() - 1);
@@ -145,29 +154,28 @@ SpaceUsage for JacobsonRank<'a, Store> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use super::super::RankSupport;
 
     #[test]
-    fn rank() {
+    fn rank1() {
         let vec = vec![ 0b10000000000000001110000000000000u32; 1024 ];
         let rank = JacobsonRank::new(&*vec);
 
-        assert_eq!(1, rank.rank(0));
-        assert_eq!(1, rank.rank(1));
-        assert_eq!(1, rank.rank(2));
-        assert_eq!(1, rank.rank(7));
-        assert_eq!(2, rank.rank(16));
-        assert_eq!(3, rank.rank(17));
-        assert_eq!(4, rank.rank(18));
-        assert_eq!(4, rank.rank(19));
-        assert_eq!(4, rank.rank(20));
+        assert_eq!(1, rank.rank1(0));
+        assert_eq!(1, rank.rank1(1));
+        assert_eq!(1, rank.rank1(2));
+        assert_eq!(1, rank.rank1(7));
+        assert_eq!(2, rank.rank1(16));
+        assert_eq!(3, rank.rank1(17));
+        assert_eq!(4, rank.rank1(18));
+        assert_eq!(4, rank.rank1(19));
+        assert_eq!(4, rank.rank1(20));
 
-        assert_eq!(16, rank.rank(4 * 32 - 1));
-        assert_eq!(17, rank.rank(4 * 32));
-        assert_eq!(2048, rank.rank(512 * 32 - 1));
-        assert_eq!(2049, rank.rank(512 * 32));
+        assert_eq!(16, rank.rank1(4 * 32 - 1));
+        assert_eq!(17, rank.rank1(4 * 32));
+        assert_eq!(2048, rank.rank1(512 * 32 - 1));
+        assert_eq!(2049, rank.rank1(512 * 32));
 
-        assert_eq!(4096, rank.rank(1000000));
+        assert_eq!(4096, rank.rank1(1000000));
     }
 
     // This test is a sanity check that we aren’t taking up too much
@@ -184,6 +192,5 @@ mod test {
             assert!((rank.total_bytes() as f64 / vec.total_bytes() as f64)
                         < 0.5);
         }
-
     }
 }
