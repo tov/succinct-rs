@@ -114,6 +114,10 @@ RankSupport for JacobsonRank<'a, Store> {
     fn rank(&self, position: u64, value: bool) -> u64 {
         if value {self.rank1(position)} else {self.rank0(position)}
     }
+
+    fn limit(&self) -> u64 {
+        self.bit_store.bit_len()
+    }
 }
 
 impl<'a, Store: ?Sized + BitStore + 'a>

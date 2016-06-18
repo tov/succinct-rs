@@ -1,7 +1,5 @@
 //! Support for fast rank queries.
 
-use storage::BitStore;
-
 mod jacobson;
 pub use self::jacobson::*;
 
@@ -12,17 +10,24 @@ pub use self::jacobson::*;
 /// `RankSupport<Over=u8>` will rank arbitrary bytes.
 pub trait RankSupport {
     /// The type of value to rank.
-    type Over;
+    type Over: Copy;
 
     /// Returns the rank of the given value at a given position.
     ///
     /// This is the number of occurrences of `value` up to and including
     /// that position.
     fn rank(&self, position: u64, value: Self::Over) -> u64;
+
+    /// The size of the vector being ranked.
+    ///
+    /// Rank queries beyond this point will continue to return the same
+    /// value, so you can think of `limit` as one past the end of the
+    /// last place that the rank changes.
+    fn limit(&self) -> u64;
 }
 
 /// Convenience trait for `RankSupport` over `bool`.
-pub trait BitRankSupport : BitStore + RankSupport<Over = bool> {
+pub trait BitRankSupport : RankSupport<Over = bool> {
     /// Returns the rank of 1 at the given position.
     ///
     /// This is the number of occurrences of 0 up to that position.

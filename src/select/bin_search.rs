@@ -2,7 +2,7 @@ use util::binary_search_function;
 use rank::{BitRankSupport, RankSupport};
 use space_usage::SpaceUsage;
 use storage::BitStore;
-pub use super::{SelectSupport1, SelectSupport0};
+pub use super::{SelectSupport, SelectSupport1, SelectSupport0};
 
 /// Performs a select query by binary searching rank queries.
 pub struct BinSearchSelect<'a, Rank: 'a> {
@@ -50,8 +50,13 @@ BitStore for BinSearchSelect<'a, Rank> {
 impl<'a, Rank: RankSupport + 'a>
 RankSupport for BinSearchSelect<'a, Rank> {
     type Over = Rank::Over;
+
     fn rank(&self, index: u64, value: Self::Over) -> u64 {
         self.rank_support.rank(index, value)
+    }
+
+    fn limit(&self) -> u64 {
+        self.rank_support.limit()
     }
 }
 
@@ -73,7 +78,7 @@ macro_rules! impl_select_support_b {
         impl<'a, Rank: BitRankSupport + 'a>
         $select_support for BinSearchSelect<'a, Rank> {
             fn $select(&self, index: u64) -> Option<u64> {
-                binary_search_function(0, self.bit_len(), index + 1,
+                binary_search_function(0, self.limit(), index + 1,
                                        |i| self.$rank(i))
             }
         }
@@ -82,6 +87,16 @@ macro_rules! impl_select_support_b {
 
 impl_select_support_b!(SelectSupport1, select1, rank1);
 impl_select_support_b!(SelectSupport0, select0, rank0);
+
+impl<'a, Rank: RankSupport + 'a>
+SelectSupport for BinSearchSelect<'a, Rank> {
+    type Over = Rank::Over;
+
+    fn select(&self, index: u64, value: Rank::Over) -> Option<u64> {
+        binary_search_function(0, self.limit(), index + 1,
+                               |i| self.rank(i, value))
+    }
+}
 
 impl<'a, Rank: BitRankSupport + 'a>
 SpaceUsage for BinSearchSelect<'a, Rank> {
