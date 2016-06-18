@@ -1,6 +1,6 @@
 use num::PrimInt;
 
-use int_vec::{IntVec, IntVecBuilder};
+use vector::{IntVector, IntVec, IntVecBuilder};
 use space_usage::SpaceUsage;
 use storage::{BitStore, BlockType};
 

@@ -2,7 +2,7 @@
 //!
 //! This library is a very early work in progress. So far we have:
 //!
-//!   - [integer vectors](int_vec/struct.IntVec.html) with arbitrary-sized
+//!   - [integer vectors](vector/struct.IntVec.html) with arbitrary-sized
 //!     (1- to 64-bit) elements;
 //!   - constant-time [rank](struct.JacobsonRank.html) queries; and
 //!   - *O*(lg lg *n*)-time [select](struct.BinSearchSelect.html) queries
@@ -34,8 +34,8 @@ extern crate num;
 
 mod util;
 
-pub mod int_vec;
-pub use int_vec::{IntVec, IntVecBuilder};
+pub mod vector;
+pub use vector::{IntVec, IntVecBuilder};
 
 pub mod storage;
 

@@ -3,13 +3,13 @@
 mod bin_search;
 pub use self::bin_search::*;
 
-/// Interface for types that support selecting the *n*th 1 bit.
+/// Interface for types that support selecting for 1 bits.
 pub trait SelectSupport1 {
     /// Returns the position of the `index`th 1 bit.
     fn select1(&self, index: u64) -> Option<u64>;
 }
 
-/// Interface for types that support selecting the *n*th 0 bit.
+/// Interface for types that support selecting for 0 bits.
 pub trait SelectSupport0 {
     /// Returns the position of the `index`th 0 bit.
     fn select0(&self, index: u64) -> Option<u64>;

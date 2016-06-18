@@ -1,14 +1,10 @@
-//! Bit-packed vectors of *k*-bit unsigned integers.
-
 use std::{fmt, mem};
 
 use num::{PrimInt, ToPrimitive};
 
+use super::*;
 use storage::{BitStore, BitStoreMut, BlockType};
 use space_usage::SpaceUsage;
-
-pub mod builder;
-pub use self::builder::IntVecBuilder;
 
 /// A vector of *k*-bit unsigned integers, where *k* is determined at
 /// run time.
@@ -143,18 +139,6 @@ impl<Block: PrimInt> IntVec<Block> {
         Self::compute_n_blocks(element_bits, n_elements).is_ok()
     }
 
-    /// Returns the number of elements in the vector.
-    #[inline]
-    pub fn len(&self) -> u64 {
-        self.n_elements
-    }
-
-    /// Is the vector empty?
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
     fn get_address(&self, address: Address, element_bits: usize) -> Block {
         let block_bits = Self::block_bits();
         let margin = block_bits - address.bit_offset;
@@ -173,30 +157,6 @@ impl<Block: PrimInt> IntVec<Block> {
         let low_bits = block2.get_bits(0, extra);
 
         (high_bits << extra) | low_bits
-    }
-
-    /// Returns the element at the given index.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `element_index` is out of bounds.
-    pub fn get(&self, element_index: u64) -> Block {
-        if self.is_packed() {
-            return self.blocks[element_index as usize];
-        }
-
-        let element_bits = self.element_bits();
-
-        if element_bits == 1 {
-            if self.get_bit(element_index) {
-                return Block::one();
-            } else {
-                return Block::zero();
-            }
-        }
-
-        let address = self.compute_address(element_index);
-        self.get_address(address, element_bits)
     }
 
     /// Returns the element at a given index, also given an arbitrary
@@ -249,34 +209,6 @@ impl<Block: PrimInt> IntVec<Block> {
 
         self.blocks[address.block_index] = new_block1;
         self.blocks[address.block_index + 1] = new_block2;
-    }
-
-    /// Sets the element at the given index.
-    ///
-    /// # Panics
-    ///
-    ///   - Panics if `element_index` is out of bounds.
-    ///
-    ///   - Debug mode only: Panics if `element_value` is too large to
-    ///     fit in the element size. (TODO: What’s the right thing here?)
-    pub fn set(&mut self, element_index: u64, element_value: Block) {
-        if self.is_packed() {
-            self.blocks[element_index as usize] = element_value;
-            return;
-        }
-
-        let element_bits = self.element_bits();
-
-        debug_assert!(element_value < Block::one() << element_bits,
-                      "IntVec::set: value overflow");
-
-        if element_bits == 1 {
-            self.set_bit(element_index, element_value == Block::one());
-            return;
-        }
-
-        let address = self.compute_address(element_index);
-        self.set_address(address, element_bits, element_value);
     }
 
 
@@ -462,12 +394,6 @@ impl<Block: PrimInt> IntVec<Block> {
         Block::nbits()
     }
 
-    /// The number of bits per elements.
-    #[inline]
-    pub fn element_bits(&self) -> usize {
-        self.element_bits
-    }
-
     /// True if elements are packed one per block.
     #[inline]
     pub fn is_packed(&self) -> bool {
@@ -482,6 +408,59 @@ impl<Block: PrimInt> IntVec<Block> {
 
     // TODO: fn align(&mut self) chooses element_bits...
 
+}
+
+impl<Block: BlockType> IntVector for IntVec<Block> {
+    type Block = Block;
+
+    fn len(&self) -> u64 {
+        self.n_elements
+    }
+
+    fn get(&self, element_index: u64) -> Block {
+        if self.is_packed() {
+            return self.blocks[element_index as usize];
+        }
+
+        let element_bits = self.element_bits();
+
+        if element_bits == 1 {
+            if self.get_bit(element_index) {
+                return Block::one();
+            } else {
+                return Block::zero();
+            }
+        }
+
+        let address = self.compute_address(element_index);
+        self.get_address(address, element_bits)
+    }
+
+    fn element_bits(&self) -> usize {
+        self.element_bits
+    }
+}
+
+impl<Block: BlockType> IntVectorMut for IntVec<Block> {
+    fn set(&mut self, element_index: u64, element_value: Block) {
+        if self.is_packed() {
+            self.blocks[element_index as usize] = element_value;
+            return;
+        }
+
+        let element_bits = self.element_bits();
+
+        debug_assert!(element_value < Block::one() << element_bits,
+                      "IntVec::set: value overflow");
+
+        if element_bits == 1 {
+            self.set_bit(element_index, element_value == Block::one());
+            return;
+        }
+
+        let address = self.compute_address(element_index);
+        self.set_address(address, element_bits, element_value);
+    }
 }
 
 impl<Block: BlockType> BitStore for IntVec<Block> {
@@ -775,5 +754,117 @@ mod test {
         assert!(  v.get_bit(1));
         assert!(! v.get_bit(2));
         assert!(  v.get_bit(3));
+    }
+}
+
+use std::marker::PhantomData;
+
+/// Builder for configuring and constructing an `IntVec`.
+#[derive(Clone, Debug)]
+pub struct IntVecBuilder<Block: BlockType = usize> {
+    /// The number of bits in each element.
+    element_bits: usize,
+    /// The initial number of elements.
+    n_elements: u64,
+    /// The number of elements to allocate storage for.
+    capacity: u64,
+    /// How to initialize the elements.
+    fill: Fill<Block>,
+    marker: PhantomData<Block>,
+}
+
+impl<Block: BlockType> Default for IntVecBuilder<Block> {
+    fn default() -> Self {
+        IntVecBuilder::<Block>::new(Block::nbits())
+    }
+}
+
+impl<Block: BlockType> IntVecBuilder<Block> {
+    /// Creates a new `IntVecBuilder` with `element_bits` bits per
+    /// elements.
+    pub fn new(element_bits: usize) -> Self {
+        assert!(element_bits != 0,
+                "IntVecBuilder: cannot have 0-bit elements.");
+        IntVecBuilder {
+            element_bits: element_bits,
+            n_elements: 0,
+            capacity: 0,
+            fill: Fill::Block(Block::zero()),
+            marker: PhantomData,
+        }
+    }
+
+    /// Builds the specified `IntVec`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the size conditions of [`IntVec::<Block>::is_okay_size()`](struct.IntVec.html#method.is_okay_size) are not met.
+    pub fn build(&self) -> IntVec<Block> {
+        let n_blocks
+            = IntVec::<Block>::compute_n_blocks(self.element_bits,
+                                                self.capacity).unwrap();
+
+        let mut result = IntVec {
+            blocks: Vec::with_capacity(n_blocks),
+            n_elements: 0,
+            element_bits: self.element_bits,
+        };
+
+        result.resize(self.n_elements, self.fill);
+
+        result
+    }
+
+    /// Sets the element size to `element_bits`.
+    ///
+    /// The elements will range from `0` to `2.pow(element_bits) - 1`.
+    pub fn element_bits(&mut self, element_bits: usize) -> &mut Self {
+        self.element_bits = element_bits;
+        self
+    }
+
+    /// Sets the initial number of elements.
+    ///
+    /// If `n_elements()` finds that `capacity()` has been set to a
+    /// lower value, it adjust `capacity()` upward.
+    pub fn n_elements(&mut self, n_elements: u64) -> &mut Self {
+        self.n_elements = n_elements;
+        if self.n_elements > self.capacity {
+            self.capacity = self.n_elements;
+        }
+        self
+    }
+
+    /// Sets the size of the initial allocation, which may be larger
+    /// than the initial number of elements.
+    ///
+    /// If `capacity()` finds that `n_elements()` has been set to a
+    /// higher value, it adjust `n_elements()` downward.
+    pub fn capacity(&mut self, capacity: u64) -> &mut Self {
+        self.capacity = capacity;
+        if self.capacity < self.n_elements {
+            self.n_elements = capacity;
+        }
+        self
+    }
+
+    /// Zero-fill the new vector’s data.
+    pub fn zero_fill(&mut self) -> &mut Self {
+        self.fill = Fill::Block(Block::zero());
+        self
+    }
+
+    /// Fill the vector’s data with the specified block. This will align
+    /// as a block, which may not align with elements in any particular way.
+    /// It’s not yet specified how the elements are laid out.
+    pub fn block_fill(&mut self, block: Block) -> &mut Self {
+        self.fill = Fill::Block(block);
+        self
+    }
+
+    /// Fill the vector’s data with the given element.
+    pub fn element_fill(&mut self, element: Block) -> &mut Self {
+        self.fill = Fill::Element(element);
+        self
     }
 }
