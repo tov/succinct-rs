@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 
 use num::{PrimInt, ToPrimitive};
 
-use super::*;
+pub use super::*;
 use storage::{BitStore, BitStoreMut, BlockType};
 use space_usage::SpaceUsage;
 
