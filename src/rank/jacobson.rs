@@ -149,7 +149,7 @@ mod test {
 
     #[test]
     fn rank1() {
-        let vec = vec![ 0b00000000000001110000000000000001; 1024 ];
+        let vec = vec![ 0b00000000000001110000000000000001u32; 1024 ];
         let rank = JacobsonRank::new(&*vec);
 
         assert_eq!(1, rank.rank1(0));

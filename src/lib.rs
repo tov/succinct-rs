@@ -30,6 +30,7 @@
 #![cfg_attr(feature = "clippy", feature(plugin))]
 #![cfg_attr(feature = "clippy", plugin(clippy))]
 
+extern crate byteorder;
 extern crate num;
 
 mod util;
@@ -38,6 +39,7 @@ pub mod vector;
 pub use vector::{IntVec, IntVecBuilder};
 
 pub mod storage;
+pub mod stream;
 
 pub mod rank;
 pub use rank::{JacobsonRank};

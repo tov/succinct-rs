@@ -1,7 +1,9 @@
 //! Traits for describing how bits and arrays of bits are stored.
 
+use std::io;
 use std::mem;
 
+use byteorder::{ByteOrder, ReadBytesExt, WriteBytesExt};
 use num::{PrimInt, ToPrimitive};
 
 /// Types that can be used for `IntVec` storage.
@@ -115,9 +117,84 @@ pub trait BlockType: PrimInt {
     fn rank1(self, index: usize) -> usize {
         (self & Self::low_mask(index + 1)).count_ones() as usize
     }
+
+    /// Reads a block with the specified endianness.
+    fn read_block<R, T>(source: &mut R) -> io::Result<Self>
+        where R: io::Read, T: ByteOrder;
+
+    /// Writes a block with the specified endianness.
+    fn write_block<W, T>(&self, sink: &mut W) -> io::Result<()>
+        where W: io::Write, T: ByteOrder;
 }
 
-impl<Block: PrimInt> BlockType for Block { }
+
+impl BlockType for u8 {
+    fn read_block<R, T>(source: &mut R) -> io::Result<Self>
+        where R: io::Read,
+              T: ByteOrder {
+        source.read_u8()
+    }
+
+    fn write_block<W, T>(&self, sink: &mut W) -> io::Result<()>
+        where W: io::Write,
+              T: ByteOrder {
+        sink.write_u8(*self)
+    }
+}
+
+macro_rules! impl_block_type {
+    ($ty:ident, $read:ident, $write:ident)
+        =>
+    {
+        impl BlockType for $ty {
+            fn read_block<R, T>(source: &mut R) -> io::Result<Self>
+                where R: io::Read,
+                      T: ByteOrder {
+                source.$read::<T>()
+            }
+
+            fn write_block<W, T>(&self, sink: &mut W) -> io::Result<()>
+                where W: io::Write,
+                      T: ByteOrder {
+                sink.$write::<T>(*self)
+            }
+        }
+    }
+}
+
+impl_block_type!(u16, read_u16, write_u16);
+impl_block_type!(u32, read_u32, write_u32);
+impl_block_type!(u64, read_u64, write_u64);
+
+#[cfg(target_pointer_width = "64")]
+impl BlockType for usize {
+    fn read_block<R, T>(source: &mut R) -> io::Result<Self>
+        where R: io::Read,
+              T: ByteOrder {
+        source.read_u64::<T>().map(|x| x as usize)
+    }
+
+    fn write_block<W, T>(&self, sink: &mut W) -> io::Result<()>
+        where W: io::Write,
+              T: ByteOrder {
+        sink.write_u64::<T>(*self as u64)
+    }
+}
+
+#[cfg(target_pointer_width = "32")]
+impl BlockType for usize {
+    fn read_block<R, T>(source: &mut R) -> io::Result<Self>
+        where R: io::Read,
+              T: ByteOrder {
+        source.read_u32::<T>().map(|x| x as usize)
+    }
+
+    fn write_block<W, T>(&self, sink: &mut W) -> io::Result<()>
+        where W: io::Write,
+              T: ByteOrder {
+        sink.write_u32::<T>(*self as u32)
+    }
+}
 
 /// Interface for read-only bit vector operations.
 pub trait BitStore {
@@ -261,37 +338,37 @@ mod test {
 
     #[test]
     fn floor_log2() {
-        assert_eq!(0, 1.floor_log2());
-        assert_eq!(1, 2.floor_log2());
-        assert_eq!(1, 3.floor_log2());
-        assert_eq!(2, 4.floor_log2());
-        assert_eq!(2, 5.floor_log2());
-        assert_eq!(2, 7.floor_log2());
-        assert_eq!(3, 8.floor_log2());
+        assert_eq!(0, 1u32.floor_log2());
+        assert_eq!(1, 2u32.floor_log2());
+        assert_eq!(1, 3u32.floor_log2());
+        assert_eq!(2, 4u32.floor_log2());
+        assert_eq!(2, 5u32.floor_log2());
+        assert_eq!(2, 7u32.floor_log2());
+        assert_eq!(3, 8u32.floor_log2());
     }
 
     #[test]
     fn ceil_log2() {
-        assert_eq!(0, 1.ceil_log2());
-        assert_eq!(1, 2.ceil_log2());
-        assert_eq!(2, 3.ceil_log2());
-        assert_eq!(2, 4.ceil_log2());
-        assert_eq!(3, 5.ceil_log2());
-        assert_eq!(3, 7.ceil_log2());
-        assert_eq!(3, 8.ceil_log2());
-        assert_eq!(4, 9.ceil_log2());
+        assert_eq!(0, 1u32.ceil_log2());
+        assert_eq!(1, 2u32.ceil_log2());
+        assert_eq!(2, 3u32.ceil_log2());
+        assert_eq!(2, 4u32.ceil_log2());
+        assert_eq!(3, 5u32.ceil_log2());
+        assert_eq!(3, 7u32.ceil_log2());
+        assert_eq!(3, 8u32.ceil_log2());
+        assert_eq!(4, 9u32.ceil_log2());
     }
 
     #[test]
     fn ceil_div() {
-        assert_eq!(6, 12.ceil_div(2));
-        assert_eq!(4, 12.ceil_div(3));
-        assert_eq!(3, 12.ceil_div(4));
-        assert_eq!(3, 12.ceil_div(5));
-        assert_eq!(2, 12.ceil_div(6));
-        assert_eq!(2, 12.ceil_div(7));
-        assert_eq!(2, 12.ceil_div(11));
-        assert_eq!(1, 12.ceil_div(12));
+        assert_eq!(6, 12u32.ceil_div(2));
+        assert_eq!(4, 12u32.ceil_div(3));
+        assert_eq!(3, 12u32.ceil_div(4));
+        assert_eq!(3, 12u32.ceil_div(5));
+        assert_eq!(2, 12u32.ceil_div(6));
+        assert_eq!(2, 12u32.ceil_div(7));
+        assert_eq!(2, 12u32.ceil_div(11));
+        assert_eq!(1, 12u32.ceil_div(12));
     }
 
     #[test]

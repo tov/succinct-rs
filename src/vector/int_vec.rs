@@ -1,7 +1,7 @@
 use std::{fmt, mem};
 use std::marker::PhantomData;
 
-use num::{PrimInt, ToPrimitive};
+use num::ToPrimitive;
 
 pub use super::*;
 use storage::{BitStore, BitStoreMut, BlockType};
@@ -50,7 +50,7 @@ impl Address {
     }
 }
 
-impl<Block: PrimInt> IntVec<Block> {
+impl<Block: BlockType> IntVec<Block> {
     // Computes the number of blocks from the number of elements.
     // Performs sufficient overflow checks that we shouldn’t have to
     // repeat them each time we index, even though it’s nearly the
@@ -733,7 +733,7 @@ mod test {
 
     #[test]
     fn aligned() {
-        let mut v = IntVecBuilder::new(4).n_elements(20).build();
+        let mut v = IntVecBuilder::<u32>::new(4).n_elements(20).build();
         assert_eq!(20, v.len());
 
         assert_eq!(0, v.get(0));
@@ -759,13 +759,13 @@ mod test {
     #[test]
     #[should_panic]
     fn aligned_oob() {
-        let v = IntVecBuilder::new(4).n_elements(20).build();
+        let v = IntVecBuilder::<u32>::new(4).n_elements(20).build();
         assert_eq!(0, v.get(20));
     }
 
     #[test]
     fn unaligned() {
-        let mut v = IntVecBuilder::new(5).n_elements(20).build();
+        let mut v = IntVecBuilder::<u32>::new(5).n_elements(20).build();
         assert_eq!(20, v.len());
 
         assert_eq!(0, v.get(0));
@@ -791,13 +791,13 @@ mod test {
     #[test]
     #[should_panic]
     fn unaligned_oob() {
-        let v = IntVecBuilder::new(5).n_elements(20).build();
+        let v = IntVecBuilder::<u32>::new(5).n_elements(20).build();
         assert_eq!(0, v.get(20));
     }
 
     #[test]
     fn pop() {
-        let mut v = IntVec::new(7);
+        let mut v = IntVec::<u32>::new(7);
         assert_eq!(None, v.pop());
         v.push(1);
         v.push(2);
@@ -840,7 +840,7 @@ mod test {
     #[test]
     #[should_panic]
     fn value_overflow() {
-        let mut v = IntVec::new(3);
+        let mut v = IntVec::<u32>::new(3);
         v.push(78); // 78 is too big
     }
 
@@ -848,7 +848,7 @@ mod test {
     fn bit_vector() {
         use storage::*;
 
-        let mut v = IntVec::new(1);
+        let mut v = IntVec::<u32>::new(1);
         v.push(1);
         v.push(0);
         v.push(0);
