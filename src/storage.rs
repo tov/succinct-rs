@@ -268,6 +268,7 @@ impl<Block: BlockType> BitStoreMut for [Block] {
 #[cfg(test)]
 mod test {
     use super::*;
+    use quickcheck::{quickcheck, TestResult};
 
     #[test]
     fn low_mask() {
@@ -345,6 +346,16 @@ mod test {
         assert_eq!(2, 5u32.floor_log2());
         assert_eq!(2, 7u32.floor_log2());
         assert_eq!(3, 8u32.floor_log2());
+
+        fn prop(n: u64) -> TestResult {
+            if n == 0 { return TestResult::discard(); }
+
+            TestResult::from_bool(
+                2u64.pow(n.floor_log2() as u32) <= n
+                    && 2u64.pow(n.floor_log2() as u32 + 1) > n)
+        }
+
+        quickcheck(prop as fn(u64) -> TestResult);
     }
 
     #[test]
@@ -357,6 +368,16 @@ mod test {
         assert_eq!(3, 7u32.ceil_log2());
         assert_eq!(3, 8u32.ceil_log2());
         assert_eq!(4, 9u32.ceil_log2());
+
+        fn prop(n: u64) -> TestResult {
+            if n <= 1 { return TestResult::discard(); }
+
+            TestResult::from_bool(
+                2u64.pow(n.ceil_log2() as u32) >= n
+                    && 2u64.pow(n.ceil_log2() as u32 - 1) < n)
+        }
+
+        quickcheck(prop as fn(u64) -> TestResult);
     }
 
     #[test]
@@ -369,6 +390,16 @@ mod test {
         assert_eq!(2, 12u32.ceil_div(7));
         assert_eq!(2, 12u32.ceil_div(11));
         assert_eq!(1, 12u32.ceil_div(12));
+
+        fn prop(n: u64, m: u64) -> TestResult {
+            if n * m == 0 { return TestResult::discard(); }
+
+            TestResult::from_bool(
+                m * n.ceil_div(m) >= n
+                    && m * (n.ceil_div(m) - 1) < n)
+        }
+
+        quickcheck(prop as fn(u64, u64) -> TestResult);
     }
 
     #[test]

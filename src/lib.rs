@@ -33,6 +33,9 @@
 extern crate byteorder;
 extern crate num;
 
+#[cfg(test)]
+extern crate quickcheck;
+
 mod util;
 mod errors;
 
