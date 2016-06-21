@@ -41,7 +41,33 @@ impl UniversalCode for Fibonacci {
     }
 
     fn decode<R: BitRead>(source: &mut R) -> Result<Option<u64>> {
-        unimplemented!();
+        let mut result  = 0;
+        let mut fib_i_1 = 1;
+        let mut fib_i   = 1;
+
+        let mut previous = false;
+
+        while let Some(bit) = try!(source.read_bit()) {
+            if bit && previous {
+                return Ok(Some(result));
+            }
+
+            if bit {
+                result += fib_i;
+            }
+
+            let fib_i_2 = fib_i_1;
+            fib_i_1 = fib_i;
+            fib_i = fib_i_1 + fib_i_2;
+
+            previous = bit;
+        }
+
+        if result == 0 {
+            Ok(None)
+        } else {
+            out_of_bits("Fibonacci::decode")
+        }
     }
 }
 
@@ -60,10 +86,15 @@ mod test {
         Fibonacci::encode(&mut dv, 3).unwrap();
         Fibonacci::encode(&mut dv, 4).unwrap();
 
-        // assert_eq!(Some(2), Fibonacci::decode(&mut dv).unwrap());
-        // assert_eq!(Some(3), Fibonacci::decode(&mut dv).unwrap());
-        // assert_eq!(Some(4), Fibonacci::decode(&mut dv).unwrap());
-        // assert_eq!(None::<u64>, Fibonacci::decode(&mut dv).unwrap());
+        assert_eq!(Some(2), Fibonacci::decode(&mut dv).unwrap());
+        assert_eq!(Some(3), Fibonacci::decode(&mut dv).unwrap());
+        assert_eq!(Some(4), Fibonacci::decode(&mut dv).unwrap());
+        assert_eq!(None::<u64>, Fibonacci::decode(&mut dv).unwrap());
     }
 
+    #[test]
+    fn qc() {
+        quickcheck(properties::code_decode::<Fibonacci>
+                        as fn(Vec<u64>) -> bool);
+    }
 }

@@ -16,7 +16,7 @@ pub struct Elias<Header: UniversalCode>(PhantomData<Header>);
 pub type Gamma = Elias<Unary>;
 
 /// An Elias delta code encodes the header using the Elias gamma code.
-pub type Delta = Elias<Gamma>;
+pub type Delta = Elias<Lift0<Gamma>>;
 
 /// An Elias omega code iterates the Elias encoding.
 pub struct Omega;
@@ -79,7 +79,9 @@ impl UniversalCode for Omega {
 #[cfg(test)]
 mod test {
     use std::collections::VecDeque;
+    use quickcheck::quickcheck;
     use coding::*;
+    use coding::properties;
 
     #[test]
     fn gamma() {
@@ -125,5 +127,20 @@ mod test {
         assert_eq!(Some(38932), Omega::decode(&mut dv).unwrap());
         assert_eq!(Some(4), Omega::decode(&mut dv).unwrap());
         assert_eq!(None::<u64>, Omega::decode(&mut dv).unwrap());
+    }
+
+    #[test]
+    fn qc_gamma() {
+        quickcheck(properties::code_decode::<Gamma> as fn(Vec<u64>) -> bool);
+    }
+
+    #[test]
+    fn qc_delta() {
+        quickcheck(properties::code_decode::<Delta> as fn(Vec<u64>) -> bool);
+    }
+
+    #[test]
+    fn qc_omega() {
+        quickcheck(properties::code_decode::<Omega> as fn(Vec<u64>) -> bool);
     }
 }
