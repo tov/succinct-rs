@@ -8,13 +8,16 @@ pub struct Fibonacci;
 impl UniversalCode for Fibonacci {
     fn encode<W: BitWrite>(sink: &mut W, mut value: u64) -> Result<()> {
         assert!(value != 0, "Fibonacci codes cannot handle 0.");
-        let mut fib_i_1 = 0;
+        let mut fib_i_1 = 1;
         let mut fib_i   = 1;
 
         while fib_i <= value {
             let fib_i_2 = fib_i_1;
             fib_i_1 = fib_i;
-            fib_i = fib_i_1 + fib_i_2;
+            fib_i = match fib_i_1.checked_add(fib_i_2) {
+                Some(n) => n,
+                None => return too_many_bits("Fibonacci::encode"),
+            };
         }
 
         // Now fib_i_1 is the largest Fibonacci number <= value
@@ -58,7 +61,10 @@ impl UniversalCode for Fibonacci {
 
             let fib_i_2 = fib_i_1;
             fib_i_1 = fib_i;
-            fib_i = fib_i_1 + fib_i_2;
+            fib_i = match fib_i_1.checked_add(fib_i_2) {
+                Some(n) => n,
+                None => return too_many_bits("Fibonacci::decode"),
+            };
 
             previous = bit;
         }

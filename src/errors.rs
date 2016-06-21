@@ -8,6 +8,5 @@ pub fn out_of_bits<A>(who: &str) -> Result<A> {
 
 pub fn too_many_bits<A>(who: &str) -> Result<A> {
     Err(Error::new(ErrorKind::InvalidInput,
-                   format!("{}: could not decode: value too big for type",
-                           who)))
+                   format!("{}: value too big for type", who)))
 }
