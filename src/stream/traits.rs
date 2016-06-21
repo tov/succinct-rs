@@ -36,10 +36,10 @@ pub trait BitRead {
 
         for _ in 0 .. nbits {
             if let Some(bit) = try!(self.read_bit()) {
+                result = result << 1;
                 if bit {
                     result = result | N::one()
                 }
-                result = result << 1;
             } else {
                 return out_of_bits("BitRead::read_int");
             }
@@ -59,6 +59,19 @@ pub trait BitWrite {
         for _ in 0 .. nbits {
             try!(self.write_bit(value & N::one() == N::one()));
             value = value >> 1;
+        }
+
+        Ok(())
+    }
+
+    /// Writes the lower `nbits` of `value`, most-significant first.
+    fn write_int_be<N: PrimInt>(&mut self, nbits: usize, value: N)
+                                -> Result<()> {
+        let mut mask = N::one() << nbits - 1;
+
+        for _ in 0 .. nbits {
+            try!(self.write_bit(value & mask != N::zero()));
+            mask = mask >> 1;
         }
 
         Ok(())
@@ -145,6 +158,35 @@ mod test {
     }
 
     #[test]
+    fn read_int_be() {
+        let mut vd = VecDeque::new();
+
+        vd.write_bit(false).unwrap();
+        assert_eq!(Some(0), vd.read_int_be(1).ok());
+
+        vd.write_bit(true).unwrap();
+        assert_eq!(Some(1), vd.read_int_be(1).ok());
+
+        vd.write_bit(true).unwrap();
+        vd.write_bit(false).unwrap();
+        assert_eq!(Some(2), vd.read_int_be(2).ok());
+
+        vd.write_bit(false).unwrap();
+        vd.write_bit(true).unwrap();
+        assert_eq!(Some(1), vd.read_int_be(2).ok());
+
+        vd.write_bit(true).unwrap();
+        vd.write_bit(true).unwrap();
+        assert_eq!(Some(3), vd.read_int_be(2).ok());
+
+        vd.write_bit(true).unwrap();
+        vd.write_bit(true).unwrap();
+        vd.write_bit(false).unwrap();
+        vd.write_bit(false).unwrap();
+        assert_eq!(Some(12), vd.read_int_be(4).ok());
+    }
+
+    #[test]
     fn write_int() {
         let mut vd = VecDeque::new();
 
@@ -163,5 +205,26 @@ mod test {
         assert_eq!(Some(1), vd.read_int(4).ok());
         assert_eq!(Some(0), vd.read_int(4).ok());
         assert_eq!(Some(6), vd.read_int(4).ok());
+    }
+
+    #[test]
+    fn write_int_be() {
+        let mut vd = VecDeque::new();
+
+        vd.write_int_be(5, 6).unwrap();
+        vd.write_int_be(5, 7).unwrap();
+        vd.write_int_be(5, 2).unwrap();
+        vd.write_int_be(4, 3).unwrap();
+        vd.write_int_be(4, 1).unwrap();
+        vd.write_int_be(4, 0).unwrap();
+        vd.write_int_be(4, 6).unwrap();
+
+        assert_eq!(Some(6), vd.read_int_be(5).ok());
+        assert_eq!(Some(7), vd.read_int_be(5).ok());
+        assert_eq!(Some(2), vd.read_int_be(5).ok());
+        assert_eq!(Some(3), vd.read_int_be(4).ok());
+        assert_eq!(Some(1), vd.read_int_be(4).ok());
+        assert_eq!(Some(0), vd.read_int_be(4).ok());
+        assert_eq!(Some(6), vd.read_int_be(4).ok());
     }
 }

@@ -42,23 +42,18 @@ impl<Header: UniversalCode> UniversalCode for Elias<Header> {
 
 impl UniversalCode for Omega {
     fn encode<W: BitWrite>(sink: &mut W, mut value: u64) -> Result<()> {
-        let mut stack = Vec::<bool>::new();
-        stack.push(false);
+        let mut stack = Vec::<(usize, u64)>::new();
 
         while value > 1 {
             let nbits = 64 - value.leading_zeros();
-
-            for _ in 0 .. nbits {
-                stack.push(value & 1 == 1);
-                value >>= 1;
-            }
-
+            stack.push((nbits as usize, value));
             value = nbits as u64 - 1;
         }
 
-        while let Some(bit) = stack.pop() {
-            try!(sink.write_bit(bit));
+        while let Some((nbits, value)) = stack.pop() {
+            try!(sink.write_int_be(nbits, value));
         }
+        try!(sink.write_bit(false));
 
         Ok(())
     }
@@ -70,17 +65,7 @@ impl UniversalCode for Omega {
             if let Some(bit) = try!(source.read_bit()) {
                 if !bit { return Ok(Some(result)); }
 
-                let mut next: u64 = 0;
-                for _ in 0 .. result {
-                    next <<= 1;
-
-                    match try!(source.read_bit()) {
-                        Some(true) => { next |= 1; }
-                        Some(false) => { }
-                        None => { return out_of_bits("Omega::decode"); }
-                    }
-                }
-
+                let next: u64 = try!(source.read_int_be(result as usize));
                 result = next | (1 << result as u32)
             } else if result == 1 {
                 return Ok(None);
