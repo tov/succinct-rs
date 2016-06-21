@@ -19,16 +19,20 @@ impl UniversalCode for Unary {
 
     fn decode<R: BitRead>(source: &mut R) -> Result<Option<u64>> {
         let mut result = 0;
+        let mut consumed = false;
 
         while let Some(bit) = try!(source.read_bit()) {
             if bit { return Ok(Some(result)); }
+            // This can't overflow because it would require too many
+            // unary digits to get there:
             result = result + 1;
+            consumed = true;
         }
 
-        if result == 0 {
-            Ok(None)
-        } else {
+        if consumed {
             out_of_bits("Unary::decode")
+        } else {
+            Ok(None)
         }
     }
 }

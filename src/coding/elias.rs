@@ -21,17 +21,23 @@ pub type Delta = Elias<Lift0<Gamma>>;
 /// An Elias omega code iterates the Elias encoding.
 pub struct Omega;
 
+const WORD_BITS: u32 = 64;
+
 impl<Header: UniversalCode> UniversalCode for Elias<Header> {
     fn encode<W: BitWrite>(sink: &mut W, value: u64) -> Result<()> {
         assert!(value != 0, "Elias codes do not handle 0");
 
-        let nbits = 64 - value.leading_zeros() - 1;
+        let nbits: u32 = WORD_BITS - 1 - value.leading_zeros();
         try!(Header::encode(sink, nbits as u64));
         sink.write_int(nbits as usize, value)
     }
 
     fn decode<R: BitRead>(source: &mut R) -> Result<Option<u64>> {
         if let Some(nbits) = try!(Header::decode(source)) {
+            if nbits > WORD_BITS as u64 - 1 {
+                return too_many_bits("Elias::decode");
+            }
+
             let low_bits: u64 = try!(source.read_int(nbits as usize));
             Ok(Some(low_bits | (1 << nbits)))
         } else {
@@ -45,7 +51,7 @@ impl UniversalCode for Omega {
         let mut stack = Vec::<(usize, u64)>::new();
 
         while value > 1 {
-            let nbits = 64 - value.leading_zeros();
+            let nbits = WORD_BITS - value.leading_zeros();
             stack.push((nbits as usize, value));
             value = nbits as u64 - 1;
         }
