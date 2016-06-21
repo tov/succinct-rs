@@ -1,52 +1,65 @@
-use std::io::Result;
+use std::io::{Error, ErrorKind, Result};
 
-use num::{One, Zero};
-
-use storage::BlockType;
-
-trait BitStream {
-    /// The underlying numeric type for the bit source or sink.
-    type Block: BlockType;
-
-    /// The position in the stream, from the beginning, in bits.
-    fn pos(&self) -> u64;
-
-    /// Align the position to the next whole-byte boundary. This may be
-    /// done by skipping input or emitting 0s.
-    fn align_byte(&mut self);
-
-    /// Align the position to the next whole-block boundary. This may be
-    /// done by skipping input or emitting 0s.
-    fn align_block(&mut self) {
-        while self.pos() % Self::Block::nbits() as u64 != 0 {
-            self.align_byte()
-        }
-    }
-}
+use num::PrimInt;
 
 /// Allows reading bits from a source.
-trait BitRead : BitStream {
+pub trait BitRead {
     /// Reads a single bit from the source.
-    fn read_bit(&mut self) -> Result<bool> {
-        self.read_int(1).map(|x| x == Self::Block::one())
-    }
+    ///
+    /// End-of-file is indicated by `Ok(None)`.
+    fn read_bit(&mut self) -> Result<Option<bool>>;
 
-    /// Reads an unsigned integer of `nbits`.
-    fn read_int(&mut self, nbits: usize) -> Result<Self::Block>;
+    /// Reads `nbits` bits as an integer, least-significant bit first.
+    fn read_int<N: PrimInt>(&mut self, nbits: usize) -> Result<N> {
+        let mut result = N::zero();
+
+        for _ in 0 .. nbits {
+            if let Some(bit) = try!(self.read_bit()) {
+                if bit {
+                    result = result | N::one();
+                }
+                result = result << 1;
+            } else {
+                return
+                    Err(Error::new(ErrorKind::InvalidInput,
+                                   "BitRead::read_int: more bits expected"));
+            }
+        }
+
+        Ok(result)
+    }
 }
 
 /// Allows writing bits to a sink.
-trait BitWrite : BitStream {
+pub trait BitWrite {
     /// Writes a single bit to the sink.
-    fn write_bit(&mut self, value: bool) -> Result<()> {
-        self.write_int(1,
-                       if value {Self::Block::one()} else {Self::Block::zero()})
+    fn write_bit(&mut self, value: bool) -> Result<()>;
+
+    /// Writes the lower `nbits` of `value`, least-significant first.
+    fn write_int<N: PrimInt>(&mut self, nbits: usize, mut value: N) -> Result<()> {
+        for _ in 0 .. nbits {
+            try!(self.write_bit(value & N::one() == N::one()));
+            value = value >> 1;
+        }
+
+        Ok(())
     }
+}
 
-    /// Writes an unsigned integer of `nbits`.
-    fn write_int(&mut self, nbits: usize, value: Self::Block) -> Result<()>;
+// These instances aren't particularly efficient, but they might be good
+// for testing.
 
-    /// Writes out any bits in the buffer, filling with 0s if necessary
-    /// to align to a block boundary.
-    fn flush(&mut self);
+use std::collections::VecDeque;
+
+impl BitRead for VecDeque<bool> {
+    fn read_bit(&mut self) -> Result<Option<bool>> {
+        Ok(self.pop_front())
+    }
+}
+
+impl BitWrite for VecDeque<bool> {
+    fn write_bit(&mut self, value: bool) -> Result<()> {
+        self.push_back(value);
+        Ok(())
+    }
 }
