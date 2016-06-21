@@ -1,4 +1,6 @@
-use std::io::{Error, ErrorKind, Result};
+use std::io::Result;
+
+use errors::*;
 
 use num::PrimInt;
 
@@ -21,9 +23,25 @@ pub trait BitRead {
                 }
                 mask = mask << 1;
             } else {
-                return
-                    Err(Error::new(ErrorKind::InvalidInput,
-                                   "BitRead::read_int: more bits expected"));
+                return out_of_bits("BitRead::read_int");
+            }
+        }
+
+        Ok(result)
+    }
+
+    /// Reads `nbits` bits as an integer, most-significant bit first.
+    fn read_int_be<N: PrimInt>(&mut self, nbits: usize) -> Result<N> {
+        let mut result = N::zero();
+
+        for _ in 0 .. nbits {
+            if let Some(bit) = try!(self.read_bit()) {
+                if bit {
+                    result = result | N::one()
+                }
+                result = result << 1;
+            } else {
+                return out_of_bits("BitRead::read_int");
             }
         }
 

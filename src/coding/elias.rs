@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
-use std::io::{Error, ErrorKind};
 
 use super::*;
+use errors::*;
 use stream::*;
 
 /// An Elias code.
@@ -75,16 +75,9 @@ impl UniversalCode for Omega {
                     next <<= 1;
 
                     match try!(source.read_bit()) {
-                        Some(true) => {
-                            next |= 1;
-                        }
-
+                        Some(true) => { next |= 1; }
                         Some(false) => { }
-
-                        None => {
-                            return Err(Error::new(ErrorKind::InvalidInput,
-                                                  "Omega::decode: more bits expected"));
-                        }
+                        None => { return out_of_bits("Omega::decode"); }
                     }
                 }
 
@@ -92,8 +85,7 @@ impl UniversalCode for Omega {
             } else if result == 1 {
                 return Ok(None);
             } else {
-                return Err(Error::new(ErrorKind::InvalidInput,
-                                      "Omega::decode: more bits expected"));
+                return out_of_bits("Omega::decode");
             }
         }
     }

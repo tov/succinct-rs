@@ -34,6 +34,7 @@ extern crate byteorder;
 extern crate num;
 
 mod util;
+mod errors;
 
 pub mod vector;
 pub use vector::{IntVec, IntVecBuilder};
@@ -50,3 +51,4 @@ pub use select::{BinSearchSelect};
 
 mod space_usage;
 pub use space_usage::SpaceUsage;
+

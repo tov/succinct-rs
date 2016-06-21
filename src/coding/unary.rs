@@ -1,9 +1,8 @@
-use std::io::{Error, ErrorKind};
-
 use super::*;
+use errors::*;
 use stream::*;
 
-/// Encodes $n$ as $n$ zeroes followed by a one.
+/// Encodes _n_ as _n_ zeroes followed by a one.
 pub struct Unary;
 
 impl UniversalCode for Unary {
@@ -29,7 +28,7 @@ impl UniversalCode for Unary {
         if result == 0 {
             Ok(None)
         } else {
-            Err(Error::new(ErrorKind::InvalidInput, "unary decode: more bits expected"))
+            out_of_bits("Unary::decode")
         }
     }
 }
