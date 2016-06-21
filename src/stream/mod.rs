@@ -2,3 +2,6 @@
 
 mod traits;
 pub use self::traits::*;
+
+mod bit_buffer;
+pub use self::bit_buffer::*;
