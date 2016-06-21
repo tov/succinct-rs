@@ -1,3 +1,5 @@
+use std::mem;
+
 use super::*;
 use errors::*;
 use stream::*;
@@ -5,35 +7,58 @@ use stream::*;
 /// A Fibonacci code.
 pub struct Fibonacci;
 
+struct Fib {
+    i_1: u64,
+    i: u64,
+}
+
+impl Fib {
+    fn new() -> Self {
+        Fib {
+            i_1: 1,
+            i: 1,
+        }
+    }
+
+    fn next(&mut self) -> Result<()> {
+        if let Some(next) = self.i_1.checked_add(self.i) {
+            self.i_1 = self.i;
+            self.i = next;
+            Ok(())
+        } else {
+            too_many_bits("Fibonacci")
+        }
+    }
+
+    fn prev(&mut self) {
+        self.i -= self.i_1;
+        mem::swap(&mut self.i, &mut self.i_1);
+    }
+}
+
 impl UniversalCode for Fibonacci {
     fn encode<W: BitWrite>(sink: &mut W, mut value: u64) -> Result<()> {
         assert!(value != 0, "Fibonacci codes cannot handle 0.");
-        let mut fib_i_1 = 1;
-        let mut fib_i   = 1;
+        let mut fib = Fib::new();
 
-        while fib_i <= value {
-            let fib_i_2 = fib_i_1;
-            fib_i_1 = fib_i;
-            fib_i = match fib_i_1.checked_add(fib_i_2) {
-                Some(n) => n,
-                None => return too_many_bits("Fibonacci::encode"),
-            };
+        // Having to compute fib.i when we really just need fib.i_1
+        // means that this gives up on smaller numbers than it needs to.
+        while fib.i <= value {
+            try!(fib.next());
         }
 
-        // Now fib_i_1 is the largest Fibonacci number <= value
+        // Now fib.i_1 is the largest Fibonacci number <= value
 
         let mut stack = vec![true];
-        while fib_i > 1 {
-            if fib_i_1 <= value {
-                value -= fib_i_1;
+        while fib.i > 1 {
+            if fib.i_1 <= value {
+                value -= fib.i_1;
                 stack.push(true);
             } else {
                 stack.push(false);
             }
 
-            let fib_i_2 = fib_i - fib_i_1;
-            fib_i = fib_i_1;
-            fib_i_1 = fib_i_2;
+            fib.prev();
         }
 
         while let Some(bit) = stack.pop() {
@@ -45,9 +70,7 @@ impl UniversalCode for Fibonacci {
 
     fn decode<R: BitRead>(source: &mut R) -> Result<Option<u64>> {
         let mut result  = 0;
-        let mut fib_i_1 = 1;
-        let mut fib_i   = 1;
-
+        let mut fib = Fib::new();
         let mut previous = false;
 
         while let Some(bit) = try!(source.read_bit()) {
@@ -56,16 +79,10 @@ impl UniversalCode for Fibonacci {
             }
 
             if bit {
-                result += fib_i;
+                result += fib.i;
             }
 
-            let fib_i_2 = fib_i_1;
-            fib_i_1 = fib_i;
-            fib_i = match fib_i_1.checked_add(fib_i_2) {
-                Some(n) => n,
-                None => return too_many_bits("Fibonacci::decode"),
-            };
-
+            try!(fib.next());
             previous = bit;
         }
 
