@@ -12,13 +12,14 @@ pub trait BitRead {
     /// Reads `nbits` bits as an integer, least-significant bit first.
     fn read_int<N: PrimInt>(&mut self, nbits: usize) -> Result<N> {
         let mut result = N::zero();
+        let mut mask = N::one();
 
         for _ in 0 .. nbits {
             if let Some(bit) = try!(self.read_bit()) {
                 if bit {
-                    result = result | N::one();
+                    result = result | mask;
                 }
-                result = result << 1;
+                mask = mask << 1;
             } else {
                 return
                     Err(Error::new(ErrorKind::InvalidInput,
@@ -61,5 +62,88 @@ impl BitWrite for VecDeque<bool> {
     fn write_bit(&mut self, value: bool) -> Result<()> {
         self.push_back(value);
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use std::collections::VecDeque;
+
+    #[test]
+    fn read_bit() {
+        let mut vd = VecDeque::new();
+        vd.push_back(true);
+        vd.push_back(true);
+        vd.push_back(false);
+
+        assert_eq!(Some(true), vd.read_bit().unwrap());
+        assert_eq!(Some(true), vd.read_bit().unwrap());
+        assert_eq!(Some(false), vd.read_bit().unwrap());
+        assert_eq!(None, vd.read_bit().unwrap());
+    }
+
+    #[test]
+    fn write_bit() {
+        let mut vd = VecDeque::new();
+
+        vd.write_bit(false).unwrap();
+        vd.write_bit(true).unwrap();
+        vd.write_bit(true).unwrap();
+
+        assert_eq!(Some(false), vd.pop_front());
+        assert_eq!(Some(true), vd.pop_front());
+        assert_eq!(Some(true), vd.pop_front());
+        assert_eq!(None, vd.pop_front());
+    }
+
+    #[test]
+    fn read_int() {
+        let mut vd = VecDeque::new();
+
+        vd.write_bit(false).unwrap();
+        assert_eq!(Some(0), vd.read_int(1).ok());
+
+        vd.write_bit(true).unwrap();
+        assert_eq!(Some(1), vd.read_int(1).ok());
+
+        vd.write_bit(true).unwrap();
+        vd.write_bit(false).unwrap();
+        assert_eq!(Some(1), vd.read_int(2).ok());
+
+        vd.write_bit(false).unwrap();
+        vd.write_bit(true).unwrap();
+        assert_eq!(Some(2), vd.read_int(2).ok());
+
+        vd.write_bit(true).unwrap();
+        vd.write_bit(true).unwrap();
+        assert_eq!(Some(3), vd.read_int(2).ok());
+
+        vd.write_bit(true).unwrap();
+        vd.write_bit(true).unwrap();
+        vd.write_bit(false).unwrap();
+        vd.write_bit(false).unwrap();
+        assert_eq!(Some(3), vd.read_int(4).ok());
+    }
+
+    #[test]
+    fn write_int() {
+        let mut vd = VecDeque::new();
+
+        vd.write_int(5, 6).unwrap();
+        vd.write_int(5, 7).unwrap();
+        vd.write_int(5, 2).unwrap();
+        vd.write_int(4, 3).unwrap();
+        vd.write_int(4, 1).unwrap();
+        vd.write_int(4, 0).unwrap();
+        vd.write_int(4, 6).unwrap();
+
+        assert_eq!(Some(6), vd.read_int(5).ok());
+        assert_eq!(Some(7), vd.read_int(5).ok());
+        assert_eq!(Some(2), vd.read_int(5).ok());
+        assert_eq!(Some(3), vd.read_int(4).ok());
+        assert_eq!(Some(1), vd.read_int(4).ok());
+        assert_eq!(Some(0), vd.read_int(4).ok());
+        assert_eq!(Some(6), vd.read_int(4).ok());
     }
 }

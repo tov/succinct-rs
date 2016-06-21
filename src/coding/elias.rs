@@ -1,7 +1,5 @@
 use std::marker::PhantomData;
-use std::mem;
-
-use num::PrimInt;
+use std::io::{Error, ErrorKind};
 
 use super::*;
 use stream::*;
@@ -20,21 +18,135 @@ pub type Gamma = Elias<Unary>;
 /// An Elias delta code encodes the header using the Elias gamma code.
 pub type Delta = Elias<Gamma>;
 
-impl<Header: UniversalCode> UniversalCode for Elias<Header> {
-    fn encode<W: BitWrite, N: PrimInt>(sink: &mut W, value: N) -> Result<()> {
-        assert!(value != N::zero(), "Elias codes do not handle 0");
+/// An Elias omega code iterates the Elias encoding.
+pub struct Omega;
 
-        let nbits = 8 * mem::size_of::<N>() as u32 - value.leading_zeros() - 1;
-        try!(Header::encode(sink, nbits));
+impl<Header: UniversalCode> UniversalCode for Elias<Header> {
+    fn encode<W: BitWrite>(sink: &mut W, value: u64) -> Result<()> {
+        assert!(value != 0, "Elias codes do not handle 0");
+
+        let nbits = 64 - value.leading_zeros() - 1;
+        try!(Header::encode(sink, nbits as u64));
         sink.write_int(nbits as usize, value)
     }
 
-    fn decode<R: BitRead, N: PrimInt>(source: &mut R) -> Result<Option<N>> {
+    fn decode<R: BitRead>(source: &mut R) -> Result<Option<u64>> {
         if let Some(nbits) = try!(Header::decode(source)) {
-            let low_bits: N = try!(source.read_int(nbits));
-            Ok(Some(low_bits | (N::one() << nbits)))
+            let low_bits: u64 = try!(source.read_int(nbits as usize));
+            Ok(Some(low_bits | (1 << nbits)))
         } else {
             Ok(None)
         }
+    }
+}
+
+impl UniversalCode for Omega {
+    fn encode<W: BitWrite>(sink: &mut W, mut value: u64) -> Result<()> {
+        let mut stack = Vec::<bool>::new();
+        stack.push(false);
+
+        while value > 1 {
+            let nbits = 64 - value.leading_zeros();
+
+            for _ in 0 .. nbits {
+                stack.push(value & 1 == 1);
+                value >>= 1;
+            }
+
+            value = nbits as u64 - 1;
+        }
+
+        while let Some(bit) = stack.pop() {
+            try!(sink.write_bit(bit));
+        }
+
+        Ok(())
+    }
+
+    fn decode<R: BitRead>(source: &mut R) -> Result<Option<u64>> {
+        let mut result: u64 = 1;
+
+        loop {
+            if let Some(bit) = try!(source.read_bit()) {
+                if !bit { return Ok(Some(result)); }
+
+                let mut next: u64 = 0;
+                for _ in 0 .. result {
+                    next <<= 1;
+
+                    match try!(source.read_bit()) {
+                        Some(true) => {
+                            next |= 1;
+                        }
+
+                        Some(false) => { }
+
+                        None => {
+                            return Err(Error::new(ErrorKind::InvalidInput,
+                                                  "Omega::decode: more bits expected"));
+                        }
+                    }
+                }
+
+                result = next | (1 << result as u32)
+            } else if result == 1 {
+                return Ok(None);
+            } else {
+                return Err(Error::new(ErrorKind::InvalidInput,
+                                      "Omega::decode: more bits expected"));
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::collections::VecDeque;
+    use coding::*;
+
+    #[test]
+    fn gamma() {
+        let mut dv = VecDeque::<bool>::new();
+
+        Gamma::encode(&mut dv, 2).unwrap();
+        Gamma::encode(&mut dv, 3).unwrap();
+        Gamma::encode(&mut dv, 4).unwrap();
+
+        assert_eq!(Some(2), Gamma::decode(&mut dv).unwrap());
+        assert_eq!(Some(3), Gamma::decode(&mut dv).unwrap());
+        assert_eq!(Some(4), Gamma::decode(&mut dv).unwrap());
+        assert_eq!(None::<u64>, Gamma::decode(&mut dv).unwrap());
+    }
+
+    #[test]
+    fn delta() {
+        let mut dv = VecDeque::<bool>::new();
+
+        Delta::encode(&mut dv, 2).unwrap();
+        Delta::encode(&mut dv, 3).unwrap();
+        Delta::encode(&mut dv, 38932).unwrap();
+        Delta::encode(&mut dv, 4).unwrap();
+
+        assert_eq!(Some(2), Delta::decode(&mut dv).unwrap());
+        assert_eq!(Some(3), Delta::decode(&mut dv).unwrap());
+        assert_eq!(Some(38932), Delta::decode(&mut dv).unwrap());
+        assert_eq!(Some(4), Delta::decode(&mut dv).unwrap());
+        assert_eq!(None::<u64>, Delta::decode(&mut dv).unwrap());
+    }
+
+    #[test]
+    fn omega() {
+        let mut dv = VecDeque::<bool>::new();
+
+        Omega::encode(&mut dv, 2).unwrap();
+        Omega::encode(&mut dv, 3).unwrap();
+        Omega::encode(&mut dv, 38932).unwrap();
+        Omega::encode(&mut dv, 4).unwrap();
+
+        assert_eq!(Some(2), Omega::decode(&mut dv).unwrap());
+        assert_eq!(Some(3), Omega::decode(&mut dv).unwrap());
+        assert_eq!(Some(38932), Omega::decode(&mut dv).unwrap());
+        assert_eq!(Some(4), Omega::decode(&mut dv).unwrap());
+        assert_eq!(None::<u64>, Omega::decode(&mut dv).unwrap());
     }
 }
