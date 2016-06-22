@@ -1,4 +1,5 @@
 use num::PrimInt;
+use std::borrow::Cow;
 
 use vector::{IntVector, IntVec, IntVecBuilder};
 use space_usage::SpaceUsage;
@@ -9,18 +10,19 @@ pub use super::{RankSupport, BitRankSupport};
 /// Add-on to `BitStore` to support fast rank queries.
 ///
 /// Construct with `JacobsonRank::new`.
-#[derive(Clone, Debug)]
-pub struct JacobsonRank<'a, Store: ?Sized + BitStore + 'a> {
-    bit_store: &'a Store,
+#[derive(Clone)]
+pub struct JacobsonRank<'a, Store: ?Sized + ToOwned + BitStore + 'a> {
+    bit_store: Cow<'a, Store>,
     large_block_size: usize,
     large_block_ranks: IntVec<u64>,
     small_block_ranks: IntVec<u64>,
 }
 
-impl<'a, Store: BitStore + ?Sized + 'a>
+impl<'a, Store: BitStore + ?Sized + ToOwned + 'a>
 JacobsonRank<'a, Store> {
     /// Creates a new rank support structure for the given bit vector.
-    pub fn new(bits: &'a Store) -> Self {
+    pub fn new<B>(bits: B) -> Self where B: Into<Cow<'a, Store>> {
+        let bits = bits.into();
         let n = bits.bit_len();
         let lg_n = n.ceil_log2();
         let lg2_n = lg_n * lg_n;
@@ -75,7 +77,7 @@ JacobsonRank<'a, Store> {
     }
 }
 
-impl<'a, Store: ?Sized + BitStore + 'a>
+impl<'a, Store: ?Sized + BitStore + ToOwned + 'a>
 BitStore for JacobsonRank<'a, Store> {
     type Block = Store::Block;
 
@@ -96,7 +98,7 @@ BitStore for JacobsonRank<'a, Store> {
     }
 }
 
-impl<'a, Store: ?Sized + BitStore + 'a>
+impl<'a, Store: ?Sized + BitStore + ToOwned + 'a>
 RankSupport for JacobsonRank<'a, Store> {
     type Over = bool;
 
@@ -109,7 +111,7 @@ RankSupport for JacobsonRank<'a, Store> {
     }
 }
 
-impl<'a, Store: ?Sized + BitStore + 'a>
+impl<'a, Store: ?Sized + BitStore + ToOwned + 'a>
 BitRankSupport for JacobsonRank<'a, Store> {
     fn rank1(&self, position: u64) -> u64 {
         // Rank for any position past the end is the rank of the
@@ -132,7 +134,7 @@ BitRankSupport for JacobsonRank<'a, Store> {
     }
 }
 
-impl<'a, Store: ?Sized + BitStore + 'a>
+impl<'a, Store: ?Sized + BitStore + ToOwned + 'a>
 SpaceUsage for JacobsonRank<'a, Store> {
     #[inline]
     fn is_stack_only() -> bool { false }
@@ -150,7 +152,7 @@ mod test {
     #[test]
     fn rank1() {
         let vec = vec![ 0b00000000000001110000000000000001u32; 1024 ];
-        let rank = JacobsonRank::new(&*vec);
+        let rank = JacobsonRank::new(vec);
 
         assert_eq!(1, rank.rank1(0));
         assert_eq!(1, rank.rank1(1));
