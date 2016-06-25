@@ -2,14 +2,13 @@ use std::io::{Error, ErrorKind, Result};
 
 use storage::{BlockType};
 use stream::{BitRead, BitWrite};
-use int_vector::{IntVec, IntVecBuilder};
-use bit_vector::{Bits, BitsMut};
+use bit_vector::*;
 
 /// A bit buffer can be used to read bits from or write bits to an
 /// underlying bit vector.
 #[derive(Clone, Debug)]
 pub struct BitBuffer<Block: BlockType = usize> {
-    data: IntVec<Block>,
+    data: BitVec<Block>,
     pos: u64,
 }
 
@@ -24,13 +23,13 @@ impl<Block: BlockType> BitBuffer<Block> {
     /// bits) preallocated.
     pub fn with_capacity(capacity: u64) -> Self {
         BitBuffer {
-            data: IntVecBuilder::<Block>::new(1).capacity(capacity).build(),
+            data: BitVec::with_capacity(capacity),
             pos: 0,
         }
     }
 
     /// Creates a new bit buffer for reading from a bit vector.
-    pub fn from(input: IntVec<Block>) -> Self {
+    pub fn from(input: BitVec<Block>) -> Self {
         BitBuffer {
             data: input,
             pos: 0,
@@ -38,7 +37,7 @@ impl<Block: BlockType> BitBuffer<Block> {
     }
 
     /// Creates a new bit buffer for appending to a bit vector.
-    pub fn append(vec: IntVec<Block>) -> Self {
+    pub fn append(vec: BitVec<Block>) -> Self {
         let len = vec.bit_len();
         BitBuffer {
             data: vec,
@@ -48,13 +47,13 @@ impl<Block: BlockType> BitBuffer<Block> {
 
     /// Returns the bit vector underlying the bit buffer.
     #[inline]
-    pub fn into_inner(self) -> IntVec<Block> {
+    pub fn into_inner(self) -> BitVec<Block> {
         self.data
     }
 
     /// Gives access to the bit vector underlying the bit buffer.
     #[inline]
-    pub fn inner(&self) -> &IntVec<Block> {
+    pub fn inner(&self) -> &BitVec<Block> {
         &self.data
     }
 
@@ -118,7 +117,7 @@ impl<Block: BlockType> BitRead for BitBuffer<Block> {
 impl<Block: BlockType> BitWrite for BitBuffer<Block> {
     fn write_bit(&mut self, value: bool) -> Result<()> {
         while self.pos >= self.bit_len() {
-            self.data.push(Block::zero());
+            self.data.push_bit(false);
         }
 
         let pos = self.pos;
@@ -132,17 +131,17 @@ impl<Block: BlockType> BitWrite for BitBuffer<Block> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use int_vector::IntVec;
+    use bit_vector::*;
     use stream::{BitRead, BitWrite};
 
     #[test]
     fn reader() {
-        let mut vec = IntVec::<usize>::new(1);
-        vec.push(0);
-        vec.push(1);
-        vec.push(0);
-        vec.push(0);
-        vec.push(1);
+        let mut vec = BitVec::<usize>::new();
+        vec.push_bit(false);
+        vec.push_bit(true);
+        vec.push_bit(false);
+        vec.push_bit(false);
+        vec.push_bit(true);
 
         let mut reader = BitBuffer::from(vec);
 
@@ -166,11 +165,11 @@ mod test {
 
         let mut vec = writer.into_inner();
 
-        assert_eq!(Some(1), vec.pop());
-        assert_eq!(Some(1), vec.pop());
-        assert_eq!(Some(0), vec.pop());
-        assert_eq!(Some(0), vec.pop());
-        assert_eq!(Some(1), vec.pop());
-        assert_eq!(None, vec.pop());
+        assert_eq!(Some(true), vec.pop_bit());
+        assert_eq!(Some(true), vec.pop_bit());
+        assert_eq!(Some(false), vec.pop_bit());
+        assert_eq!(Some(false), vec.pop_bit());
+        assert_eq!(Some(true), vec.pop_bit());
+        assert_eq!(None, vec.pop_bit());
     }
 }
