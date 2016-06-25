@@ -15,6 +15,11 @@ pub trait Bits {
     /// The length of the slice in bits.
     fn bit_len(&self) -> u64;
 
+    /// The length of the slice in blocks.
+    fn block_len(&self) -> usize {
+        self.bit_len().ceil_div(Self::Block::nbits() as u64) as usize
+    }
+
     /// Gets the bit at `position`
     ///
     /// The default implementation calls `get_block` and masks out the
@@ -29,11 +34,6 @@ pub trait Bits {
         let address = Address::new::<Self::Block>(position);
         let block = self.get_block(address.block_index);
         block.get_bit(address.bit_offset)
-    }
-
-    /// The length of the slice in blocks.
-    fn block_len(&self) -> usize {
-        self.bit_len().ceil_div(Self::Block::nbits() as u64) as usize
     }
 
     /// Gets the block at `position`
@@ -103,7 +103,7 @@ pub trait Bits {
 ///
 /// Minimal complete definition is `set_bit` or `set_block`, since each
 /// is defined in terms of the other. Note that `set_block` in terms of
-/// `set_bit` is inefficient, and thus you should implement `get_block`
+/// `set_bit` is inefficient, and thus you should implement `set_block`
 /// directly if possible.
 pub trait BitsMut: Bits {
     /// Sets the bit at `position` to `value`.
