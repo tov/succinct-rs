@@ -1,7 +1,7 @@
 use bit_vector::traits::*;
 use storage::BlockType;
 
-impl<Block: BlockType> BitSlice for Vec<Block> {
+impl<Block: BlockType> Bits for Vec<Block> {
     type Block = Block;
 
     #[inline]
@@ -20,7 +20,7 @@ impl<Block: BlockType> BitSlice for Vec<Block> {
     }
 }
 
-impl<Block: BlockType> BitSliceMut for Vec<Block> {
+impl<Block: BlockType> BitsMut for Vec<Block> {
     #[inline]
     fn set_block(&mut self, position: usize, value: Block) {
         self[position] = value;

@@ -38,7 +38,7 @@ impl<Block: BlockType> BitVec<Block> {
     }
 }
 
-impl<Block: BlockType> BitSlice for BitVec<Block> {
+impl<Block: BlockType> Bits for BitVec<Block> {
     type Block = Block;
 
     fn bit_len(&self) -> u64 {
@@ -58,7 +58,7 @@ impl<Block: BlockType> BitSlice for BitVec<Block> {
     }
 }
 
-impl<Block: BlockType> BitSliceMut for BitVec<Block> {
+impl<Block: BlockType> BitsMut for BitVec<Block> {
     fn set_bit(&mut self, index: u64, value: bool) {
         assert!(index < self.len, "BitVec:get_bit: out of bounds");
 

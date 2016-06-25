@@ -8,7 +8,7 @@ use storage::BlockType;
 /// is defined in terms of the other. Note that `get_block` in terms of
 /// `get_bit` is inefficient, and thus you should implement `get_block`
 /// directly if possible.
-pub trait BitSlice {
+pub trait Bits {
     /// The underlying block type used to store the bits of the slice.
     type Block: BlockType;
 
@@ -24,7 +24,7 @@ pub trait BitSlice {
     ///
     /// Panics if `position` is out of bounds.
     fn get_bit(&self, position: u64) -> bool {
-        assert!(position < self.bit_len(), "BitSlice::get_bit: out of bounds");
+        assert!(position < self.bit_len(), "Bits::get_bit: out of bounds");
 
         let address = Address::new::<Self::Block>(position);
         let block = self.get_block(address.block_index);
@@ -74,7 +74,7 @@ pub trait BitSlice {
     /// Panics if the bit span goes out of bounds.
     fn get_bits(&self, start: u64, count: usize) -> Self::Block {
         let limit = start + count as u64;
-        assert!(limit <= self.bit_len(), "BitSlice::get_bits: out of bounds");
+        assert!(limit <= self.bit_len(), "Bits::get_bits: out of bounds");
 
         let address = Address::new::<Self::Block>(start);
         let margin = Self::Block::nbits() - address.bit_offset;
@@ -103,7 +103,7 @@ pub trait BitSlice {
 /// is defined in terms of the other. Note that `set_block` in terms of
 /// `set_bit` is inefficient, and thus you should implement `get_block`
 /// directly if possible.
-pub trait BitSliceMut: BitSlice {
+pub trait BitsMut: Bits {
     /// Sets the bit at `position` to `value`.
     ///
     /// The default implementation uses `get_block` and `set_block`.
@@ -112,7 +112,7 @@ pub trait BitSliceMut: BitSlice {
     ///
     /// Panics if `position` is out of bounds.
     fn set_bit(&mut self, position: u64, value: bool) {
-        assert!(position < self.bit_len(), "BitSlice::get_bit: out of bounds");
+        assert!(position < self.bit_len(), "BitsMut::set_bit: out of bounds");
 
         let address = Address::new::<Self::Block>(position);
         let old_block = self.get_block(address.block_index);
@@ -153,7 +153,7 @@ pub trait BitSliceMut: BitSlice {
     /// Panics if the bit span goes out of bounds.
     fn set_bits(&mut self, start: u64, count: usize, value: Self::Block) {
         let limit = start + count as u64;
-        assert!(limit <= self.bit_len(), "BitSlice::get_bits: out of bounds");
+        assert!(limit <= self.bit_len(), "BitsMut::set_bits: out of bounds");
 
         let address = Address::new::<Self::Block>(start);
         let margin = Self::Block::nbits() - address.bit_offset;
@@ -182,7 +182,7 @@ pub trait BitSliceMut: BitSlice {
 }
 
 /// Interface for full bit vector operations.
-pub trait BitVector: BitSliceMut {
+pub trait BitVector: BitsMut {
     /// Adds the given bit to the end of the bit vector.
     fn push_bit(&mut self, value: bool);
 
