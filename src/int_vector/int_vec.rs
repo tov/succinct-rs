@@ -4,7 +4,8 @@ use std::marker::PhantomData;
 use num::ToPrimitive;
 
 pub use super::*;
-use storage::{BitStore, BitStoreMut, BlockType};
+use storage::{BlockType};
+use bit_vector::{Bits, BitsMut};
 use space_usage::SpaceUsage;
 
 /// A vector of *k*-bit unsigned integers, where *k* is determined at
@@ -190,9 +191,9 @@ impl<Block: BlockType> IntVec<Block> {
 
         if margin >= element_bits {
             let old_block = self.blocks[address.block_index];
-            let new_block = old_block.set_bits(address.bit_offset,
-                                               element_bits,
-                                               element_value);
+            let new_block = old_block.with_bits(address.bit_offset,
+                                                element_bits,
+                                                element_value);
             self.blocks[address.block_index] = new_block;
             return;
         }
@@ -204,9 +205,9 @@ impl<Block: BlockType> IntVec<Block> {
 
         let high_bits = element_value >> extra;
 
-        let new_block1 = old_block1.set_bits(address.bit_offset,
-                                             margin, high_bits);
-        let new_block2 = old_block2.set_bits(0, extra, element_value);
+        let new_block1 = old_block1.with_bits(address.bit_offset,
+                                              margin, high_bits);
+        let new_block2 = old_block2.with_bits(0, extra, element_value);
 
         self.blocks[address.block_index] = new_block1;
         self.blocks[address.block_index + 1] = new_block2;
@@ -464,7 +465,7 @@ impl<Block: BlockType> IntVectorMut for IntVec<Block> {
     }
 }
 
-impl<Block: BlockType> BitStore for IntVec<Block> {
+impl<Block: BlockType> Bits for IntVec<Block> {
     type Block = Block;
 
     fn block_len(&self) -> usize {
@@ -480,7 +481,7 @@ impl<Block: BlockType> BitStore for IntVec<Block> {
     }
 }
 
-impl<Block: BlockType> BitStoreMut for IntVec<Block> {
+impl<Block: BlockType> BitsMut for IntVec<Block> {
     fn set_block(&mut self, position: usize, value: Block) {
         self.blocks[position] = value;
     }

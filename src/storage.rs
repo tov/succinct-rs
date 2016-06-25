@@ -4,7 +4,7 @@ use std::io;
 use std::mem;
 
 use byteorder::{ByteOrder, ReadBytesExt, WriteBytesExt};
-use num::{PrimInt, ToPrimitive};
+use num::PrimInt;
 
 /// Types that can be used for `IntVec` storage.
 pub trait BlockType: PrimInt {
@@ -64,7 +64,7 @@ pub trait BlockType: PrimInt {
     ///
     /// `start + len < Self::nbits()`
     #[inline]
-    fn set_bits(self, start: usize, len: usize, value: Self) -> Self {
+    fn with_bits(self, start: usize, len: usize, value: Self) -> Self {
         if len == 0 { return self; }
 
         let limit      = start + len;
@@ -84,7 +84,7 @@ pub trait BlockType: PrimInt {
 
     /// Sets the value of the `bit_index`th bit to true.
     #[inline]
-    fn set_bit(self, bit_index: usize, bit_value: bool) -> Self {
+    fn with_bit(self, bit_index: usize, bit_value: bool) -> Self {
         if bit_value {
             self | Self::nth_mask(bit_index)
         } else {
@@ -196,75 +196,6 @@ impl BlockType for usize {
     }
 }
 
-/// Interface for read-only bit vector operations.
-pub trait BitStore {
-    /// The type of each block of storage.
-    type Block: BlockType;
-
-    /// The length of the bit vector in blocks.
-    fn block_len(&self) -> usize;
-
-    /// The length of the bit vector in bits.
-    ///
-    /// Default implementation is `self.block_len() * Block::nbits()`.
-    #[inline]
-    fn bit_len(&self) -> u64 {
-        self.block_len() as u64 * Self::Block::nbits() as u64
-    }
-
-    /// Gets the value of the block at `position`
-    fn get_block(&self, position: usize) -> Self::Block;
-
-    /// Gets the bit at `position`
-    #[inline]
-    fn get_bit(&self, position: u64) -> bool {
-        assert!(position < self.bit_len(), "BitStore::get: out of bounds");
-        let block_bits = Self::Block::nbits() as u64;
-        let block_index = (position / block_bits).to_usize().unwrap();
-        let bit_offset = (position % block_bits) as usize;
-        self.get_block(block_index).get_bit(bit_offset)
-    }
-}
-
-/// Interface for mutable bit vector operations.
-pub trait BitStoreMut : BitStore {
-    /// Sets the block at `position` to `value`.
-    fn set_block(&mut self, position: usize, value: Self::Block);
-
-    /// Sets the bit at `position` to `value`.
-    #[inline]
-    fn set_bit(&mut self, position: u64, value: bool) {
-        assert!(position < self.bit_len(), "BitStore::set: out of bounds");
-        let block_bits = Self::Block::nbits() as u64;
-        let block_index = (position / block_bits).to_usize().unwrap();
-        let bit_offset = (position % block_bits) as usize;
-        let old_block = self.get_block(block_index);
-        let new_block = old_block.set_bit(bit_offset, value);
-        self.set_block(block_index, new_block);
-    }
-}
-
-impl<Block: BlockType> BitStore for [Block] {
-    type Block = Block;
-
-    #[inline]
-    fn block_len(&self) -> usize {
-        self.len()
-    }
-
-    #[inline]
-    fn get_block(&self, position: usize) -> Block {
-        self[position]
-    }
-}
-
-impl<Block: BlockType> BitStoreMut for [Block] {
-    #[inline]
-    fn set_block(&mut self, position: usize, value: Block) {
-        self[position] = value;
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -300,17 +231,17 @@ mod test {
     }
 
     #[test]
-    fn set_bits() {
+    fn with_bits() {
         assert_eq!(0b0111111111000001,
-                   0b0110001111000001u16.set_bits(10, 3, 0b111));
+                   0b0110001111000001u16.with_bits(10, 3, 0b111));
         assert_eq!(0b0101110111000001,
-                   0b0110001111000001u16.set_bits(9, 5, 0b01110));
+                   0b0110001111000001u16.with_bits(9, 5, 0b01110));
         assert_eq!(0b0110001111000001,
-                   0b0110001111000001u16.set_bits(14, 0, 0b01110));
+                   0b0110001111000001u16.with_bits(14, 0, 0b01110));
         assert_eq!(0b0110001110101010,
-                   0b0110001111000001u16.set_bits(0, 8, 0b10101010));
+                   0b0110001111000001u16.with_bits(0, 8, 0b10101010));
         assert_eq!(0b0000000000000010,
-                   0b0110001111000001u16.set_bits(0, 16, 0b10));
+                   0b0110001111000001u16.with_bits(0, 16, 0b10));
     }
 
     #[test]
@@ -422,34 +353,6 @@ mod test {
         assert_eq!(1, 0b11110000u8.rank1(4));
         assert_eq!(2, 0b11110000u8.rank1(5));
         assert_eq!(4, 0b11110000u8.rank1(7));
-    }
-
-    #[test]
-    fn store_bit_len() {
-        let v = vec![ 0u32; 4 ];
-        assert_eq!(128, v.bit_len());
-    }
-
-    #[test]
-    fn store_block_len() {
-        let v = vec![ 0u32; 4 ];
-        assert_eq!(4, v.block_len());
-    }
-
-    #[test]
-    fn store_set_get_bit() {
-        let mut v = vec![ 0b10101010u8; 4 ];
-        assert!(! v.get_bit(0));
-        assert!(  v.get_bit(1));
-        assert!(! v.get_bit(2));
-        assert!(  v.get_bit(3));
-
-        v.set_bit(2, true);
-
-        assert!(! v.get_bit(0));
-        assert!(  v.get_bit(1));
-        assert!(  v.get_bit(2));
-        assert!(  v.get_bit(3));
     }
 }
 

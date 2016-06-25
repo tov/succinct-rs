@@ -1,7 +1,7 @@
 use util::binary_search_function;
 use rank::{BitRankSupport, RankSupport};
 use space_usage::SpaceUsage;
-use storage::BitStore;
+use bit_vector::Bits;
 pub use super::{SelectSupport, SelectSupport1, SelectSupport0};
 
 /// Performs a select query by binary searching rank queries.
@@ -26,8 +26,8 @@ BinSearchSelect<'a, Rank> {
     }
 }
 
-impl<'a, Rank: BitStore + 'a>
-BitStore for BinSearchSelect<'a, Rank> {
+impl<'a, Rank: Bits + 'a>
+Bits for BinSearchSelect<'a, Rank> {
     type Block = Rank::Block;
 
     fn block_len(&self) -> usize {

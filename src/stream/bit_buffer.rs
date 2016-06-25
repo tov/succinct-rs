@@ -1,8 +1,9 @@
 use std::io::{Error, ErrorKind, Result};
 
-use storage::{BlockType, BitStore, BitStoreMut};
+use storage::{BlockType};
 use stream::{BitRead, BitWrite};
 use int_vector::{IntVec, IntVecBuilder};
+use bit_vector::{Bits, BitsMut};
 
 /// A bit buffer can be used to read bits from or write bits to an
 /// underlying bit vector.
@@ -76,7 +77,7 @@ impl<Block: BlockType> BitBuffer<Block> {
     }
 }
 
-impl<Block: BlockType> BitStore for BitBuffer<Block> {
+impl<Block: BlockType> Bits for BitBuffer<Block> {
     type Block = Block;
 
     #[inline]
@@ -95,7 +96,7 @@ impl<Block: BlockType> BitStore for BitBuffer<Block> {
     }
 }
 
-impl<Block: BlockType> BitStoreMut for BitBuffer<Block> {
+impl<Block: BlockType> BitsMut for BitBuffer<Block> {
     #[inline]
     fn set_block(&mut self, position: usize, value: Self::Block) {
         self.data.set_block(position, value);

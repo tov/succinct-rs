@@ -2,22 +2,23 @@ use num::PrimInt;
 
 use int_vector::{IntVector, IntVec, IntVecBuilder};
 use space_usage::SpaceUsage;
-use storage::{BitStore, BlockType};
+use storage::{BlockType};
+use bit_vector::Bits;
 
 pub use super::{RankSupport, BitRankSupport};
 
-/// Add-on to `BitStore` to support fast rank queries.
+/// Add-on to `Bits` to support fast rank queries.
 ///
 /// Construct with `JacobsonRank::new`.
 #[derive(Clone, Debug)]
-pub struct JacobsonRank<'a, Store: ?Sized + BitStore + 'a> {
+pub struct JacobsonRank<'a, Store: ?Sized + Bits + 'a> {
     bit_store: &'a Store,
     large_block_size: usize,
     large_block_ranks: IntVec<u64>,
     small_block_ranks: IntVec<u64>,
 }
 
-impl<'a, Store: BitStore + ?Sized + 'a>
+impl<'a, Store: Bits + ?Sized + 'a>
 JacobsonRank<'a, Store> {
     /// Creates a new rank support structure for the given bit vector.
     pub fn new(bits: &'a Store) -> Self {
@@ -75,8 +76,8 @@ JacobsonRank<'a, Store> {
     }
 }
 
-impl<'a, Store: ?Sized + BitStore + 'a>
-BitStore for JacobsonRank<'a, Store> {
+impl<'a, Store: ?Sized + Bits + 'a>
+Bits for JacobsonRank<'a, Store> {
     type Block = Store::Block;
 
     fn block_len(&self) -> usize {
@@ -96,7 +97,7 @@ BitStore for JacobsonRank<'a, Store> {
     }
 }
 
-impl<'a, Store: ?Sized + BitStore + 'a>
+impl<'a, Store: ?Sized + Bits + 'a>
 RankSupport for JacobsonRank<'a, Store> {
     type Over = bool;
 
@@ -109,7 +110,7 @@ RankSupport for JacobsonRank<'a, Store> {
     }
 }
 
-impl<'a, Store: ?Sized + BitStore + 'a>
+impl<'a, Store: ?Sized + Bits + 'a>
 BitRankSupport for JacobsonRank<'a, Store> {
     fn rank1(&self, position: u64) -> u64 {
         // Rank for any position past the end is the rank of the
@@ -132,7 +133,7 @@ BitRankSupport for JacobsonRank<'a, Store> {
     }
 }
 
-impl<'a, Store: ?Sized + BitStore + 'a>
+impl<'a, Store: ?Sized + Bits + 'a>
 SpaceUsage for JacobsonRank<'a, Store> {
     #[inline]
     fn is_stack_only() -> bool { false }

@@ -11,3 +11,6 @@ pub use self::vec::*;
 
 mod slice;
 pub use self::slice::*;
+
+mod prim;
+pub use self::prim::*;

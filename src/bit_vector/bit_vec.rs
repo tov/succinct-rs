@@ -66,7 +66,7 @@ impl<Block: BlockType> BitsMut for BitVec<Block> {
         let bit_offset = (index % Block::nbits() as u64) as usize;
 
         let old_block = self.data[block_index];
-        let new_block = old_block.set_bit(bit_offset, value);
+        let new_block = old_block.with_bit(bit_offset, value);
         self.data[block_index] = new_block;
     }
 }

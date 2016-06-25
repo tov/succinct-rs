@@ -116,7 +116,7 @@ pub trait BitsMut: Bits {
 
         let address = Address::new::<Self::Block>(position);
         let old_block = self.get_block(address.block_index);
-        let new_block = old_block.set_bit(address.bit_offset, value);
+        let new_block = old_block.with_bit(address.bit_offset, value);
         self.set_block(address.block_index, new_block);
     }
 
@@ -160,7 +160,7 @@ pub trait BitsMut: Bits {
 
         if margin >= count {
             let old_block = self.get_block(address.block_index);
-            let new_block = old_block.set_bits(address.bit_offset, count, value);
+            let new_block = old_block.with_bits(address.bit_offset, count, value);
             self.set_block(address.block_index, new_block);
             return;
         }
@@ -172,9 +172,9 @@ pub trait BitsMut: Bits {
 
         let high_bits = value >> extra;
 
-        let new_block1 = old_block1.set_bits(address.bit_offset,
-                                             margin, high_bits);
-        let new_block2 = old_block2.set_bits(0, extra, value);
+        let new_block1 = old_block1.with_bits(address.bit_offset,
+                                              margin, high_bits);
+        let new_block2 = old_block2.with_bits(0, extra, value);
 
         self.set_block(address.block_index, new_block1);
         self.set_block(address.block_index + 1, new_block2);
