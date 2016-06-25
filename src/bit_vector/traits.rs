@@ -53,14 +53,16 @@ pub trait Bits {
         assert!(position < self.block_len(),
                 "IntSlice::get_block: out of bounds");
 
-        let mut result = Self::Block::zero();
         let bit_position = position as u64 * Self::Block::nbits() as u64;
 
+        let mut result = Self::Block::zero();
+        let mut mask = Self::Block::one();
+
         for i in 0 .. Self::Block::nbits() as u64 {
-            result = result << 1;
             if bit_position + i < self.bit_len() && self.get_bit(bit_position + i) {
-                result = result | Self::Block::one();
+                result = result | mask;
             }
+            mask = mask << 1;
         }
 
         result
