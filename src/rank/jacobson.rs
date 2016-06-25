@@ -2,7 +2,7 @@ use num::PrimInt;
 
 use int_vector::{IntVector, IntVec, IntVecBuilder};
 use space_usage::SpaceUsage;
-use storage::{BlockType};
+use storage::{Address, BlockType};
 use bit_vector::Bits;
 
 pub use super::{RankSupport, BitRankSupport};
@@ -23,7 +23,7 @@ JacobsonRank<'a, Store> {
     /// Creates a new rank support structure for the given bit vector.
     pub fn new(bits: &'a Store) -> Self {
         let n = bits.bit_len();
-        let lg_n = n.ceil_log2();
+        let lg_n = n.ceil_lg();
         let lg2_n = lg_n * lg_n;
 
         let small_block_size  = Store::Block::nbits();
@@ -32,8 +32,8 @@ JacobsonRank<'a, Store> {
         let large_block_count = n / large_block_size as u64 + 1;
         let small_block_count = n / small_block_size as u64 + 1;
 
-        let large_meta_size   = (n + 1).ceil_log2();
-        let small_meta_size   = (large_block_size + 1).ceil_log2();
+        let large_meta_size   = (n + 1).ceil_lg();
+        let small_meta_size   = (large_block_size + 1).ceil_lg();
 
         let mut large_block_ranks =
             IntVecBuilder::new(large_meta_size)
@@ -117,17 +117,13 @@ BitRankSupport for JacobsonRank<'a, Store> {
         // last position.
         let position = ::std::cmp::min(position, self.bit_len() - 1);
 
-        let small_block_size = Store::Block::nbits() as u64;
-
         let large_block = position / self.large_block_size as u64;
-        let small_block = position / small_block_size;
-        let bit_offset  = position % small_block_size;
+        let address     = Address::new::<Store::Block>(position);
 
         let large_rank = self.large_block_ranks.get(large_block);
-        let small_rank = self.small_block_ranks.get(small_block);
-        let bits_rank  =
-            self.bit_store.get_block(small_block as usize)
-                .rank1(bit_offset as usize) as u64;
+        let small_rank = self.small_block_ranks.get(address.block_index as u64);
+        let bits_rank  = self.bit_store.get_block(address.block_index)
+                             .rank1(address.bit_offset) as u64;
 
         large_rank + small_rank + bits_rank
     }

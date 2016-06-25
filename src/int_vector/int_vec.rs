@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 use num::ToPrimitive;
 
 pub use super::*;
-use storage::{BlockType};
+use storage::{Address, BlockType};
 use bit_vector::{Bits, BitsMut};
 use space_usage::SpaceUsage;
 
@@ -33,24 +33,6 @@ pub enum Fill<Block: BlockType = usize> {
     Element(Block),
 }
 
-/// The address of a bit, as an index to a block and the index of a bit
-/// in that block.
-#[derive(Clone, Copy, Debug)]
-struct Address {
-    block_index: usize,
-    bit_offset: usize,
-}
-
-impl Address {
-    fn new(bit_index: u64, block_bits: usize) -> Self {
-        let block_bits = block_bits as u64;
-        Address {
-            block_index: (bit_index / block_bits) as usize,
-            bit_offset: (bit_index % block_bits) as usize,
-        }
-    }
-}
-
 impl<Block: BlockType> IntVec<Block> {
     // Computes the number of blocks from the number of elements.
     // Performs sufficient overflow checks that we shouldn’t have to
@@ -72,8 +54,7 @@ impl<Block: BlockType> IntVec<Block> {
         } else if block_bits < element_bits {
             Err("IntVec: element size cannot exceed block size.")
         } else if let Some(n_bits) = n_elements.checked_mul(element_bits) {
-            let mut result = n_bits / block_bits;
-            if n_bits % block_bits > 0 { result += 1 }
+            let result = Block::ceil_div_nbits(n_bits);
             result.to_usize().ok_or("IntVec: size overflow (usize)")
         } else {
             Err("IntVec: size overflow (checked_mul)")
@@ -93,7 +74,7 @@ impl<Block: BlockType> IntVec<Block> {
         assert!(bits_limit <= (Self::block_bits() * self.blocks.len()) as u64,
                 "IntVec: index out of bounds.");
 
-        Address::new(bits_index, Self::block_bits())
+        Address::new::<Block>(bits_index)
     }
 
     #[inline]
@@ -109,7 +90,7 @@ impl<Block: BlockType> IntVec<Block> {
         let element_bits  = self.element_bits() as u64;
         let bit_index     = element_index * element_bits;
 
-        Address::new(bit_index, Self::block_bits())
+        Address::new::<Block>(bit_index)
     }
 
     /// Creates a new integer vector.
@@ -266,13 +247,13 @@ impl<Block: BlockType> IntVec<Block> {
 
     /// The number of elements the vector can hold without reallocating.
     pub fn capacity(&self) -> u64 {
-        let total_bits = self.blocks.capacity() as u64 * Block::nbits() as u64;
+        let total_bits = Block::mul_nbits(self.blocks.capacity());
         total_bits / self.element_bits as u64
     }
 
     /// How many elements the backing vector has expanded to store.
     fn backing_len(&self) -> u64 {
-        let total_bits = self.blocks.len() as u64 * Block::nbits() as u64;
+        let total_bits = Block::mul_nbits(self.blocks.len());
         total_bits / self.element_bits as u64
     }
 

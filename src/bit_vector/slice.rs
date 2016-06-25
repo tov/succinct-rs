@@ -1,6 +1,7 @@
 use std::ops::Range;
 
 use bit_vector::traits::*;
+use space_usage::SpaceUsage;
 
 /// A borrowed slice of a bit vector.
 #[derive(Clone, Copy, Debug)]
@@ -28,6 +29,8 @@ impl<'a, Base: 'a + Bits> BitSlice<'a, Base> {
             len: range.end - range.start,
         }
     }
+
+    // TODO: slice
 }
 
 impl<'a, Base: 'a + BitsMut> BitSliceMut<'a, Base> {
@@ -40,6 +43,8 @@ impl<'a, Base: 'a + BitsMut> BitSliceMut<'a, Base> {
             len: range.end - range.start,
         }
     }
+
+    // TODO: slice_mut
 }
 
 impl<'a, Base: 'a + Bits> Bits for BitSlice<'a, Base> {
@@ -85,4 +90,12 @@ impl<'a, Base: 'a + BitsMut> BitsMut for BitSliceMut<'a, Base> {
     }
 
     // TODO: efficient set_block
+}
+
+impl<'a, Base: 'a + Bits> SpaceUsage for BitSlice<'a, Base> {
+    fn is_stack_only() -> bool { true }
+}
+
+impl<'a, Base: 'a + BitsMut> SpaceUsage for BitSliceMut<'a, Base> {
+    fn is_stack_only() -> bool { true }
 }

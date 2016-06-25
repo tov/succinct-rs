@@ -1,21 +1,91 @@
 //! Traits for describing how bits and arrays of bits are stored.
 
+use std::fmt;
 use std::io;
 use std::mem;
 
 use byteorder::{ByteOrder, ReadBytesExt, WriteBytesExt};
 use num::PrimInt;
+
 use bit_vector::{Bits, BitsMut};
+use space_usage::SpaceUsage;
 
 /// Types that can be used for `IntVec` and `BitVec` storage.
 ///
-/// This trait is kind of a grab bag of methods right now: it provides both
-/// bit twiddling and endian-specified IO.
-pub trait BlockType: PrimInt + Bits + BitsMut {
+/// This trait is kind of a grab bag of methods right now. It includes:
+///
+///   - methods for computing sizes and offsets relative to the block size,
+///   - methods for getting and setting individual and groups of bits,
+///   - a method for computing rank,
+///   - three arithmetic methods that probably belong elsewhere, and
+///   - block-based, endian-specified I/O.
+pub trait BlockType: PrimInt + Bits + BitsMut + fmt::Debug + SpaceUsage {
+    // Methods for computing sizes and offsets relative to the block size.
+
     /// The number of bits in a block.
     #[inline]
     fn nbits() -> usize {
         8 * mem::size_of::<Self>()
+    }
+
+    /// Returns `index / Self::nbits()`, computed by shifting.
+    ///
+    /// This is intended for converting a bit address into a block
+    /// address, which is why it takes `u64` and returns `usize`.
+    #[inline]
+    fn div_nbits(index: u64) -> usize {
+        (index >> Self::lg_nbits()) as usize
+    }
+
+    /// Returns `index / Self::nbits()` rounded up, computed by shifting.
+    ///
+    /// This is intended for converting a bit size into a block
+    /// size, which is why it takes `u64` and returns `usize`.
+    #[inline]
+    fn ceil_div_nbits(index: u64) -> usize {
+        Self::div_nbits(index + Self::nbits() as u64 - 1)
+    }
+
+    /// Returns `index % Self::nbits()`, computed by masking.
+    ///
+    /// This is intended for converting a bit address into a bit offset
+    /// within a block, which is why it takes `u64` and returns `usize`.
+    #[inline]
+    fn mod_nbits(index: u64) -> usize {
+        let mask: u64 = Self::lg_nbits_mask();
+        (index & mask) as usize
+    }
+
+    /// Returns `index * Self::nbits()`, computed by shifting.
+    ///
+    /// This is intended for converting a block address into a bit address,
+    /// which is why it takes a `usize` and returns a `u64`.
+    fn mul_nbits(index: usize) -> u64 {
+        (index as u64) << Self::lg_nbits()
+    }
+
+    /// Computes how many bits are in the last block of an array of
+    /// `len` bits.
+    ///
+    /// This is like `Self::mod_nbits`, but it returns `Self::nbits()` in
+    /// lieu of 0. Note that this means that if you have 0 bits then the
+    /// last block is full.
+    #[inline]
+    fn last_block_bits(len: u64) -> usize {
+        let masked = Self::mod_nbits(len);
+        if masked == 0 { Self::nbits() } else { masked }
+    }
+
+    /// Log-base-2 of the number of bits in a block.
+    #[inline]
+    fn lg_nbits() -> usize {
+        Self::nbits().floor_lg()
+    }
+
+    /// Mask with the lowest-order `lg_nbits()` set.
+    #[inline]
+    fn lg_nbits_mask<Result: BlockType>() -> Result {
+        Result::low_mask(Self::lg_nbits())
     }
 
     /// The bit mask consisting of `Self::nbits() - element_bits` zeroes
@@ -45,6 +115,34 @@ pub trait BlockType: PrimInt + Bits + BitsMut {
     #[inline]
     fn nth_mask(bit_index: usize) -> Self {
         Self::one() << bit_index
+    }
+
+    // Methods for getting and setting bits.
+
+    /// Extracts the value of the `bit_index`th bit.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `bit_index` is out of bounds.
+    #[inline]
+    fn get_bit(self, bit_index: usize) -> bool {
+        assert!(bit_index < Self::nbits(), "Block::get_bit: out of bounds");
+        self & Self::nth_mask(bit_index) != Self::zero()
+    }
+
+    /// Functionally updates the value of the `bit_index`th bit to `bit_value`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `bit_index` is out of bounds.
+    #[inline]
+    fn with_bit(self, bit_index: usize, bit_value: bool) -> Self {
+        assert!(bit_index < Self::nbits(), "Block::with_bit: out of bounds");
+        if bit_value {
+            self | Self::nth_mask(bit_index)
+        } else {
+            self & !Self::nth_mask(bit_index)
+        }
     }
 
     /// Extracts `len` bits starting at bit offset `start`.
@@ -80,42 +178,24 @@ pub trait BlockType: PrimInt + Bits + BitsMut {
         (self & !mask) | (shifted_value & mask)
     }
 
-    /// Extracts the value of the `bit_index`th bit.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `bit_index` is out of bounds.
-    #[inline]
-    fn get_bit(self, bit_index: usize) -> bool {
-        assert!(bit_index < Self::nbits(), "Block::get_bit: out of bounds");
-        self & Self::nth_mask(bit_index) != Self::zero()
+    /// Returns the total count of ones up through the `index`th digit,
+    /// little-endian style.
+    fn rank1(self, index: usize) -> usize {
+        (self & Self::low_mask(index + 1)).count_ones() as usize
     }
 
-    /// Functionally updates the value of the `bit_index`th bit to `bit_value`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `bit_index` is out of bounds.
-    #[inline]
-    fn with_bit(self, bit_index: usize, bit_value: bool) -> Self {
-        assert!(bit_index < Self::nbits(), "Block::with_bit: out of bounds");
-        if bit_value {
-            self | Self::nth_mask(bit_index)
-        } else {
-            self & !Self::nth_mask(bit_index)
-        }
-    }
+    // Arithmetic methods that probably belong elsewhere.
 
     /// Returns the smallest number `n` such that `2.pow(n) >= self`.
     #[inline]
-    fn ceil_log2(self) -> usize {
+    fn ceil_lg(self) -> usize {
         if self <= Self::one() { return 0; }
         Self::nbits() - (self - Self::one()).leading_zeros() as usize
     }
 
     /// Returns the largest number `n` such that `2.pow(n) <= self`.
     #[inline]
-    fn floor_log2(self) -> usize {
+    fn floor_lg(self) -> usize {
         if self <= Self::one() { return 0; }
         Self::nbits() - 1 - self.leading_zeros() as usize
     }
@@ -126,11 +206,7 @@ pub trait BlockType: PrimInt + Bits + BitsMut {
         (self + divisor - Self::one()) / divisor
     }
 
-    /// Returns the total count of ones up through the `index`th digit,
-    /// little-endian style.
-    fn rank1(self, index: usize) -> usize {
-        (self & Self::low_mask(index + 1)).count_ones() as usize
-    }
+    // I/O methods
 
     /// Reads a block with the specified endianness.
     fn read_block<R, T>(source: &mut R) -> io::Result<Self>
@@ -210,6 +286,27 @@ impl BlockType for usize {
     }
 }
 
+/// Represents the address of a bit, broken into a block component
+/// and a bit offset component.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct Address {
+    /// The index of the block containing the bit in question.
+    pub block_index: usize,
+    /// The position of the bit in question within its block.
+    pub bit_offset: usize,
+}
+
+impl Address {
+    /// Creates an `Address` for the given bit index for storage in
+    /// block type `Block`.
+    pub fn new<Block: BlockType>(bit_index: u64) -> Address {
+        Address {
+            block_index: Block::div_nbits(bit_index),
+            bit_offset: Block::mod_nbits(bit_index),
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -283,43 +380,43 @@ mod test {
     }
 
     #[test]
-    fn floor_log2() {
-        assert_eq!(0, 1u32.floor_log2());
-        assert_eq!(1, 2u32.floor_log2());
-        assert_eq!(1, 3u32.floor_log2());
-        assert_eq!(2, 4u32.floor_log2());
-        assert_eq!(2, 5u32.floor_log2());
-        assert_eq!(2, 7u32.floor_log2());
-        assert_eq!(3, 8u32.floor_log2());
+    fn floor_lg() {
+        assert_eq!(0, 1u32.floor_lg());
+        assert_eq!(1, 2u32.floor_lg());
+        assert_eq!(1, 3u32.floor_lg());
+        assert_eq!(2, 4u32.floor_lg());
+        assert_eq!(2, 5u32.floor_lg());
+        assert_eq!(2, 7u32.floor_lg());
+        assert_eq!(3, 8u32.floor_lg());
 
         fn prop(n: u64) -> TestResult {
             if n == 0 { return TestResult::discard(); }
 
             TestResult::from_bool(
-                2u64.pow(n.floor_log2() as u32) <= n
-                    && 2u64.pow(n.floor_log2() as u32 + 1) > n)
+                2u64.pow(n.floor_lg() as u32) <= n
+                    && 2u64.pow(n.floor_lg() as u32 + 1) > n)
         }
 
         quickcheck(prop as fn(u64) -> TestResult);
     }
 
     #[test]
-    fn ceil_log2() {
-        assert_eq!(0, 1u32.ceil_log2());
-        assert_eq!(1, 2u32.ceil_log2());
-        assert_eq!(2, 3u32.ceil_log2());
-        assert_eq!(2, 4u32.ceil_log2());
-        assert_eq!(3, 5u32.ceil_log2());
-        assert_eq!(3, 7u32.ceil_log2());
-        assert_eq!(3, 8u32.ceil_log2());
-        assert_eq!(4, 9u32.ceil_log2());
+    fn ceil_lg() {
+        assert_eq!(0, 1u32.ceil_lg());
+        assert_eq!(1, 2u32.ceil_lg());
+        assert_eq!(2, 3u32.ceil_lg());
+        assert_eq!(2, 4u32.ceil_lg());
+        assert_eq!(3, 5u32.ceil_lg());
+        assert_eq!(3, 7u32.ceil_lg());
+        assert_eq!(3, 8u32.ceil_lg());
+        assert_eq!(4, 9u32.ceil_lg());
 
         fn prop(n: u64) -> TestResult {
             if n <= 1 { return TestResult::discard(); }
 
             TestResult::from_bool(
-                2u64.pow(n.ceil_log2() as u32) >= n
-                    && 2u64.pow(n.ceil_log2() as u32 - 1) < n)
+                2u64.pow(n.ceil_lg() as u32) >= n
+                    && 2u64.pow(n.ceil_lg() as u32 - 1) < n)
         }
 
         quickcheck(prop as fn(u64) -> TestResult);

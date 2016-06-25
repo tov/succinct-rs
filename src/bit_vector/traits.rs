@@ -1,6 +1,6 @@
 use num::{One, Zero};
 
-use storage::BlockType;
+use storage::{Address, BlockType};
 
 /// Interface for read-only bit vector operations.
 ///
@@ -127,9 +127,8 @@ pub trait BitsMut: Bits {
     /// The bits are laid out `Block::nbits()` per block, with the notional
     /// zeroth bit in the least significant position. If `self.bit_len()` is
     /// not a multiple of `Block::nbits()` then the last block will
-    /// contain extra bits that are not part of the bit vector. The values of
-    /// these trailing bits are unspecified, and setting them should not be
-    /// relied upon.
+    /// contain extra bits that are not part of the bit vector. Implementations
+    /// of `set_block` should not change those trailing bits.
     ///
     /// The default implementation sets a block by setting each of its bits
     /// in turn. Consider it a slow reference implementation, and override it.
@@ -138,11 +137,16 @@ pub trait BitsMut: Bits {
     ///
     /// Panics if `position` is out of bounds.
     fn set_block(&mut self, position: usize, mut value: Self::Block) {
-        let bit_position = position as u64 * Self::Block::nbits() as u64;
+        let limit = if position + 1 == self.block_len() {
+            Self::Block::last_block_bits(self.bit_len())
+        } else {
+            Self::Block::nbits()
+        };
 
-        for i in 0 .. Self::Block::nbits() as u64 {
+        let start = Self::Block::mul_nbits(position);
+        for i in 0 .. limit as u64 {
             let bit = value & Self::Block::one() != Self::Block::zero();
-            self.set_bit(bit_position + i, bit);
+            self.set_bit(start + i, bit);
             value = value >> 1;
         }
     }
@@ -194,7 +198,7 @@ pub trait BitVector: BitsMut {
     /// Pushes `value` 0 or more times until the size of the bit
     /// vector is block-aligned.
     fn align_block(&mut self, value: bool) {
-        while self.bit_len() % Self::Block::nbits() as u64 != 0 {
+        while Self::Block::mod_nbits(self.bit_len()) != 0 {
             self.push_bit(value);
         }
     }
@@ -212,24 +216,6 @@ pub trait BitVector: BitsMut {
         for _ in 0 .. Self::Block::nbits() {
             self.push_bit(value & Self::Block::one() != Self::Block::zero());
             value = value >> 1;
-        }
-    }
-}
-
-/// The address of a bit, as an index to a block and the index of a bit
-/// in that block.
-#[derive(Clone, Copy, Debug)]
-struct Address {
-    block_index: usize,
-    bit_offset: usize,
-}
-
-impl Address {
-    fn new<Block: BlockType>(bit_index: u64) -> Self {
-        let block_bits = Block::nbits() as u64;
-        Address {
-            block_index: (bit_index / block_bits) as usize,
-            bit_offset: (bit_index % block_bits) as usize,
         }
     }
 }

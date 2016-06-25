@@ -1,10 +1,13 @@
+use std::cmp::Ordering;
+
 use num::ToPrimitive;
 
-use storage::BlockType;
+use space_usage::SpaceUsage;
+use storage::{Address, BlockType};
 use super::traits::*;
 
 /// A bit vector implementation.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct BitVec<Block: BlockType = usize> {
     data: Vec<Block>,
     len:  u64,
@@ -49,13 +52,12 @@ impl<Block: BlockType> Bits for BitVec<Block> {
     fn get_bit(&self, index: u64) -> bool {
         assert!(index < self.len, "BitVec:get_bit: out of bounds");
 
-        let block_index = (index / Block::nbits() as u64) as usize;
-        let bit_offset = (index % Block::nbits() as u64) as usize;
+        let address = Address::new::<Block>(index);
 
         // We don’t need to worry about overflow because we do a bounds
-        // check above, and it shouldn’t be possible to create an IntVec
+        // check above, and it shouldn’t be possible to create an BitVec
         // that is too large to index.
-        self.data[block_index].get_bit(bit_offset)
+        self.data[address.block_index].get_bit(address.bit_offset)
     }
 
     #[inline]
@@ -70,19 +72,27 @@ impl<Block: BlockType> BitsMut for BitVec<Block> {
     fn set_bit(&mut self, index: u64, value: bool) {
         assert!(index < self.len, "BitVec:get_bit: out of bounds");
 
-        let block_index = (index / Block::nbits() as u64) as usize;
-        let bit_offset = (index % Block::nbits() as u64) as usize;
+        let address = Address::new::<Block>(index);
 
-        let old_block = self.data[block_index];
-        let new_block = old_block.with_bit(bit_offset, value);
-        self.data[block_index] = new_block;
+        let old_block = self.data[address.block_index];
+        let new_block = old_block.with_bit(address.bit_offset, value);
+        self.data[address.block_index] = new_block;
     }
 
     #[inline]
     fn set_block(&mut self, index: usize, value: Block) {
-        assert!(index < self.block_len(),
-                "BitVec::set_block: out of bounds");
-        self.data[index] = value;
+        match (index + 1).cmp(&self.block_len()) {
+            Ordering::Less => {
+                self.data[index] = value;
+            },
+            Ordering::Equal => {
+                let mask = Block::low_mask(Block::last_block_bits(self.len));
+                self.data[index] = value & mask;
+            },
+            Ordering::Greater => {
+                panic!("BitVec::set_block: out of bounds");
+            },
+        }
     }
 }
 
@@ -108,15 +118,6 @@ impl<Block: BlockType> BitVector for BitVec<Block> {
 
     fn push_block(&mut self, value: Block) {
         let block_len = self.block_len();
-
-        // Zero out any trailing bits
-        let keep = self.len % Block::nbits() as u64;
-        if keep > 0 {
-            let mask = Block::low_mask(keep as usize);
-            self.data[block_len - 1] = self.data[block_len - 1] & mask;
-        }
-
-        // Expand the length and set the new last block
         self.len = Block::nbits() as u64 * (block_len as u64 + 1);
 
         if self.data.len() < block_len + 1 {
@@ -124,6 +125,14 @@ impl<Block: BlockType> BitVector for BitVec<Block> {
         } else {
             self.set_block(block_len, value);
         }
+    }
+}
+
+impl<Block: BlockType> SpaceUsage for BitVec<Block> {
+    fn is_stack_only() -> bool { false }
+
+    fn heap_bytes(&self) -> usize {
+        self.data.heap_bytes()
     }
 }
 
@@ -235,5 +244,18 @@ mod test {
         assert_eq!(false, bv.get_bit(2));
         assert_eq!(true, bv.get_bit(3));
         assert_eq!(false, bv.get_bit(4));
+    }
+
+    #[test]
+    fn set_block_mask() {
+        let mut bv: BitVec = BitVec::new();
+
+        bv.push_bit(false);
+        bv.set_block(0, 0b11);
+        assert_eq!(0b01, bv.get_block(0));
+
+        bv.push_bit(false);
+        bv.set_block(0, 0b11);
+        assert_eq!(0b11, bv.get_block(0));
     }
 }
