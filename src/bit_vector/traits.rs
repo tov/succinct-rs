@@ -3,6 +3,11 @@ use num::{One, Zero};
 use storage::BlockType;
 
 /// Interface for read-only bit vector operations.
+///
+/// Minimal complete definition is `get_bit` or `get_block`, since each
+/// is defined in terms of the other. Note that `get_block` in terms of
+/// `get_bit` is inefficient, and thus you should implement `get_block`
+/// directly if possible.
 pub trait BitSlice {
     /// The underlying block type used to store the bits of the slice.
     type Block: BlockType;
@@ -12,10 +17,19 @@ pub trait BitSlice {
 
     /// Gets the bit at `position`
     ///
+    /// The default implementation calls `get_block` and masks out the
+    /// correct bit.
+    ///
     /// # Panics
     ///
     /// Panics if `position` is out of bounds.
-    fn get_bit(&self, position: u64) -> bool;
+    fn get_bit(&self, position: u64) -> bool {
+        assert!(position < self.bit_len(), "BitSlice::get_bit: out of bounds");
+
+        let address = Address::new::<Self::Block>(position);
+        let block = self.get_block(address.block_index);
+        block.get_bit(address.bit_offset)
+    }
 
     /// The length of the slice in blocks.
     fn block_len(&self) -> usize {
@@ -62,23 +76,20 @@ pub trait BitSlice {
         let limit = start + count as u64;
         assert!(limit <= self.bit_len(), "BitSlice::get_bits: out of bounds");
 
-        let block_bits = Self::Block::nbits();
-        let block_index = (start / block_bits as u64) as usize;
-        let bit_offset = (start % block_bits as u64) as usize;
-
-        let margin = block_bits - bit_offset;
+        let address = Address::new::<Self::Block>(start);
+        let margin = Self::Block::nbits() - address.bit_offset;
 
         if margin >= count {
-            let block = self.get_block(block_index);
-            return block.get_bits(bit_offset, count)
+            let block = self.get_block(address.block_index);
+            return block.get_bits(address.bit_offset, count)
         }
 
         let extra = count - margin;
 
-        let block1 = self.get_block(block_index);
-        let block2 = self.get_block(block_index + 1);
+        let block1 = self.get_block(address.block_index);
+        let block2 = self.get_block(address.block_index + 1);
 
-        let high_bits = block1.get_bits(bit_offset, margin);
+        let high_bits = block1.get_bits(address.bit_offset, margin);
         let low_bits = block2.get_bits(0, extra);
 
         (high_bits << extra) | low_bits
@@ -87,13 +98,27 @@ pub trait BitSlice {
 
 /// Interface for mutable bit vector operations that don’t affect the
 /// length.
+///
+/// Minimal complete definition is `set_bit` or `set_block`, since each
+/// is defined in terms of the other. Note that `set_block` in terms of
+/// `set_bit` is inefficient, and thus you should implement `get_block`
+/// directly if possible.
 pub trait BitSliceMut: BitSlice {
     /// Sets the bit at `position` to `value`.
+    ///
+    /// The default implementation uses `get_block` and `set_block`.
     ///
     /// # Panics
     ///
     /// Panics if `position` is out of bounds.
-    fn set_bit(&mut self, position: u64, value: bool);
+    fn set_bit(&mut self, position: u64, value: bool) {
+        assert!(position < self.bit_len(), "BitSlice::get_bit: out of bounds");
+
+        let address = Address::new::<Self::Block>(position);
+        let old_block = self.get_block(address.block_index);
+        let new_block = old_block.set_bit(address.bit_offset, value);
+        self.set_block(address.block_index, new_block);
+    }
 
     /// Sets the block at `position` to `value`.
     ///
@@ -130,31 +155,29 @@ pub trait BitSliceMut: BitSlice {
         let limit = start + count as u64;
         assert!(limit <= self.bit_len(), "BitSlice::get_bits: out of bounds");
 
-        let block_bits = Self::Block::nbits();
-        let block_index = (start / block_bits as u64) as usize;
-        let bit_offset = (start % block_bits as u64) as usize;
-
-        let margin = block_bits - bit_offset;
+        let address = Address::new::<Self::Block>(start);
+        let margin = Self::Block::nbits() - address.bit_offset;
 
         if margin >= count {
-            let old_block = self.get_block(block_index);
-            let new_block = old_block.set_bits(bit_offset, count, value);
-            self.set_block(block_index, new_block);
+            let old_block = self.get_block(address.block_index);
+            let new_block = old_block.set_bits(address.bit_offset, count, value);
+            self.set_block(address.block_index, new_block);
             return;
         }
 
         let extra = count - margin;
 
-        let old_block1 = self.get_block(block_index);
-        let old_block2 = self.get_block(block_index + 1);
+        let old_block1 = self.get_block(address.block_index);
+        let old_block2 = self.get_block(address.block_index + 1);
 
         let high_bits = value >> extra;
 
-        let new_block1 = old_block1.set_bits(bit_offset, margin, high_bits);
+        let new_block1 = old_block1.set_bits(address.bit_offset,
+                                             margin, high_bits);
         let new_block2 = old_block2.set_bits(0, extra, value);
 
-        self.set_block(block_index, new_block1);
-        self.set_block(block_index + 1, new_block2);
+        self.set_block(address.block_index, new_block1);
+        self.set_block(address.block_index + 1, new_block2);
     }
 }
 
@@ -187,6 +210,24 @@ pub trait BitVector: BitSliceMut {
         for _ in 0 .. Self::Block::nbits() {
             self.push_bit(value & Self::Block::one() != Self::Block::zero());
             value = value >> 1;
+        }
+    }
+}
+
+/// The address of a bit, as an index to a block and the index of a bit
+/// in that block.
+#[derive(Clone, Copy, Debug)]
+struct Address {
+    block_index: usize,
+    bit_offset: usize,
+}
+
+impl Address {
+    fn new<Block: BlockType>(bit_index: u64) -> Self {
+        let block_bits = Block::nbits() as u64;
+        Address {
+            block_index: (bit_index / block_bits) as usize,
+            bit_offset: (bit_index % block_bits) as usize,
         }
     }
 }
