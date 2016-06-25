@@ -2,7 +2,7 @@ use std::io::{Error, ErrorKind, Result};
 
 use storage::{BlockType, BitStore, BitStoreMut};
 use stream::{BitRead, BitWrite};
-use vector::{IntVec, IntVecBuilder};
+use int_vector::{IntVec, IntVecBuilder};
 
 /// A bit buffer can be used to read bits from or write bits to an
 /// underlying bit vector.
@@ -131,7 +131,7 @@ impl<Block: BlockType> BitWrite for BitBuffer<Block> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use vector::IntVec;
+    use int_vector::IntVec;
     use stream::{BitRead, BitWrite};
 
     #[test]

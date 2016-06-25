@@ -39,8 +39,11 @@ extern crate quickcheck;
 mod util;
 mod errors;
 
-pub mod vector;
-pub use vector::{IntVec, IntVecBuilder};
+pub mod bit_vector;
+pub use bit_vector::*;
+
+pub mod int_vector;
+pub use int_vector::{IntVec, IntVecBuilder};
 
 pub mod storage;
 pub mod stream;
