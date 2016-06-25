@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::fmt;
 
 use num::ToPrimitive;
 
@@ -14,6 +15,25 @@ pub struct BitVec<Block: BlockType = usize> {
 }
 
 impl<Block: BlockType> BitVec<Block> {
+    /// BitVec maintains the following invariants:
+    ///
+    ///  1) The size of the underlying vector is tight.
+    ///  2) Any extra bits in the last block are zeroed.
+    ///
+    /// This function checks (asserts) 1 and restores 2.
+    #[inline]
+    fn restore_invariant(&mut self) {
+        // This part of the invariant should not have to be restored:
+        debug_assert!(self.data.len() == self.block_len());
+
+        // Mask out any nasty trailing bits:
+        let bit_len = self.bit_len();
+        self.data.last_mut().map(|block| {
+            let mask = Block::low_mask(Block::last_block_bits(bit_len));
+            *block = *block & mask;
+        });
+    }
+
     /// Creates a new, empty bit vector.
     pub fn new() -> Self {
         BitVec {
@@ -38,6 +58,59 @@ impl<Block: BlockType> BitVec<Block> {
             data: Vec::with_capacity(capacity),
             len: 0,
         }
+    }
+
+    /// Creates a new bit vector of `len` bits initialized to `value`.
+    pub fn with_fill(len: u64, value: bool) -> Self {
+        let block_size = Block::ceil_div_nbits(len);
+        let block_value = if value {!Block::zero()} else {Block::zero()};
+        let mut result = Self::with_fill_block(block_size, block_value);
+        result.len = len;
+        result.restore_invariant();
+        result
+    }
+
+    /// Creates a new bit vector of `block_len` blocks initialized to `value`.
+    pub fn with_fill_block(block_len: usize, value: Block) -> Self {
+        BitVec {
+            data: vec![ value; block_len ],
+            len: Block::mul_nbits(block_len),
+        }
+    }
+
+    /// How many bits the bit vector can hold without reallocating.
+    pub fn capacity(&self) -> u64 {
+        Block::mul_nbits(self.block_capacity())
+    }
+
+    /// How many blocks the bit vector can hold without reallocating.
+    pub fn block_capacity(&self) -> usize {
+        self.data.capacity()
+    }
+
+    /// Resizes the bit vector to the given number of elements,
+    /// filling if necessary.
+    pub fn resize(&mut self, new_len: u64, value: bool) {
+        if new_len < self.bit_len() || !value {
+            self.resize_block(Block::ceil_div_nbits(new_len), Block::zero());
+        } else {
+            let trailing = Block::last_block_bits(self.bit_len());
+            let remaining = Block::nbits() - trailing;
+            self.data.last_mut().map(|block| {
+                *block = *block | (Block::low_mask(remaining) << trailing);
+            });
+            self.resize_block(Block::ceil_div_nbits(new_len), !Block::zero());
+        }
+
+        self.len = new_len;
+        self.restore_invariant();
+    }
+
+    /// Resizes the bit vector to the given number of blocks,
+    /// filling if necessary.
+    pub fn resize_block(&mut self, new_len: usize, value: Block) {
+        self.data.resize(new_len, value);
+        self.len = Block::mul_nbits(new_len);
     }
 }
 
@@ -128,6 +201,17 @@ impl<Block: BlockType> BitVector for BitVec<Block> {
     }
 }
 
+impl<Block: BlockType> fmt::Binary for BitVec<Block> {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        for i in 0 .. self.bit_len() {
+            let bit = if self.get_bit(i) {"1"} else {"0"};
+            try!(formatter.write_str(bit));
+        }
+
+        Ok(())
+    }
+}
+
 impl<Block: BlockType> SpaceUsage for BitVec<Block> {
     fn is_stack_only() -> bool { false }
 
@@ -140,11 +224,54 @@ impl<Block: BlockType> SpaceUsage for BitVec<Block> {
 mod test {
     use bit_vector::*;
 
+    macro_rules! assert_bv {
+        ($expected:expr, $actual:expr) => {
+            assert_eq!($expected, format!("{:b}", $actual))
+        }
+    }
+
     #[test]
     fn new() {
         let bv: BitVec = BitVec::new();
         assert_eq!(0, bv.bit_len());
         assert_eq!(0, bv.block_len());
+    }
+
+    #[test]
+    fn capacity() {
+        let bv: BitVec<u32> = BitVec::new();
+        assert_eq!(0, bv.capacity());
+
+        let bv: BitVec<u32> = BitVec::with_capacity(65);
+        assert_eq!(96, bv.capacity());
+    }
+
+    #[test]
+    fn push_binary() {
+        let mut bv: BitVec = BitVec::new();
+        bv.push_bit(true);
+        bv.push_bit(false);
+        bv.push_bit(false);
+        assert_eq!("100", format!("{:b}", bv));
+    }
+
+    #[test]
+    fn fill_with_block() {
+        let bv: BitVec<u8> = BitVec::with_fill_block(3, 0b101);
+        assert_eq!(3, bv.block_capacity());
+        assert_bv!("101000001010000010100000", bv);
+    }
+
+    #[test]
+    fn fill_with() {
+        let bv0: BitVec = BitVec::with_fill(20, false);
+        let bv1: BitVec = BitVec::with_fill(20, true);
+
+        assert_eq!(false, bv0.get_bit(3));
+        assert_eq!(true, bv1.get_bit(3));
+
+        assert_bv!("00000000000000000000", bv0);
+        assert_bv!("11111111111111111111", bv1);
     }
 
     #[test]
@@ -184,9 +311,7 @@ mod test {
     fn push_block() {
         let mut bv: BitVec<u32> = BitVec::new();
         bv.push_block(0);
-
-        assert_eq!(32, bv.bit_len());
-        assert_eq!(1, bv.block_len());
+        assert_bv!("00000000000000000000000000000000", bv);
     }
 
     #[test]
@@ -257,5 +382,52 @@ mod test {
         bv.push_bit(false);
         bv.set_block(0, 0b11);
         assert_eq!(0b11, bv.get_block(0));
+    }
+
+    #[test]
+    fn resize() {
+        let mut bv: BitVec<u8> = BitVec::new();
+
+        bv.push_bit(true);
+        bv.push_bit(false);
+        bv.push_bit(true);
+        assert_bv!("101", bv);
+
+        bv.resize(21, false);
+        assert_bv!("101000000000000000000", bv);
+
+        bv.resize(22, false);
+        assert_bv!("1010000000000000000000", bv);
+
+        bv.resize(5, false);
+        assert_bv!("10100", bv);
+
+        bv.resize(21, true);
+        assert_bv!("101001111111111111111", bv);
+
+        bv.resize(4, true);
+        assert_bv!("1010", bv);
+
+        bv.push_block(0b11111111);
+        assert_bv!("1010000011111111", bv);
+    }
+
+    #[test]
+    fn resize_block() {
+        let mut bv: BitVec<u8> = BitVec::new();
+
+        bv.push_bit(true);
+        bv.push_bit(false);
+        bv.push_bit(true);
+        assert_bv!("101", bv);
+
+        bv.resize_block(1, 0);
+        assert_bv!("10100000", bv);
+
+        bv.resize_block(3, 0b01000101);
+        assert_bv!("101000001010001010100010", bv);
+
+        bv.resize_block(2, 0);
+        assert_bv!("1010000010100010", bv);
     }
 }

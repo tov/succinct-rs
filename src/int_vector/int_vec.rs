@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 
 use num::ToPrimitive;
 
-pub use super::*;
+use super::*;
 use storage::{Address, BlockType};
 use bit_vector::{Bits, BitsMut};
 use space_usage::SpaceUsage;
@@ -676,7 +676,7 @@ impl<Block: BlockType> IntVecBuilder<Block> {
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    use int_vector::*;
     use bit_vector::*;
 
     #[test]
