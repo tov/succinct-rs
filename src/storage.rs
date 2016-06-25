@@ -5,7 +5,7 @@ use std::io;
 use std::mem;
 
 use byteorder::{ByteOrder, ReadBytesExt, WriteBytesExt};
-use num::PrimInt;
+use num::{PrimInt, ToPrimitive};
 
 use bit_vector::{Bits, BitsMut};
 use space_usage::SpaceUsage;
@@ -32,9 +32,33 @@ pub trait BlockType: PrimInt + Bits + BitsMut + fmt::Debug + SpaceUsage {
     ///
     /// This is intended for converting a bit address into a block
     /// address, which is why it takes `u64` and returns `usize`.
+    /// There is no check that the result actually fits in a `usize`,
+    /// so this should only be used when `index` is already known to
+    /// be small enough.
     #[inline]
     fn div_nbits(index: u64) -> usize {
         (index >> Self::lg_nbits()) as usize
+    }
+
+    /// Returns `index / Self::nbits()`, computed by shifting.
+    ///
+    /// This is intended for converting a bit address into a block
+    /// address, which is why it takes `u64` and returns `usize`.
+    #[inline]
+    fn div_nbits_checked(index: u64) -> Option<usize> {
+        (index >> Self::lg_nbits()).to_usize()
+    }
+
+    /// Returns `index / Self::nbits()` rounded up, computed by shifting.
+    ///
+    /// This is intended for converting a bit size into a block
+    /// size, which is why it takes `u64` and returns `usize`.
+    /// There is no check that the result actually fits in a `usize`,
+    /// so this should only be used when `index` is already known to
+    /// be small enough.
+    #[inline]
+    fn ceil_div_nbits_checked(index: u64) -> Option<usize> {
+        Self::div_nbits_checked(index + Self::nbits() as u64 - 1)
     }
 
     /// Returns `index / Self::nbits()` rounded up, computed by shifting.

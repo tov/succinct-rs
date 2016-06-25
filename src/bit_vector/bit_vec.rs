@@ -1,8 +1,6 @@
 use std::cmp::Ordering;
 use std::fmt;
 
-use num::ToPrimitive;
-
 use space_usage::SpaceUsage;
 use storage::{Address, BlockType};
 use super::traits::*;
@@ -20,7 +18,8 @@ impl<Block: BlockType> BitVec<Block> {
     ///  1) The size of the underlying vector is tight.
     ///  2) Any extra bits in the last block are zeroed.
     ///
-    /// This function checks (asserts) 1 and restores 2.
+    /// This function checks (asserts) 1 and restores 2. It is used when
+    /// the bit vector shrinks.
     #[inline]
     fn restore_invariant(&mut self) {
         // This part of the invariant should not have to be restored:
@@ -44,10 +43,15 @@ impl<Block: BlockType> BitVec<Block> {
 
     /// Creates a new, empty bit vector with space allocated for `capacity`
     /// bits.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `capacity` is too large. In particular the number of
+    /// blocks required by the capacity (`capacity / Block::nbits()`)
+    /// must fit in a `usize`.
     pub fn with_capacity(capacity: u64) -> Self {
-        let block_capacity = capacity.ceil_div(Block::nbits() as u64)
-                                     .to_usize()
-                                     .expect("BitVec::with_capacity: overflow");
+        let block_capacity = Block::ceil_div_nbits_checked(capacity)
+                                 .expect("BitVec::with_capacity: overflow");
         Self::with_block_capacity(block_capacity)
     }
 
@@ -61,8 +65,15 @@ impl<Block: BlockType> BitVec<Block> {
     }
 
     /// Creates a new bit vector of `len` bits initialized to `value`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `len` is too large. In particular the number of
+    /// blocks required by the capacity (`len / Block::nbits()`)
+    /// must fit in a `usize`.
     pub fn with_fill(len: u64, value: bool) -> Self {
-        let block_size = Block::ceil_div_nbits(len);
+        let block_size = Block::ceil_div_nbits_checked(len)
+                             .expect("BitVec::with_fill: overflow");
         let block_value = if value {!Block::zero()} else {Block::zero()};
         let mut result = Self::with_fill_block(block_size, block_value);
         result.len = len;
@@ -90,16 +101,25 @@ impl<Block: BlockType> BitVec<Block> {
 
     /// Resizes the bit vector to the given number of elements,
     /// filling if necessary.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `new_len` is too large. In particular the number of
+    /// blocks required by the capacity (`new_len / Block::nbits()`)
+    /// must fit in a `usize`.
     pub fn resize(&mut self, new_len: u64, value: bool) {
+        let new_block_len = Block::ceil_div_nbits_checked(new_len)
+                                .expect("BitVec::resize: overflow");
+
         if new_len < self.bit_len() || !value {
-            self.resize_block(Block::ceil_div_nbits(new_len), Block::zero());
+            self.resize_block(new_block_len, Block::zero());
         } else {
             let trailing = Block::last_block_bits(self.bit_len());
             let remaining = Block::nbits() - trailing;
             self.data.last_mut().map(|block| {
                 *block = *block | (Block::low_mask(remaining) << trailing);
             });
-            self.resize_block(Block::ceil_div_nbits(new_len), !Block::zero());
+            self.resize_block(new_block_len, !Block::zero());
         }
 
         self.len = new_len;
@@ -111,6 +131,98 @@ impl<Block: BlockType> BitVec<Block> {
     pub fn resize_block(&mut self, new_len: usize, value: Block) {
         self.data.resize(new_len, value);
         self.len = Block::mul_nbits(new_len);
+    }
+
+    /// Reserves capacity for at least `additional` more bits to be
+    /// inserted.
+    ///
+    /// The collection may reserve more space to avoid frequent
+    /// reallocations.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the number of blocks overflows a `usize`.
+    pub fn reserve(&mut self, additional: u64) {
+        let intended_cap = self.bit_len() + additional;
+        let intended_blocks = Block::ceil_div_nbits_checked(intended_cap)
+                                  .expect("BitVec::reserve: overflow");
+        let additional_blocks = intended_blocks - self.block_len();
+        self.reserve_block(additional_blocks);
+    }
+
+    /// Reserves capacity for at least `additional` blocks of bits to be
+    /// inserted.
+    ///
+    /// The collection may reserve more space to avoid frequent
+    /// reallocations.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the number of blocks overflows a `usize`.
+    pub fn reserve_block(&mut self, additional: usize) {
+        self.data.reserve(additional);
+    }
+
+    /// Reserves capacity for at least `additional` more bits to be
+    /// inserted.
+    ///
+    /// Unlike [`reserve`](#method.reserve), does nothing if the
+    /// capacity is already sufficient.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the number of blocks overflows a `usize`.
+    pub fn reserve_exact(&mut self, additional: u64) {
+        let intended_cap = self.bit_len() + additional;
+        let intended_blocks = Block::ceil_div_nbits_checked(intended_cap)
+                                  .expect("BitVec::reserve: overflow");
+        let additional_blocks = intended_blocks - self.block_len();
+        self.reserve_exact_block(additional_blocks);
+    }
+
+    /// Reserves capacity for at least `additional` more blocks of bits to be
+    /// inserted.
+    ///
+    /// Unlike [`reserve`](#method.reserve), does nothing if the
+    /// capacity is already sufficient.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the number of blocks overflows a `usize`.
+    pub fn reserve_exact_block(&mut self, additional: usize) {
+        self.data.reserve_exact(additional);
+    }
+
+    /// Shrinks the capacity to just fit the number of elements.
+    pub fn shrink_to_fit(&mut self) {
+        self.data.shrink_to_fit()
+    }
+
+    /// Shrinks to the given size.
+    ///
+    /// Does nothing if `len` is greater than the current size.
+    pub fn truncate(&mut self, len: u64) {
+        let block_len = Block::ceil_div_nbits_checked(len)
+                            .expect("BitVec::truncate: overflow");
+        self.truncate_block(block_len);
+        self.len = len;
+        self.restore_invariant();
+    }
+
+    /// Shrinks to the given size in blocks.
+    ///
+    /// Does nothing if `block_len` is greater than the current size in blocks.
+    pub fn truncate_block(&mut self, block_len: usize) {
+        if block_len < self.block_len() {
+            self.data.truncate(block_len);
+            self.len = Block::mul_nbits(block_len);
+        }
+    }
+
+    /// Sets the size to 0 while retaining the allocated storage.
+    pub fn clear(&mut self) {
+        self.data.clear();
+        self.len = 0;
     }
 }
 
@@ -186,6 +298,13 @@ impl<Block: BlockType> BitVector for BitVec<Block> {
 
         let result = Some(self.get_bit(self.len - 1));
         self.len -= 1;
+
+        if Block::mod_nbits(self.len) == 0 {
+            self.data.pop();
+        } else {
+            self.restore_invariant();
+        }
+
         result
     }
 
