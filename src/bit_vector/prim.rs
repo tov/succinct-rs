@@ -1,5 +1,3 @@
-use num::Zero;
-
 use storage::BlockType;
 use bit_vector::traits::*;
 
@@ -24,7 +22,7 @@ macro_rules! impl_bits_prim {
             fn get_bit(&self, position: u64) -> bool {
                 assert!(position < self.bit_len(),
                         "prim::get_bit: out of bounds");
-                self & Self::nth_mask(position as usize) != Self::zero()
+                BlockType::get_bit(*self, position as usize)
             }
 
             #[inline]
@@ -37,9 +35,7 @@ macro_rules! impl_bits_prim {
             fn get_bits(&self, start: u64, count: usize) -> Self {
                 assert!(start + count as u64 <= Self::nbits() as u64,
                         "prim::get_bits: out of bounds");
-
-                if count == 0 { return Self::zero(); }
-                (*self >> start as usize) & Self::low_mask(count)
+                BlockType::get_bits(*self, start as usize, count)
             }
         }
 

@@ -696,6 +696,7 @@ impl<Block: BlockType> IntVecBuilder<Block> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use bit_vector::*;
 
     #[test]
     fn create_empty() {

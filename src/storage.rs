@@ -5,9 +5,13 @@ use std::mem;
 
 use byteorder::{ByteOrder, ReadBytesExt, WriteBytesExt};
 use num::PrimInt;
+use bit_vector::{Bits, BitsMut};
 
-/// Types that can be used for `IntVec` storage.
-pub trait BlockType: PrimInt {
+/// Types that can be used for `IntVec` and `BitVec` storage.
+///
+/// This trait is kind of a grab bag of methods right now: it provides both
+/// bit twiddling and endian-specified IO.
+pub trait BlockType: PrimInt + Bits + BitsMut {
     /// The number of bits in a block.
     #[inline]
     fn nbits() -> usize {
@@ -45,30 +49,30 @@ pub trait BlockType: PrimInt {
 
     /// Extracts `len` bits starting at bit offset `start`.
     ///
-    /// # Precondition
+    /// # Panics
     ///
-    /// `start + len < Self::nbits()`
+    /// Panics of the bit span is out of bounds.
     #[inline]
     fn get_bits(self, start: usize, len: usize) -> Self {
-        if len == 0 { return Self::zero(); }
+        assert!(start + len <= Self::nbits(),
+                "Block::get_bits: out of bounds");;
 
-        let limit      = start + len;
-        debug_assert!(limit <= Self::nbits());
+        if len == 0 { return Self::zero(); }
 
         (self >> start) & Self::low_mask(len)
     }
 
-    /// Sets `len` bits to `value` starting at offset `start`.
+    /// Functionally updates `len` bits to `value` starting at offset `start`.
     ///
-    /// # Precondition
+    /// # Panics
     ///
-    /// `start + len < Self::nbits()`
+    /// Panics of the bit span is out of bounds.
     #[inline]
     fn with_bits(self, start: usize, len: usize, value: Self) -> Self {
-        if len == 0 { return self; }
+        assert!(start + len <= Self::nbits(),
+                "Block::with_bits: out of bounds");
 
-        let limit      = start + len;
-        debug_assert!(limit <= Self::nbits());
+        if len == 0 { return self; }
 
         let mask = Self::low_mask(len) << start;
         let shifted_value = value << start;
@@ -77,14 +81,24 @@ pub trait BlockType: PrimInt {
     }
 
     /// Extracts the value of the `bit_index`th bit.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `bit_index` is out of bounds.
     #[inline]
     fn get_bit(self, bit_index: usize) -> bool {
+        assert!(bit_index < Self::nbits(), "Block::get_bit: out of bounds");
         self & Self::nth_mask(bit_index) != Self::zero()
     }
 
-    /// Sets the value of the `bit_index`th bit to true.
+    /// Functionally updates the value of the `bit_index`th bit to `bit_value`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `bit_index` is out of bounds.
     #[inline]
     fn with_bit(self, bit_index: usize, bit_value: bool) -> Self {
+        assert!(bit_index < Self::nbits(), "Block::with_bit: out of bounds");
         if bit_value {
             self | Self::nth_mask(bit_index)
         } else {
@@ -260,12 +274,12 @@ mod test {
 
     #[test]
     fn set_bit() {
-        assert_eq!(0b00100000, 0b00000000u8.set_bit(5, true));
-        assert_eq!(0b00000000, 0b00000000u8.set_bit(5, false));
-        assert_eq!(0b10101010, 0b10101010u8.set_bit(7, true));
-        assert_eq!(0b00101010, 0b10101010u8.set_bit(7, false));
-        assert_eq!(0b10101011, 0b10101010u8.set_bit(0, true));
-        assert_eq!(0b10101010, 0b10101010u8.set_bit(0, false));
+        assert_eq!(0b00100000, 0b00000000u8.with_bit(5, true));
+        assert_eq!(0b00000000, 0b00000000u8.with_bit(5, false));
+        assert_eq!(0b10101010, 0b10101010u8.with_bit(7, true));
+        assert_eq!(0b00101010, 0b10101010u8.with_bit(7, false));
+        assert_eq!(0b10101011, 0b10101010u8.with_bit(0, true));
+        assert_eq!(0b10101010, 0b10101010u8.with_bit(0, false));
     }
 
     #[test]
