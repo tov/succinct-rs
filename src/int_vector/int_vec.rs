@@ -315,7 +315,7 @@ impl<Block: BlockType> IntVec<Block> {
         let goal_elements = self.len() + additional;
         let goal_blocks = Self::compute_n_blocks(self.element_bits,
                                                  goal_elements).unwrap();
-        let difference = self.blocks.capacity().saturating_sub(goal_blocks);
+        let difference = goal_blocks.saturating_sub(self.blocks.capacity());
         self.blocks.reserve(difference);
     }
 

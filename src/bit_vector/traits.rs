@@ -91,10 +91,10 @@ pub trait Bits {
         let block1 = self.get_block(address.block_index);
         let block2 = self.get_block(address.block_index + 1);
 
-        let high_bits = block1.get_bits(address.bit_offset, margin);
-        let low_bits = block2.get_bits(0, extra);
+        let low_bits = block1.get_bits(address.bit_offset, margin);
+        let high_bits = block2.get_bits(0, extra);
 
-        (high_bits << extra) | low_bits
+        (high_bits << margin) | low_bits
     }
 }
 
@@ -176,11 +176,11 @@ pub trait BitsMut: Bits {
         let old_block1 = self.get_block(address.block_index);
         let old_block2 = self.get_block(address.block_index + 1);
 
-        let high_bits = value >> extra;
+        let high_bits = value >> margin;
 
         let new_block1 = old_block1.with_bits(address.bit_offset,
-                                              margin, high_bits);
-        let new_block2 = old_block2.with_bits(0, extra, value);
+                                              margin, value);
+        let new_block2 = old_block2.with_bits(0, extra, high_bits);
 
         self.set_block(address.block_index, new_block1);
         self.set_block(address.block_index + 1, new_block2);
