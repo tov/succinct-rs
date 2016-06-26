@@ -8,7 +8,7 @@
 This library is a very early work in progress. So far we have:
 
   - integer vectors with arbitrary-sized (1- to 64-bit) elements;
-  - bit vectors and buffers,
+  - bit vectors and bit buffers,
   - a variety of universal codes,
   - constant-time rank queries; and
   - *O*(lg lg *n*)-time select queries based on binary search over ranks.
@@ -19,7 +19,7 @@ It’s [on crates.io](https://crates.io/crates/succinct), so you can add
 
 ```toml
 [dependencies]
-succinct = "0.2.2"
+succinct = "0.3.0"
 ```
 
 to your `Cargo.toml` and
