@@ -33,6 +33,7 @@ impl<Block: BlockType> VectorBase<Block> {
     #[inline]
     fn set_len_from_blocks(&mut self, element_bits: usize) {
         self.len = Block::mul_nbits(self.vec.len()) / element_bits as u64;
+        self.clear_extra_bits(element_bits);
     }
 
     #[inline]
@@ -48,12 +49,14 @@ impl<Block: BlockType> VectorBase<Block> {
         }
     }
 
+    #[inline]
     pub fn with_capacity(element_bits: usize, capacity: u64) -> Self {
         Self::with_block_capacity(
             Block::ceil_div_nbits_checked(element_bits as u64 * capacity)
                 .expect("VectorBase::with_capacity: overflow"))
     }
 
+    #[inline]
     pub fn with_block_fill(element_bits: usize, block_len: usize, fill: Block)
                            -> Self {
         let mut result = VectorBase {
@@ -62,14 +65,15 @@ impl<Block: BlockType> VectorBase<Block> {
         };
 
         result.set_len_from_blocks(element_bits);
-        result.clear_extra_bits(element_bits);
         result
     }
 
+    #[inline]
     pub fn get_block(&self, block_index: usize) -> Block {
         self.vec[block_index]
     }
 
+    #[inline]
     pub fn set_block(&mut self, element_bits: usize,
                      block_index: usize, value: Block) {
         self.vec[block_index] = value;
@@ -78,6 +82,7 @@ impl<Block: BlockType> VectorBase<Block> {
         }
     }
 
+    #[inline]
     pub fn get_bits(&self, element_bits: usize, index: u64, count: usize)
                     -> Block {
         assert!(index + count as u64 <= self.len * element_bits as u64,
@@ -85,6 +90,7 @@ impl<Block: BlockType> VectorBase<Block> {
         self.vec.get_bits(index, count)
     }
 
+    #[inline]
     pub fn set_bits(&mut self, element_bits: usize, index: u64,
                     count: usize, value: Block) {
         assert!(index + count as u64 <= self.len * element_bits as u64,
@@ -93,30 +99,33 @@ impl<Block: BlockType> VectorBase<Block> {
     }
 
     // PRECONDITION: element_size == 1
+    #[inline]
     pub fn get_bit(&self, index: u64) -> bool {
         assert!(index < self.len, "VectorBase::get_bit: out of bounds");
         self.vec.get_bit(index)
     }
 
     // PRECONDITION: element_size == 1
+    #[inline]
     pub fn set_bit(&mut self, index: u64, value: bool) {
         assert!(index < self.len, "VectorBase::set_bit: out of bounds");
         self.vec.set_bit(index, value);
     }
 
+    #[inline]
     pub fn push_block(&mut self, element_bits: usize, value: Block) {
         self.vec.push(value);
         self.set_len_from_blocks(element_bits);
-        self.clear_extra_bits(element_bits);
     }
 
+    #[inline]
     pub fn pop_block(&mut self, element_bits: usize) -> Option<Block> {
         let result = self.vec.pop();
         self.set_len_from_blocks(element_bits);
-        self.clear_extra_bits(element_bits);
         result
     }
 
+    #[inline]
     pub fn push_bits(&mut self, element_bits: usize, value: Block) {
         if element_bits as u64 * (self.len + 1) > Block::mul_nbits(self.vec.len()) {
             self.vec.push(Block::zero());
@@ -128,6 +137,7 @@ impl<Block: BlockType> VectorBase<Block> {
                       element_bits, value);
     }
 
+    #[inline]
     pub fn pop_bits(&mut self, element_bits: usize) -> Option<Block> {
         if self.len == 0 { return None; }
 
@@ -144,6 +154,7 @@ impl<Block: BlockType> VectorBase<Block> {
     }
 
     // PRECONDITION: element_size == 1
+    #[inline]
     pub fn push_bit(&mut self, value: bool) {
         if self.len + 1 > Block::mul_nbits(self.vec.len()) {
             self.vec.push(Block::zero());
@@ -154,6 +165,7 @@ impl<Block: BlockType> VectorBase<Block> {
         self.set_bit(pos, value);
     }
 
+    #[inline]
     pub fn pop_bit(&mut self) -> Option<bool> {
         if self.len == 0 { return None; }
 
@@ -188,18 +200,20 @@ impl<Block: BlockType> VectorBase<Block> {
         self.vec.capacity()
     }
 
+    #[inline]
     pub fn capacity(&self, element_bits: usize) -> u64 {
         Block::mul_nbits(self.block_capacity()) / element_bits as u64
     }
 
+    #[inline]
     pub fn truncate_block(&mut self, element_bits: usize, block_len: usize) {
         if block_len < self.vec.len() {
             self.vec.truncate(block_len);
             self.set_len_from_blocks(element_bits);
-            self.clear_extra_bits(element_bits);
         }
     }
 
+    #[inline]
     pub fn truncate(&mut self, element_bits: usize, len: u64) {
         if len < self.len {
             let block_len = Block::ceil_div_nbits(len * element_bits as u64);
@@ -233,23 +247,26 @@ impl<Block: BlockType> VectorBase<Block> {
         goal_blocks.saturating_sub(self.vec.capacity())
     }
 
+    #[inline]
     pub fn reserve(&mut self, element_bits: usize, additional: u64) {
         let difference = self.additional_blocks(element_bits, additional);
         self.reserve_blocks(difference);
     }
 
+    #[inline]
     pub fn reserve_exact(&mut self, element_bits: usize, additional: u64) {
         let difference = self.additional_blocks(element_bits, additional);
         self.reserve_exact_blocks(difference);
     }
 
+    #[inline]
     pub fn resize_blocks(&mut self, element_bits: usize,
                          block_len: usize, fill: Block) {
         self.vec.resize(block_len, fill);
         self.set_len_from_blocks(element_bits);
-        self.clear_extra_bits(element_bits);
     }
 
+    #[inline]
     pub fn resize(&mut self, element_bits: usize, len: u64, fill: Block) {
         let bit_len = element_bits as u64 * len;
         let block_len = Block::ceil_div_nbits_checked(bit_len)
