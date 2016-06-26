@@ -7,12 +7,12 @@ use bit_vector::*;
 /// A bit buffer can be used to read bits from or write bits to an
 /// underlying bit vector.
 #[derive(Clone, Debug)]
-pub struct BitBuffer<Block: BlockType = usize> {
-    data: BitVec<Block>,
+pub struct BitBuffer<Inner = BitVec> {
+    data: Inner,
     pos: u64,
 }
 
-impl<Block: BlockType> BitBuffer<Block> {
+impl<Block: BlockType> BitBuffer<BitVec<Block>> {
     /// Creates a new, empty bit buffer.
     #[inline]
     pub fn new() -> Self {
@@ -27,9 +27,11 @@ impl<Block: BlockType> BitBuffer<Block> {
             pos: 0,
         }
     }
+}
 
+impl<Inner: Bits> BitBuffer<Inner> {
     /// Creates a new bit buffer for reading from a bit vector.
-    pub fn from(input: BitVec<Block>) -> Self {
+    pub fn from(input: Inner) -> Self {
         BitBuffer {
             data: input,
             pos: 0,
@@ -37,31 +39,12 @@ impl<Block: BlockType> BitBuffer<Block> {
     }
 
     /// Creates a new bit buffer for appending to a bit vector.
-    pub fn append(vec: BitVec<Block>) -> Self {
+    pub fn append(vec: Inner) -> Self {
         let len = vec.bit_len();
         BitBuffer {
             data: vec,
             pos: len,
         }
-    }
-
-    /// Returns the bit vector underlying the bit buffer.
-    #[inline]
-    pub fn into_inner(self) -> BitVec<Block> {
-        self.data
-    }
-
-    /// Gives access to the bit vector underlying the bit buffer.
-    #[inline]
-    pub fn inner(&self) -> &BitVec<Block> {
-        &self.data
-    }
-
-    /// The position in the bit buffer where the next read or write will
-    /// occur.
-    #[inline]
-    pub fn position(&self) -> u64 {
-        self.pos
     }
 
     /// Moves the position for the next read or write.
@@ -76,8 +59,29 @@ impl<Block: BlockType> BitBuffer<Block> {
     }
 }
 
-impl<Block: BlockType> Bits for BitBuffer<Block> {
-    type Block = Block;
+impl<Inner> BitBuffer<Inner> {
+    /// Returns the bit vector underlying the bit buffer.
+    #[inline]
+    pub fn into_inner(self) -> Inner {
+        self.data
+    }
+
+    /// Gives access to the bit vector underlying the bit buffer.
+    #[inline]
+    pub fn inner(&self) -> &Inner {
+        &self.data
+    }
+
+    /// The position in the bit buffer where the next read or write will
+    /// occur.
+    #[inline]
+    pub fn position(&self) -> u64 {
+        self.pos
+    }
+}
+
+impl<Inner: Bits> Bits for BitBuffer<Inner> {
+    type Block = Inner::Block;
 
     #[inline]
     fn block_len(&self) -> usize {
@@ -95,14 +99,14 @@ impl<Block: BlockType> Bits for BitBuffer<Block> {
     }
 }
 
-impl<Block: BlockType> BitsMut for BitBuffer<Block> {
+impl<Inner: BitsMut> BitsMut for BitBuffer<Inner> {
     #[inline]
     fn set_block(&mut self, position: usize, value: Self::Block) {
         self.data.set_block(position, value);
     }
 }
 
-impl<Block: BlockType> BitRead for BitBuffer<Block> {
+impl<Inner: Bits> BitRead for BitBuffer<Inner> {
     fn read_bit(&mut self) -> Result<Option<bool>> {
         if self.pos < self.bit_len() {
             let result = self.get_bit(self.pos);
@@ -114,7 +118,7 @@ impl<Block: BlockType> BitRead for BitBuffer<Block> {
     }
 }
 
-impl<Block: BlockType> BitWrite for BitBuffer<Block> {
+impl<Inner: BitVector> BitWrite for BitBuffer<Inner> {
     fn write_bit(&mut self, value: bool) -> Result<()> {
         while self.pos >= self.bit_len() {
             self.data.push_bit(false);
@@ -155,7 +159,7 @@ mod test {
 
     #[test]
     fn writer() {
-        let mut writer = BitBuffer::<usize>::new();
+        let mut writer: BitBuffer = BitBuffer::new();
 
         writer.write_bit(true).unwrap();
         writer.write_bit(false).unwrap();
