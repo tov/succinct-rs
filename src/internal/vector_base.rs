@@ -12,6 +12,11 @@ use storage::BlockType;
 ///
 /// These two properties are what make it safe to use derived
 /// implementations of Eq, Ord, Hash, etc.
+///
+/// Many `VectorBase` methods take `element_bits` as a parameter. For methods
+/// that create a vector, `element_bits` is checked for overflow. For other methods,
+/// it is assumed to have already been checked, so the client must ensure that it
+/// doesn’t pass bogus `element_bits` values.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct VectorBase<Block> {
     len: u64,
@@ -108,6 +113,7 @@ impl<Block: BlockType> VectorBase<Block> {
     #[inline]
     pub fn get_bits(&self, element_bits: usize, index: u64, count: usize)
                     -> Block {
+        // If element_bits is legit then the RHS of the comparison can't overflow.
         assert!(index + count as u64 <= self.len * element_bits as u64,
                 "VectorBase::get_bits: out of bounds");
         self.vec.get_bits(index, count)
@@ -116,6 +122,7 @@ impl<Block: BlockType> VectorBase<Block> {
     #[inline]
     pub fn set_bits(&mut self, element_bits: usize, index: u64,
                     count: usize, value: Block) {
+        // If element_bits is legit then the RHS of the comparison can't overflow.
         assert!(index + count as u64 <= self.len * element_bits as u64,
                 "VectorBase::set_bits: out of bounds");
         self.vec.set_bits(index, count, value);
