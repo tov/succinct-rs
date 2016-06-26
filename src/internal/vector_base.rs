@@ -332,7 +332,7 @@ mod test {
     }
 
     #[test]
-    fn set_block() {
+    fn set_block_5() {
         let mut v = VB::with_block_fill(5, 3, 0b01010101);
         assert_eq!(0b01010101, v.get_block(0));
         assert_eq!(0b01010101, v.get_block(1));
@@ -340,5 +340,37 @@ mod test {
 
         v.set_block(5, 2, 0b11111111);
         assert_eq!(0b00001111, v.get_block(2));
+    }
+
+    #[test]
+    fn set_block_7() {
+        let mut v = VB::with_block_fill(7, 3, 0b01010101);
+        assert_eq!(0b01010101, v.get_block(0));
+        assert_eq!(0b01010101, v.get_block(1));
+        assert_eq!(0b00010101, v.get_block(2));
+    }
+
+    #[test]
+    fn get_bits() {
+        let v = VB::with_block_fill(5, 5, 0b01010101);
+        assert_eq!(0b10101, v.get_bits(5, 0, 5));
+        assert_eq!(0b101, v.get_bits(5, 0, 3));
+        assert_eq!(0b010101, v.get_bits(5, 6, 6));
+    }
+
+    #[test]
+    fn set_bits() {
+        let mut v = VB::with_block_fill(5, 10, 0);
+        assert_eq!(0, v.get_bits(5,  0, 5));
+        assert_eq!(0, v.get_bits(5,  5, 5));
+        assert_eq!(0, v.get_bits(5, 10, 5));
+
+        v.set_bits(5,  0, 5, 17);
+        v.set_bits(5,  5, 5,  2);
+        v.set_bits(5, 10, 5,  8);
+
+        assert_eq!(17, v.get_bits(5, 0, 5));
+        assert_eq!( 2, v.get_bits(5, 5, 5));
+        assert_eq!( 8, v.get_bits(5, 10, 5));
     }
 }
