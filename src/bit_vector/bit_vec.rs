@@ -1,6 +1,9 @@
 use std::cmp::Ordering;
 use std::fmt;
 
+#[cfg(target_pointer_width = "32")]
+use num::ToPrimitive;
+
 use space_usage::SpaceUsage;
 use storage::{Address, BlockType};
 use super::traits::*;
@@ -224,6 +227,15 @@ impl<Block: BlockType> BitVec<Block> {
         self.data.clear();
         self.len = 0;
     }
+
+    /// Returns an iterator over the bits of the bit vector
+    pub fn iter(&self) -> Iter<Block> {
+        Iter {
+            vec: &self,
+            start: 0,
+            limit: self.bit_len(),
+        }
+    }
 }
 
 impl<Block: BlockType> Bits for BitVec<Block> {
@@ -342,6 +354,79 @@ impl<Block: BlockType> SpaceUsage for BitVec<Block> {
 impl<Block: BlockType> Default for BitVec<Block> {
     fn default() -> Self {
         BitVec::new()
+    }
+}
+
+/// Iterator over `BitVec`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct Iter<'a, Block: BlockType + 'a> {
+    vec: &'a BitVec<Block>,
+    start: u64,
+    limit: u64,
+}
+
+impl<'a, Block: BlockType> Iterator for Iter<'a, Block> {
+    type Item = bool;
+
+    fn next(&mut self) -> Option<bool> {
+        if self.start < self.limit {
+            let result = self.vec.get_bit(self.start);
+            self.start += 1;
+            Some(result)
+        } else {None}
+    }
+
+    #[cfg(target_pointer_width = "32")]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        if let Some(len) = (self.limit - self.start).to_usize() {
+            (len, Some(len))
+        } else {
+            (0, None)
+        }
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.len();
+        (len, Some(len))
+    }
+
+    fn count(self) -> usize {
+        self.len()
+    }
+
+    fn last(mut self) -> Option<Self::Item> {
+        self.next_back()
+    }
+
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        self.start = self.start.checked_add(n as u64).unwrap_or(self.limit);
+        self.next()
+    }
+}
+
+#[cfg(target_pointer_width = "64")]
+impl<'a, Block: BlockType> ExactSizeIterator for Iter<'a, Block> {
+    fn len(&self) -> usize {
+        (self.limit - self.start) as usize
+    }
+}
+
+impl<'a, Block: BlockType> DoubleEndedIterator for Iter<'a, Block> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        if self.start < self.limit {
+            self.limit -= 1;
+            Some(self.vec.get_bit(self.limit))
+        } else { None }
+    }
+}
+
+impl<'a, Block: BlockType + 'a> IntoIterator for &'a BitVec<Block> {
+    type Item = bool;
+    type IntoIter = Iter<'a, Block>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
     }
 }
 

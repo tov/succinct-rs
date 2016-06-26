@@ -3,7 +3,7 @@ use std::{fmt, mem};
 use num::ToPrimitive;
 
 use super::*;
-use storage::{Address, BlockType};
+use storage::BlockType;
 use bit_vector::{Bits, BitsMut};
 use space_usage::SpaceUsage;
 
@@ -59,7 +59,7 @@ impl<Block: BlockType> IntVec<Block> {
 
     #[inline]
     fn compute_address_random(&self, bit_offset: u64, element_bits: usize,
-                              element_index: u64) -> Address {
+                              element_index: u64) -> u64 {
         let bits_index = element_index
             .checked_mul(element_bits as u64)
             .expect("IntVec: index overflow")
@@ -70,11 +70,11 @@ impl<Block: BlockType> IntVec<Block> {
         assert!(bits_limit <= (Self::block_bits() * self.blocks.len()) as u64,
                 "IntVec: index out of bounds.");
 
-        Address::new::<Block>(bits_index)
+        bits_index
     }
 
     #[inline]
-    fn compute_address(&self, element_index: u64) -> Address {
+    fn compute_address(&self, element_index: u64) -> u64 {
         // Because of the underlying slice, this bounds checks twice.
         assert!(element_index < self.n_elements,
                 "IntVec: index out of bounds.");
@@ -86,7 +86,7 @@ impl<Block: BlockType> IntVec<Block> {
         let element_bits  = self.element_bits() as u64;
         let bit_index     = element_index * element_bits;
 
-        Address::new::<Block>(bit_index)
+        bit_index
     }
 
     /// Creates a new integer vector.
@@ -159,26 +159,6 @@ impl<Block: BlockType> IntVec<Block> {
         Self::compute_n_blocks(element_bits, n_elements).is_ok()
     }
 
-    fn get_address(&self, address: Address, element_bits: usize) -> Block {
-        let block_bits = Self::block_bits();
-        let margin = block_bits - address.bit_offset;
-
-        if margin >= element_bits {
-            let block = self.blocks[address.block_index];
-            return block.get_bits(address.bit_offset, element_bits)
-        }
-
-        let extra = element_bits - margin;
-
-        let block1 = self.blocks[address.block_index];
-        let block2 = self.blocks[address.block_index + 1];
-
-        let high_bits = block1.get_bits(address.bit_offset, margin);
-        let low_bits = block2.get_bits(0, extra);
-
-        (high_bits << extra) | low_bits
-    }
-
     /// Returns the element at a given index, also given an arbitrary
     /// element size and bit offset.
     ///
@@ -199,38 +179,8 @@ impl<Block: BlockType> IntVec<Block> {
         let address = self.compute_address_random(bit_offset,
                                                   element_bits,
                                                   element_index);
-        self.get_address(address, element_bits)
+        self.blocks.get_bits(address, element_bits)
     }
-
-    fn set_address(&mut self, address: Address, element_bits: usize,
-                   element_value: Block) {
-        let block_bits = Self::block_bits();
-        let margin = block_bits - address.bit_offset;
-
-        if margin >= element_bits {
-            let old_block = self.blocks[address.block_index];
-            let new_block = old_block.with_bits(address.bit_offset,
-                                                element_bits,
-                                                element_value);
-            self.blocks[address.block_index] = new_block;
-            return;
-        }
-
-        let extra = element_bits - margin;
-
-        let old_block1 = self.blocks[address.block_index];
-        let old_block2 = self.blocks[address.block_index + 1];
-
-        let high_bits = element_value >> extra;
-
-        let new_block1 = old_block1.with_bits(address.bit_offset,
-                                              margin, high_bits);
-        let new_block2 = old_block2.with_bits(0, extra, element_value);
-
-        self.blocks[address.block_index] = new_block1;
-        self.blocks[address.block_index + 1] = new_block2;
-    }
-
 
     /// Sets the element at a given index to a given value, also given
     /// an arbitrary element size and bit offset.
@@ -256,7 +206,7 @@ impl<Block: BlockType> IntVec<Block> {
         let address = self.compute_address_random(bit_offset,
                                                   element_bits,
                                                   element_index);
-        self.set_address(address, element_bits, element_value);
+        self.blocks.set_bits(address, element_bits, element_value);
     }
 
     /// Pushes an element onto the end of the vector, increasing the
@@ -425,9 +375,6 @@ impl<Block: BlockType> IntVec<Block> {
     pub fn is_aligned(&self) -> bool {
         Self::block_bits() % self.element_bits() == 0
     }
-
-    // TODO: fn align(&mut self) chooses element_bits...
-
 }
 
 impl<Block: BlockType> IntVector for IntVec<Block> {
@@ -442,18 +389,8 @@ impl<Block: BlockType> IntVector for IntVec<Block> {
             return self.blocks[element_index as usize];
         }
 
-        let element_bits = self.element_bits();
-
-        if element_bits == 1 {
-            if self.get_bit(element_index) {
-                return Block::one();
-            } else {
-                return Block::zero();
-            }
-        }
-
         let address = self.compute_address(element_index);
-        self.get_address(address, element_bits)
+        self.blocks.get_bits(address, self.element_bits())
     }
 
     fn element_bits(&self) -> usize {
@@ -473,13 +410,8 @@ impl<Block: BlockType> IntVectorMut for IntVec<Block> {
         debug_assert!(element_value < Block::one() << element_bits,
                       "IntVec::set: value overflow");
 
-        if element_bits == 1 {
-            self.set_bit(element_index, element_value == Block::one());
-            return;
-        }
-
         let address = self.compute_address(element_index);
-        self.set_address(address, element_bits, element_value);
+        self.blocks.set_bits(address, element_bits, element_value);
     }
 }
 
@@ -603,7 +535,7 @@ impl<A: BlockType> SpaceUsage for IntVec<A> {
 
 #[cfg(test)]
 mod test {
-    use int_vector::*;
+    use int_vector::{IntVec, IntVector, IntVectorMut};
     use bit_vector::*;
 
     #[test]

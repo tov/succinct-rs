@@ -44,10 +44,10 @@ pub mod stream;
 pub mod coding;
 
 pub mod bit_vector;
-pub use bit_vector::*;
+pub use bit_vector::{Bits, BitsMut, BitVector, BitVec};
 
 pub mod int_vector;
-pub use int_vector::*;
+pub use int_vector::{IntVector, IntVectorMut, IntVec};
 
 pub mod rank;
 pub use rank::JacobsonRank;
