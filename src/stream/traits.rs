@@ -57,7 +57,7 @@ pub trait BitWrite {
     /// Writes the lower `nbits` of `value`, least-significant first.
     fn write_int<N: PrimInt>(&mut self, nbits: usize, mut value: N) -> Result<()> {
         for _ in 0 .. nbits {
-            try!(self.write_bit(value & N::one() == N::one()));
+            try!(self.write_bit(value & N::one() != N::zero()));
             value = value >> 1;
         }
 
