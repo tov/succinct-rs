@@ -1,4 +1,4 @@
-use num::{One, Zero};
+use num::{One, Zero, ToPrimitive};
 
 use storage::{Address, BlockType};
 
@@ -243,5 +243,36 @@ impl<Block: BlockType> BitsMut for [Block] {
     #[inline]
     fn set_block(&mut self, position: usize, value: Block) {
         self[position] = value;
+    }
+}
+
+impl Bits for Vec<bool> {
+    type Block = usize;
+
+    #[inline]
+    fn bit_len(&self) -> u64 {
+        self.len() as u64
+    }
+
+    fn get_bit(&self, position: u64) -> bool {
+        self[position.to_usize().expect("Vec<bool>::get_bit: overflow")]
+    }
+}
+
+impl BitsMut for Vec<bool> {
+    fn set_bit(&mut self, position: u64, value: bool) {
+        let position = position.to_usize()
+                               .expect("Vec<bool>::set_bit: overflow");
+        self[position] = value;
+    }
+}
+
+impl BitVector for Vec<bool> {
+    fn push_bit(&mut self, value: bool) {
+        self.push(value);
+    }
+
+    fn pop_bit(&mut self) -> Option<bool> {
+        self.pop()
     }
 }
