@@ -609,4 +609,21 @@ mod test {
         assert_eq!(1, v.len());
         assert_eq!(0b00011010, v.get_block(0));
     }
+
+    #[test] #[should_panic]
+    fn with_capacity_overflow() {
+        VB::with_capacity(5, !0);
+    }
+
+    #[test] #[should_panic]
+    fn get_block_oob0() {
+        let v = VB::new();
+        v.get_block(0);
+    }
+
+    #[test] #[should_panic]
+    fn get_block_oob2() {
+        let v = VB::with_block_fill(5, 2, 0);
+        v.get_block(2);
+    }
 }
