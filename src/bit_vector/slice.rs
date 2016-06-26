@@ -94,8 +94,10 @@ impl<'a, Base: 'a + BitsMut> BitsMut for BitSliceMut<'a, Base> {
 
 impl<'a, Base: 'a + Bits> SpaceUsage for BitSlice<'a, Base> {
     fn is_stack_only() -> bool { true }
+    fn heap_bytes(&self) -> usize { 0 }
 }
 
 impl<'a, Base: 'a + BitsMut> SpaceUsage for BitSliceMut<'a, Base> {
     fn is_stack_only() -> bool { true }
+    fn heap_bytes(&self) -> usize { 0 }
 }

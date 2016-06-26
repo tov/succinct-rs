@@ -65,12 +65,8 @@ pub trait SpaceUsage: Sized {
     /// including any portion of its size that is
     /// included in `stack_bytes`. This is typically for containers
     /// that heap allocate varying amounts of memory.
-    ///
-    /// The default implementation returns `0`.
     #[inline]
-    fn heap_bytes(&self) -> usize {
-        0
-    }
+    fn heap_bytes(&self) -> usize;
 }
 
 #[macro_export]
@@ -78,8 +74,8 @@ macro_rules! impl_stack_only_space_usage {
     ( $t:ty ) =>
     {
         impl SpaceUsage for $t {
-            #[inline]
-            fn is_stack_only() -> bool { true }
+            #[inline] fn is_stack_only() -> bool { true }
+            #[inline] fn heap_bytes(&self) -> usize { 0 }
         }
     }
 }
