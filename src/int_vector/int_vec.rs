@@ -89,6 +89,17 @@ impl<Block: BlockType> IntVec<Block> {
         bit_index
     }
 
+    /// Makes sure that any unused bits are zeroed.
+    fn restore_invariant(&mut self) {
+        debug_assert!(self.blocks.len() == self.block_len());
+
+        let bit_len = self.n_elements * self.element_bits as u64;
+        self.blocks.last_mut().map(|block| {
+            let mask = Block::low_mask(Block::last_block_bits(bit_len));
+            *block = *block & mask;
+        });
+    }
+
     /// Creates a new integer vector.
     ///
     /// # Arguments
@@ -221,6 +232,12 @@ impl<Block: BlockType> IntVec<Block> {
         self.set(pos, element_value);
     }
 
+    /// How many elements the backing vector has expanded to store.
+    fn backing_len(&self) -> u64 {
+        let total_bits = Block::mul_nbits(self.blocks.len());
+        total_bits / self.element_bits as u64
+    }
+
     /// Removes and returns the last element of the vector, if present.
     pub fn pop(&mut self) -> Option<Block> {
         if self.n_elements == 0 {
@@ -228,6 +245,12 @@ impl<Block: BlockType> IntVec<Block> {
         } else {
             let result = self.get(self.n_elements - 1);
             self.n_elements -= 1;
+
+            if self.blocks.len() > self.block_len() {
+                self.blocks.pop();
+            }
+            self.restore_invariant();
+
             Some(result)
         }
     }
@@ -238,24 +261,27 @@ impl<Block: BlockType> IntVec<Block> {
         total_bits / self.element_bits as u64
     }
 
-    /// How many elements the backing vector has expanded to store.
-    fn backing_len(&self) -> u64 {
-        let total_bits = Block::mul_nbits(self.blocks.len());
-        total_bits / self.element_bits as u64
+    /// The number of blocks of elements the vector can hold without
+    /// reallocating.
+    pub fn block_capacity(&self) -> usize {
+        self.blocks.capacity()
     }
 
     /// Resizes to the given number of elements, filling if necessary.
     pub fn resize(&mut self, n_elements: u64, fill: Fill<Block>) {
+        let n_blocks = Self::compute_n_blocks(self.element_bits,
+                                              n_elements).unwrap();
+
         if n_elements <= self.n_elements {
+            self.blocks.truncate(n_blocks);
             self.n_elements = n_elements;
+            self.restore_invariant();
         } else {
             match fill {
                 Fill::Block(block) => {
-                    let n_blocks = Self::compute_n_blocks(self.element_bits,
-                                                          n_elements)
-                        .unwrap();
                     self.blocks.resize(n_blocks, block);
                     self.n_elements = n_elements;
+                    self.restore_invariant();
                 }
 
                 Fill::Element(element) => {
@@ -265,6 +291,12 @@ impl<Block: BlockType> IntVec<Block> {
                 }
             }
         }
+    }
+
+    /// Resizes to the given number of blocks, filling if necessary.
+    pub fn resize_block(&mut self, n_blocks: usize, fill: Block) {
+        self.blocks.resize(n_blocks, fill);
+        self.n_elements = self.bit_len() / self.element_bits as u64;
     }
 
     /// Reserves capacity for at least `additional` more elements to be
@@ -280,13 +312,24 @@ impl<Block: BlockType> IntVec<Block> {
     /// are not met. This will happen if the total number of bits
     /// overflows `u64`.
     pub fn reserve(&mut self, additional: u64) {
-        let goal_elements = self.len().checked_add(additional)
-            .expect("IntVec::reserve: size overflow");
+        let goal_elements = self.len() + additional;
         let goal_blocks = Self::compute_n_blocks(self.element_bits,
-                                                 goal_elements)
-            .unwrap();
+                                                 goal_elements).unwrap();
         let difference = self.blocks.capacity().saturating_sub(goal_blocks);
         self.blocks.reserve(difference);
+    }
+
+    /// Reserves capacity for at least `additional` blocks of values to be
+    /// inserted.
+    ///
+    /// The collection may reserve more space to avoid frequent
+    /// reallocations.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the number of blocks overflows a `usize`.
+    pub fn reserve_block(&mut self, additional: usize) {
+        self.blocks.reserve(additional);
     }
 
     /// Reserves capacity for at least `additional` more elements to be
@@ -302,50 +345,63 @@ impl<Block: BlockType> IntVec<Block> {
     /// are not met. This will happen if the total number of bits
     /// overflows `u64`.
     pub fn reserve_exact(&mut self, additional: u64) {
-        let goal_elements = self.len().checked_add(additional)
-            .expect("IntVec::reserve: size overflow");
+        let goal_elements = self.len() + additional;
         let goal_blocks = Self::compute_n_blocks(self.element_bits,
-                                                 goal_elements)
-            .unwrap();
+                                                 goal_elements).unwrap();
         let difference = self.blocks.capacity().saturating_sub(goal_blocks);
         self.blocks.reserve_exact(difference);
     }
 
+    /// Reserves capacity for at least `additional` blocks of values to be
+    /// inserted.
+    ///
+    /// Unlike [`reserve_block`](#method.reserve_block), does nothing if the
+    /// capacity is already sufficient.
+    ///
+    /// The collection may reserve more space to avoid frequent
+    /// reallocations.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the number of blocks overflows a `usize`.
+    pub fn reserve_exact_block(&mut self, additional: usize) {
+        self.blocks.reserve_exact(additional);
+    }
+
     /// Shrinks the capacity to just fit the number of elements.
     pub fn shrink_to_fit(&mut self) {
-        let n_blocks = Self::compute_n_blocks(self.element_bits,
-                                              self.n_elements).unwrap();
-        self.blocks.truncate(n_blocks);
         self.blocks.shrink_to_fit();
     }
 
     /// Shrinks to the given size.
     ///
-    /// If `n_elements` is greater than the current size, does nothing.
+    /// Does nothing if `n_elements` is greater than the current size.
     pub fn truncate(&mut self, n_elements: u64) {
         if n_elements <= self.n_elements {
+            let block_len = Self::compute_n_blocks(self.element_bits,
+                                                   n_elements).unwrap();
+            self.truncate_block(block_len);
             self.n_elements = n_elements;
+            self.restore_invariant();
         }
     }
 
-    /// Returns a reference to the backing slice of blocks.
+    /// Shrinks to the given number of blocks.
     ///
-    /// Note that this does not respect element boundaries, and the
-    /// layout is not specified.
-    pub fn as_block_slice(&self) -> &[Block] {
-        &self.blocks
-    }
+    /// Does nothing if `n_blocks` is greater than the current blocks.
+    pub fn truncate_block(&mut self, n_blocks: usize) {
+        if n_blocks < self.block_len() {
+            self.blocks.truncate(n_blocks);
+            self.n_elements = Block::mul_nbits(n_blocks)
+                                / self.element_bits as u64;
+            self.restore_invariant();
+        }
 
-    /// Returns a mutable reference to the backing slice of blocks.
-    ///
-    /// Note that this does not respect element boundaries, and the
-    /// layout is not specified.
-    pub fn as_mut_block_slice(&mut self) -> &mut [Block] {
-        &mut self.blocks
     }
 
     /// Sets the size to 0 while retaining the allocated storage.
     pub fn clear(&mut self) {
+        self.blocks.clear();
         self.n_elements = 0;
     }
 
@@ -419,7 +475,7 @@ impl<Block: BlockType> Bits for IntVec<Block> {
     type Block = Block;
 
     fn block_len(&self) -> usize {
-        self.blocks.len()
+        Block::ceil_div_nbits(self.n_elements * self.element_bits as u64)
     }
 
     fn bit_len(&self) -> u64 {
@@ -707,6 +763,24 @@ mod test {
         assert!(  v.get_bit(1));
         assert!(! v.get_bit(2));
         assert!(  v.get_bit(3));
+    }
+
+    #[test]
+    fn push_pop_equals() {
+        let mut v = IntVec::<u32>::new(5);
+        let mut u = IntVec::<u32>::new(5);
+
+        v.push(5);
+        u.push(5);
+        assert!( v == u );
+
+        v.push(6);
+        u.push(7);
+        assert!( v != u );
+
+        v.pop();
+        u.pop();
+        assert!( v == u );
     }
 }
 

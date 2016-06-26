@@ -150,7 +150,7 @@ impl<Block: BlockType> BitVec<Block> {
         let intended_blocks = Block::ceil_div_nbits_checked(intended_cap)
                                   .expect("BitVec::reserve: overflow");
         let additional_blocks = intended_blocks - self.block_len();
-        self.reserve_block(additional_blocks);
+        self.data.reserve(additional_blocks);
     }
 
     /// Reserves capacity for at least `additional` blocks of bits to be
@@ -180,13 +180,13 @@ impl<Block: BlockType> BitVec<Block> {
         let intended_blocks = Block::ceil_div_nbits_checked(intended_cap)
                                   .expect("BitVec::reserve: overflow");
         let additional_blocks = intended_blocks - self.block_len();
-        self.reserve_exact_block(additional_blocks);
+        self.data.reserve_exact(additional_blocks);
     }
 
     /// Reserves capacity for at least `additional` more blocks of bits to be
     /// inserted.
     ///
-    /// Unlike [`reserve`](#method.reserve), does nothing if the
+    /// Unlike [`reserve_block`](#method.reserve_block), does nothing if the
     /// capacity is already sufficient.
     ///
     /// # Panics
