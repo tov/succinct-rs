@@ -53,7 +53,7 @@ impl<Block: BlockType> BitVec<Block> {
     /// blocks required by the capacity (`capacity / Block::nbits()`)
     /// must fit in a `usize`.
     pub fn with_capacity(capacity: u64) -> Self {
-        let block_capacity = Block::ceil_div_nbits_checked(capacity)
+        let block_capacity = Block::checked_ceil_div_nbits(capacity)
                                  .expect("BitVec::with_capacity: overflow");
         Self::with_block_capacity(block_capacity)
     }
@@ -75,7 +75,7 @@ impl<Block: BlockType> BitVec<Block> {
     /// blocks required by the capacity (`len / Block::nbits()`)
     /// must fit in a `usize`.
     pub fn with_fill(len: u64, value: bool) -> Self {
-        let block_size = Block::ceil_div_nbits_checked(len)
+        let block_size = Block::checked_ceil_div_nbits(len)
                              .expect("BitVec::with_fill: overflow");
         let block_value = if value {!Block::zero()} else {Block::zero()};
         let mut result = Self::with_fill_block(block_size, block_value);
@@ -111,7 +111,7 @@ impl<Block: BlockType> BitVec<Block> {
     /// blocks required by the capacity (`new_len / Block::nbits()`)
     /// must fit in a `usize`.
     pub fn resize(&mut self, new_len: u64, value: bool) {
-        let new_block_len = Block::ceil_div_nbits_checked(new_len)
+        let new_block_len = Block::checked_ceil_div_nbits(new_len)
                                 .expect("BitVec::resize: overflow");
 
         if new_len < self.bit_len() || !value {
@@ -147,7 +147,7 @@ impl<Block: BlockType> BitVec<Block> {
     /// Panics if the number of blocks overflows a `usize`.
     pub fn reserve(&mut self, additional: u64) {
         let intended_cap = self.bit_len() + additional;
-        let intended_blocks = Block::ceil_div_nbits_checked(intended_cap)
+        let intended_blocks = Block::checked_ceil_div_nbits(intended_cap)
                                   .expect("BitVec::reserve: overflow");
         let additional_blocks = intended_blocks - self.block_len();
         self.data.reserve(additional_blocks);
@@ -177,7 +177,7 @@ impl<Block: BlockType> BitVec<Block> {
     /// Panics if the number of blocks overflows a `usize`.
     pub fn reserve_exact(&mut self, additional: u64) {
         let intended_cap = self.bit_len() + additional;
-        let intended_blocks = Block::ceil_div_nbits_checked(intended_cap)
+        let intended_blocks = Block::checked_ceil_div_nbits(intended_cap)
                                   .expect("BitVec::reserve: overflow");
         let additional_blocks = intended_blocks - self.block_len();
         self.data.reserve_exact(additional_blocks);
@@ -205,7 +205,7 @@ impl<Block: BlockType> BitVec<Block> {
     ///
     /// Does nothing if `len` is greater than the current size.
     pub fn truncate(&mut self, len: u64) {
-        let block_len = Block::ceil_div_nbits_checked(len)
+        let block_len = Block::checked_ceil_div_nbits(len)
                             .expect("BitVec::truncate: overflow");
         self.truncate_block(block_len);
         self.len = len;

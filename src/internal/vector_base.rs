@@ -21,7 +21,7 @@ pub struct VectorBase<Block> {
 #[inline]
 fn len_to_block_len<Block: BlockType>(element_bits: usize, len: u64) -> Option<usize> {
     len.checked_mul(element_bits as u64)
-       .and_then(Block::ceil_div_nbits_checked)
+       .and_then(Block::checked_ceil_div_nbits)
 }
 
 impl<Block: BlockType> VectorBase<Block> {
@@ -265,7 +265,7 @@ impl<Block: BlockType> VectorBase<Block> {
                          -> usize {
         self.len.checked_add(additional)
                 .and_then(|e| e.checked_mul(element_bits as u64))
-                .and_then(Block::ceil_div_nbits_checked)
+                .and_then(Block::checked_ceil_div_nbits)
                 .expect("VectorBase::reserve_(exact): overflow")
                 .saturating_sub(self.vec.capacity())
     }

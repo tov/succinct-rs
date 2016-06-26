@@ -57,7 +57,7 @@ pub trait BlockType: PrimInt + Bits + BitsMut + fmt::Debug + SpaceUsage {
     /// so this should only be used when `index` is already known to
     /// be small enough.
     #[inline]
-    fn ceil_div_nbits_checked(index: u64) -> Option<usize> {
+    fn checked_ceil_div_nbits(index: u64) -> Option<usize> {
         Self::div_nbits_checked(index + Self::nbits() as u64 - 1)
     }
 
