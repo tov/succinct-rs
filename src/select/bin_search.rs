@@ -5,29 +5,32 @@ use bit_vector::Bits;
 pub use super::{SelectSupport, SelectSupport1, SelectSupport0};
 
 /// Performs a select query by binary searching rank queries.
-pub struct BinSearchSelect<'a, Rank: 'a> {
-    rank_support: &'a Rank,
+pub struct BinSearchSelect<Rank> {
+    rank_support: Rank,
 }
 
 /// Creates a new binary search select support based on a rank support.
-impl<'a, Rank: RankSupport + 'a>
-BinSearchSelect<'a, Rank> {
+impl<Rank: RankSupport> BinSearchSelect<Rank> {
     /// Creates a new binary search selection support given a rank
     /// support.
-    pub fn new(rank_support: &'a Rank) -> Self {
+    pub fn new(rank_support: Rank) -> Self {
         BinSearchSelect {
             rank_support: rank_support,
         }
     }
 
     /// Borrows a reference to the underlying rank support.
-    pub fn inner(&self) -> &'a Rank {
+    pub fn inner(&self) -> &Rank {
         &self.rank_support
+    }
+
+    /// Returns the underlying rank structure.
+    pub fn into_inner(self) -> Rank {
+        self.rank_support
     }
 }
 
-impl<'a, Rank: Bits + 'a>
-Bits for BinSearchSelect<'a, Rank> {
+impl<Rank: Bits> Bits for BinSearchSelect<Rank> {
     type Block = Rank::Block;
 
     fn block_len(&self) -> usize {
@@ -47,8 +50,7 @@ Bits for BinSearchSelect<'a, Rank> {
     }
 }
 
-impl<'a, Rank: RankSupport + 'a>
-RankSupport for BinSearchSelect<'a, Rank> {
+impl<Rank: RankSupport> RankSupport for BinSearchSelect<Rank> {
     type Over = Rank::Over;
 
     fn rank(&self, index: u64, value: Self::Over) -> u64 {
@@ -60,8 +62,7 @@ RankSupport for BinSearchSelect<'a, Rank> {
     }
 }
 
-impl<'a, Rank: BitRankSupport + 'a>
-BitRankSupport for BinSearchSelect<'a, Rank> {
+impl<Rank: BitRankSupport> BitRankSupport for BinSearchSelect<Rank> {
     fn rank1(&self, index: u64) -> u64 {
         self.rank_support.rank1(index)
     }
@@ -75,8 +76,8 @@ macro_rules! impl_select_support_b {
     ($select_support:ident, $select:ident, $rank: ident)
         =>
     {
-        impl<'a, Rank: BitRankSupport + 'a>
-        $select_support for BinSearchSelect<'a, Rank> {
+        impl<Rank: BitRankSupport>
+        $select_support for BinSearchSelect<Rank> {
             fn $select(&self, index: u64) -> Option<u64> {
                 binary_search_function(0, self.limit(), index + 1,
                                        |i| self.$rank(i))
@@ -88,8 +89,7 @@ macro_rules! impl_select_support_b {
 impl_select_support_b!(SelectSupport1, select1, rank1);
 impl_select_support_b!(SelectSupport0, select0, rank0);
 
-impl<'a, Rank: RankSupport + 'a>
-SelectSupport for BinSearchSelect<'a, Rank> {
+impl<Rank: RankSupport> SelectSupport for BinSearchSelect<Rank> {
     type Over = Rank::Over;
 
     fn select(&self, index: u64, value: Rank::Over) -> Option<u64> {
@@ -98,8 +98,7 @@ SelectSupport for BinSearchSelect<'a, Rank> {
     }
 }
 
-impl<'a, Rank: BitRankSupport + 'a>
-SpaceUsage for BinSearchSelect<'a, Rank> {
+impl<Rank: BitRankSupport> SpaceUsage for BinSearchSelect<Rank> {
     #[inline]
     fn is_stack_only() -> bool { true }
 }
@@ -112,8 +111,8 @@ mod test {
     #[test]
     fn select1() {
         let vec = vec![ 0b00000000000001110000000000000001u32; 1024 ];
-        let rank = JacobsonRank::new(&*vec);
-        let select = BinSearchSelect::new(&rank);
+        let rank = JacobsonRank::new(vec);
+        let select = BinSearchSelect::new(rank);
 
         assert_eq!(1, select.rank1(0));
         assert_eq!(1, select.rank1(1));
@@ -144,8 +143,8 @@ mod test {
     #[test]
     fn select2() {
         let vec = vec![ 0b10101010101010101010101010101010u32; 1024 ];
-        let rank = JacobsonRank::new(&*vec);
-        let select = BinSearchSelect::new(&rank);
+        let rank = JacobsonRank::new(vec);
+        let select = BinSearchSelect::new(rank);
 
         assert_eq!(Some(1), select.select1(0));
         assert_eq!(Some(3), select.select1(1));
@@ -157,8 +156,8 @@ mod test {
     #[test]
     fn select3() {
         let vec = vec![ 0b11111111111111111111111111111111u32; 1024 ];
-        let rank = JacobsonRank::new(&*vec);
-        let select = BinSearchSelect::new(&rank);
+        let rank = JacobsonRank::new(vec);
+        let select = BinSearchSelect::new(rank);
 
         assert_eq!(Some(0), select.select1(0));
         assert_eq!(Some(1), select.select1(1));

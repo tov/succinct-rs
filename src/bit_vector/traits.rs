@@ -246,6 +246,77 @@ impl<Block: BlockType> BitsMut for [Block] {
     }
 }
 
+impl<'a, Block: BlockType> Bits for &'a [Block] {
+    type Block = Block;
+
+    #[inline]
+    fn bit_len(&self) -> u64 {
+        self.len() as u64 * Block::nbits() as u64
+    }
+
+    #[inline]
+    fn block_len(&self) -> usize {
+        self.len()
+    }
+
+    #[inline]
+    fn get_block(&self, position: usize) -> Block {
+        self[position]
+    }
+}
+
+impl<'a, Block: BlockType> Bits for &'a mut [Block] {
+    type Block = Block;
+
+    #[inline]
+    fn bit_len(&self) -> u64 {
+        self.len() as u64 * Block::nbits() as u64
+    }
+
+    #[inline]
+    fn block_len(&self) -> usize {
+        self.len()
+    }
+
+    #[inline]
+    fn get_block(&self, position: usize) -> Block {
+        self[position]
+    }
+}
+
+impl<'a, Block: BlockType> BitsMut for &'a mut [Block] {
+    #[inline]
+    fn set_block(&mut self, position: usize, value: Block) {
+        self[position] = value;
+    }
+}
+
+impl<Block: BlockType> Bits for Vec<Block> {
+    type Block = Block;
+
+    #[inline]
+    fn bit_len(&self) -> u64 {
+        self.len() as u64 * Block::nbits() as u64
+    }
+
+    #[inline]
+    fn block_len(&self) -> usize {
+        self.len()
+    }
+
+    #[inline]
+    fn get_block(&self, position: usize) -> Block {
+        self[position]
+    }
+}
+
+impl<Block: BlockType> BitsMut for Vec<Block> {
+    #[inline]
+    fn set_block(&mut self, position: usize, value: Block) {
+        self[position] = value;
+    }
+}
+
 impl Bits for Vec<bool> {
     type Block = u8; // This is bogus
 

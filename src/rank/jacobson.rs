@@ -11,17 +11,16 @@ pub use super::{RankSupport, BitRankSupport};
 ///
 /// Construct with `JacobsonRank::new`.
 #[derive(Clone, Debug)]
-pub struct JacobsonRank<'a, Store: ?Sized + Bits + 'a> {
-    bit_store: &'a Store,
+pub struct JacobsonRank<Store: Bits> {
+    bit_store: Store,
     large_block_size: usize,
     large_block_ranks: IntVec<u64>,
     small_block_ranks: IntVec<u64>,
 }
 
-impl<'a, Store: Bits + ?Sized + 'a>
-JacobsonRank<'a, Store> {
+impl<Store: Bits> JacobsonRank<Store> {
     /// Creates a new rank support structure for the given bit vector.
-    pub fn new(bits: &'a Store) -> Self {
+    pub fn new(bits: Store) -> Self {
         let n = bits.bit_len();
         let lg_n = n.ceil_lg();
         let lg2_n = lg_n * lg_n;
@@ -74,8 +73,7 @@ JacobsonRank<'a, Store> {
     }
 }
 
-impl<'a, Store: ?Sized + Bits + 'a>
-Bits for JacobsonRank<'a, Store> {
+impl<Store: Bits> Bits for JacobsonRank<Store> {
     type Block = Store::Block;
 
     fn block_len(&self) -> usize {
@@ -95,8 +93,7 @@ Bits for JacobsonRank<'a, Store> {
     }
 }
 
-impl<'a, Store: ?Sized + Bits + 'a>
-RankSupport for JacobsonRank<'a, Store> {
+impl<Store: Bits> RankSupport for JacobsonRank<Store> {
     type Over = bool;
 
     fn rank(&self, position: u64, value: bool) -> u64 {
@@ -108,8 +105,7 @@ RankSupport for JacobsonRank<'a, Store> {
     }
 }
 
-impl<'a, Store: ?Sized + Bits + 'a>
-BitRankSupport for JacobsonRank<'a, Store> {
+impl<Store: Bits> BitRankSupport for JacobsonRank<Store> {
     fn rank1(&self, position: u64) -> u64 {
         // Rank for any position past the end is the rank of the
         // last position.
@@ -127,8 +123,7 @@ BitRankSupport for JacobsonRank<'a, Store> {
     }
 }
 
-impl<'a, Store: ?Sized + Bits + 'a>
-SpaceUsage for JacobsonRank<'a, Store> {
+impl<Store: Bits> SpaceUsage for JacobsonRank<Store> {
     #[inline]
     fn is_stack_only() -> bool { false }
 
@@ -145,7 +140,7 @@ mod test {
     #[test]
     fn rank1() {
         let vec = vec![ 0b00000000000001110000000000000001u32; 1024 ];
-        let rank = JacobsonRank::new(&*vec);
+        let rank = JacobsonRank::new(vec);
 
         assert_eq!(1, rank.rank1(0));
         assert_eq!(1, rank.rank1(1));
