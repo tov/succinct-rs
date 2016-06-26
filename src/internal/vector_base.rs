@@ -73,7 +73,7 @@ impl<Block: BlockType> VectorBase<Block> {
     pub fn set_block(&mut self, element_bits: usize,
                      block_index: usize, value: Block) {
         self.vec[block_index] = value;
-        if element_bits + 1 == self.vec.len() {
+        if block_index + 1 == self.vec.len() {
             self.clear_extra_bits(element_bits);
         }
     }
@@ -328,5 +328,17 @@ mod test {
         assert_eq!(0b10101, v.get_bits(5, 2, 5));
         assert_eq!(0b01010, v.get_bits(5, 3, 5));
         assert_eq!(0b10101, v.get_bits(5, 4, 5));
+        assert_eq!(0b01010, v.get_bits(5, 5, 5));
+    }
+
+    #[test]
+    fn set_block() {
+        let mut v = VB::with_block_fill(5, 3, 0b01010101);
+        assert_eq!(0b01010101, v.get_block(0));
+        assert_eq!(0b01010101, v.get_block(1));
+        assert_eq!(0b00000101, v.get_block(2));
+
+        v.set_block(5, 2, 0b11111111);
+        assert_eq!(0b00001111, v.get_block(2));
     }
 }
