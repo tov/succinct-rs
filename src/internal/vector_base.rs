@@ -255,14 +255,14 @@ impl<Block: BlockType> VectorBase<Block> {
         let block_len = Block::ceil_div_nbits_checked(bit_len)
             .expect("VectorBase::resize: overflow");
 
-        let old_len = self.len;
         self.vec.resize(block_len, Block::zero());
+        let old_len = self.len;
         self.len = len;
 
         if len <= old_len {
             self.clear_extra_bits(element_bits);
         } else {
-            for i in self.len .. len {
+            for i in old_len .. len {
                 self.set_bits(element_bits, i * element_bits as u64,
                               element_bits, fill);
             }
@@ -372,5 +372,224 @@ mod test {
         assert_eq!(17, v.get_bits(5, 0, 5));
         assert_eq!( 2, v.get_bits(5, 5, 5));
         assert_eq!( 8, v.get_bits(5, 10, 5));
+    }
+
+    #[test]
+    fn set_bit() {
+        let mut v = VB::with_block_fill(1, 2, 0);
+        assert_eq!(16, v.len());
+
+        assert_eq!(false, v.get_bit(0));
+        assert_eq!(false, v.get_bit(1));
+        assert_eq!(false, v.get_bit(2));
+        assert_eq!(false, v.get_bit(3));
+        assert_eq!(false, v.get_bit(4));
+        assert_eq!(false, v.get_bit(5));
+
+        v.set_bit(1, true);
+        v.set_bit(2, true);
+        v.set_bit(5, true);
+
+        assert_eq!(false, v.get_bit(0));
+        assert_eq!(true, v.get_bit(1));
+        assert_eq!(true, v.get_bit(2));
+        assert_eq!(false, v.get_bit(3));
+        assert_eq!(false, v.get_bit(4));
+        assert_eq!(true, v.get_bit(5));
+    }
+
+    #[test]
+    fn push_block() {
+        let mut v = VB::new();
+        v.push_block(6, 0b11111111);
+        assert_eq!(0b00111111, v.get_block(0));
+        assert_eq!(1, v.len());
+
+        v.push_block(6, 0b11111111);
+        assert_eq!(0b00001111, v.get_block(1));
+        assert_eq!(2, v.len());
+
+        v.push_block(6, 0b11111111);
+        assert_eq!(0b11111111, v.get_block(2));
+        assert_eq!(4, v.len());
+    }
+
+    #[test]
+    fn pop_block_after_push() {
+        let mut v = VB::new();
+        v.push_block(6, 0b11111111);
+        v.push_block(6, 0b11111111);
+        v.push_block(6, 0b11111111);
+        assert_eq!(Some(0b11111111), v.pop_block(6));
+        assert_eq!(Some(0b00001111), v.pop_block(6));
+        assert_eq!(Some(0b00111111), v.pop_block(6));
+        assert_eq!(None, v.pop_block(6));
+    }
+
+    #[test]
+    fn pop_block_after_fill() {
+        let mut v = VB::with_block_fill(6, 3, 0b11111111);
+        assert_eq!(0b11111111, v.get_block(0));
+        assert_eq!(0b11111111, v.get_block(1));
+        assert_eq!(0b11111111, v.get_block(2));
+        assert_eq!(Some(0b11111111), v.pop_block(6));
+        assert_eq!(Some(0b00001111), v.pop_block(6));
+        assert_eq!(Some(0b00111111), v.pop_block(6));
+        assert_eq!(None, v.pop_block(6));
+    }
+
+    #[test]
+    fn push_bits() {
+        let mut v = VB::new();
+        v.push_bits(6, 0b100110);
+        v.push_bits(6, 0b010100);
+        v.push_bits(6, 0b001111);
+
+        assert_eq!(0b00100110, v.get_block(0));
+        assert_eq!(0b11110101, v.get_block(1));
+        assert_eq!(0b00000000, v.get_block(2));
+    }
+
+    #[test]
+    fn pop_bits() {
+        let mut v = VB::new();
+        v.push_bits(6, 0b100110);
+        v.push_bits(6, 0b010100);
+        v.push_bits(6, 0b001111);
+
+        assert_eq!(Some(0b001111), v.pop_bits(6));
+        assert_eq!(0b00000101, v.get_block(1));
+        assert_eq!(Some(0b010100), v.pop_bits(6));
+        assert_eq!(0b00100110, v.get_block(0));
+        assert_eq!(Some(0b100110), v.pop_bits(6));
+        assert_eq!(None, v.pop_bits(6));
+    }
+
+    #[test]
+    fn push_bit() {
+        let mut v = VB::new();
+
+        v.push_bit(false);
+        v.push_bit(false);
+        v.push_bit(true);
+        assert_eq!(3, v.len());
+        assert_eq!(1, v.block_len());
+        v.push_bit(false);
+        v.push_bit(true);
+        v.push_bit(true);
+        assert_eq!(0b00110100, v.get_block(0));
+
+        v.push_bit(true);
+        v.push_bit(false);
+        assert_eq!(8, v.len());
+        assert_eq!(1, v.block_len());
+        v.push_bit(true);
+        assert_eq!(9, v.len());
+        assert_eq!(2, v.block_len());
+        assert_eq!(0b01110100, v.get_block(0));
+        assert_eq!(0b00000001, v.get_block(1));
+    }
+
+    #[test]
+    fn pop_bit() {
+        let mut v = VB::with_block_fill(1, 2, 0b01010101);
+
+        assert_eq!(2, v.block_len());
+        assert_eq!(16, v.len());
+
+        for _ in 0 .. 8 {
+            assert_eq!(Some(false), v.pop_bit());
+            assert_eq!(Some(true), v.pop_bit());
+        }
+
+        assert_eq!(None, v.pop_bit());
+
+        assert_eq!(0, v.block_len());
+        assert_eq!(0, v.len());
+    }
+
+    #[test]
+    fn truncate_block() {
+        let mut v = VB::new();
+        v.push_bits(5, 17);
+        v.push_bits(5, 30);
+        v.push_bits(5, 4);
+        assert_eq!(3, v.len());
+        assert_eq!(2, v.block_len());
+
+        v.truncate_block(5, 1);
+        assert_eq!(1, v.len());
+        assert_eq!(1, v.block_len());
+        assert_eq!(Some(17), v.pop_bits(5));
+    }
+
+    #[test]
+    fn truncate() {
+        let mut v = VB::new();
+        v.push_bits(5, 0b10001);
+        v.push_bits(5, 0b11110);
+        v.push_bits(5, 0b00100);
+
+        v.truncate(5, 2);
+        assert_eq!(2, v.len());
+        assert_eq!(2, v.block_len());
+        assert_eq!(0b10001, v.get_bits(5, 0, 5));
+        assert_eq!(0b11110, v.get_bits(5, 5, 5));
+        assert_eq!(0b11010001, v.get_block(0));
+        assert_eq!(0b00000011, v.get_block(1));
+
+        v.truncate(5, 1);
+        assert_eq!(1, v.len());
+        assert_eq!(1, v.block_len());
+        assert_eq!(0b10001, v.get_bits(5, 0, 5));
+        assert_eq!(0b00010001, v.get_block(0));
+
+        v.truncate(5, 2);
+    }
+
+    #[test]
+    fn shrink_to_fit() {
+        let mut v = VB::new();
+        for i in 0 .. 5 {
+            v.push_bits(5, i);
+        }
+        v.shrink_to_fit();
+        assert_eq!(4, v.block_capacity());
+    }
+
+    #[test]
+    fn resize_blocks() {
+        let mut v = VB::new();
+        v.push_bits(5, 0b11010);
+        v.resize_blocks(5, 3, 0b11111111);
+        assert_eq!(0b11010, v.get_bits(5, 0, 5));
+        assert_eq!(0b11000, v.get_bits(5, 5, 5));
+        assert_eq!(0b11111, v.get_bits(5, 10, 5));
+
+        v.resize_blocks(5, 1, 0b11111111);
+        assert_eq!(1, v.block_len());
+        assert_eq!(1, v.len());
+        assert_eq!(0b00011010, v.get_block(0));
+    }
+
+    #[test]
+    fn resize() {
+        let mut v = VB::new();
+        v.push_bits(5, 0b11010);
+        assert_eq!(1, v.len());
+        assert_eq!(0b00011010, v.get_block(0));
+
+        v.resize(5, 3, 0b01010);
+        assert_eq!(3, v.len());
+        assert_eq!(0b11010, v.get_bits(5, 0, 5));
+        assert_eq!(0b01010, v.get_bits(5, 5, 5));
+        assert_eq!(0b01010, v.get_bits(5, 10, 5));
+        assert_eq!(0b01011010, v.get_block(0));
+        assert_eq!(0b00101001, v.get_block(1));
+
+        v.resize(5, 1, 0b01010);
+        assert_eq!(1, v.block_len());
+        assert_eq!(1, v.len());
+        assert_eq!(0b00011010, v.get_block(0));
     }
 }
