@@ -339,6 +339,12 @@ impl<Block: BlockType> SpaceUsage for BitVec<Block> {
     }
 }
 
+impl<Block: BlockType> Default for BitVec<Block> {
+    fn default() -> Self {
+        BitVec::new()
+    }
+}
+
 #[cfg(test)]
 mod test {
     use bit_vector::*;
