@@ -335,6 +335,7 @@ pub struct Iter<'a, Block: BlockType + 'a> {
 }
 
 impl<'a, Block: BlockType> Iter<'a, Block> {
+    #[inline]
     pub fn new(element_bits: usize, data: &'a VectorBase<Block>) -> Self {
         Iter {
             start: 0,
@@ -348,6 +349,7 @@ impl<'a, Block: BlockType> Iter<'a, Block> {
 impl<'a, Block: BlockType> Iterator for Iter<'a, Block> {
     type Item = Block;
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         if self.start < self.limit {
             let result = self.data.get_bits(
@@ -360,6 +362,7 @@ impl<'a, Block: BlockType> Iterator for Iter<'a, Block> {
     }
 
     #[cfg(target_pointer_width = "32")]
+    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         if let Some(len) = (self.limit - self.start).to_usize() {
             (len, Some(len))
@@ -369,19 +372,23 @@ impl<'a, Block: BlockType> Iterator for Iter<'a, Block> {
     }
 
     #[cfg(target_pointer_width = "64")]
+    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         let len = self.len();
         (len, Some(len))
     }
 
+    #[inline]
     fn count(self) -> usize {
         self.len()
     }
 
+    #[inline]
     fn last(mut self) -> Option<Self::Item> {
         self.next_back()
     }
 
+    #[inline]
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
         self.start = self.start.checked_add(n as u64).unwrap_or(self.limit);
         self.next()
@@ -390,12 +397,14 @@ impl<'a, Block: BlockType> Iterator for Iter<'a, Block> {
 
 #[cfg(target_pointer_width = "64")]
 impl<'a, Block: BlockType> ExactSizeIterator for Iter<'a, Block> {
+    #[inline]
     fn len(&self) -> usize {
         (self.limit - self.start) as usize
     }
 }
 
 impl<'a, Block: BlockType> DoubleEndedIterator for Iter<'a, Block> {
+    #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         if self.start < self.limit {
             self.limit -= 1;
@@ -408,8 +417,10 @@ impl<'a, Block: BlockType> DoubleEndedIterator for Iter<'a, Block> {
 }
 
 impl<Block: BlockType> SpaceUsage for VectorBase<Block> {
+    #[inline]
     fn is_stack_only() -> bool { false }
 
+    #[inline]
     fn heap_bytes(&self) -> usize {
         self.vec.heap_bytes()
     }
