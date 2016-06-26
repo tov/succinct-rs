@@ -8,6 +8,8 @@
 This library is a very early work in progress. So far we have:
 
   - integer vectors with arbitrary-sized (1- to 64-bit) elements;
+  - bit vectors and buffers,
+  - a variety of universal codes,
   - constant-time rank queries; and
   - *O*(lg lg *n*)-time select queries based on binary search over ranks.
 

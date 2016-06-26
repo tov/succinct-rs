@@ -2,8 +2,11 @@
 //!
 //! This library is a very early work in progress. So far we have:
 //!
-//!   - [integer vectors](vector/struct.IntVec.html) with arbitrary-sized
+//!   - [integer vectors](int_vector/struct.IntVec.html) with arbitrary-sized
 //!     (1- to 64-bit) elements;
+//!   - [bit vectors](bit_vector/struct.BitVec.html) and [bit
+//!     buffers](stream/struct.BitBuffer.html),
+//!   - a variety of [universal codes](coding/index.html),
 //!   - constant-time [rank](struct.JacobsonRank.html) queries; and
 //!   - *O*(lg lg *n*)-time [select](struct.BinSearchSelect.html) queries
 //!     based on binary search over ranks.
