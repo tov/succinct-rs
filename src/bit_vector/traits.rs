@@ -247,7 +247,7 @@ impl<Block: BlockType> BitsMut for [Block] {
 }
 
 impl Bits for Vec<bool> {
-    type Block = usize;
+    type Block = u8; // This is bogus
 
     #[inline]
     fn bit_len(&self) -> u64 {
