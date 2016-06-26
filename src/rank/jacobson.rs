@@ -1,9 +1,9 @@
 use num::PrimInt;
 
+use bit_vector::Bits;
 use int_vector::{IntVector, IntVec};
 use space_usage::SpaceUsage;
 use storage::{Address, BlockType};
-use bit_vector::Bits;
 
 pub use super::{RankSupport, BitRankSupport};
 
