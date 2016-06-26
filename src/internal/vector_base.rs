@@ -18,6 +18,12 @@ pub struct VectorBase<Block> {
     vec: Vec<Block>,
 }
 
+#[inline]
+fn len_to_block_len<Block: BlockType>(element_bits: usize, len: u64) -> Option<usize> {
+    len.checked_mul(element_bits as u64)
+       .and_then(Block::ceil_div_nbits_checked)
+}
+
 impl<Block: BlockType> VectorBase<Block> {
     // Maintains the second invariant: extra bits are zero.
     #[inline]
@@ -38,11 +44,11 @@ impl<Block: BlockType> VectorBase<Block> {
 
     #[inline]
     pub fn new() -> Self {
-        Self::with_block_capacity(0)
+        Self::block_with_capacity(0)
     }
 
     #[inline]
-    pub fn with_block_capacity(block_capacity: usize) -> Self {
+    pub fn block_with_capacity(block_capacity: usize) -> Self {
         VectorBase {
             len: 0,
             vec: Vec::with_capacity(block_capacity)
@@ -51,13 +57,13 @@ impl<Block: BlockType> VectorBase<Block> {
 
     #[inline]
     pub fn with_capacity(element_bits: usize, capacity: u64) -> Self {
-        Self::with_block_capacity(
-            Block::ceil_div_nbits_checked(element_bits as u64 * capacity)
+        Self::block_with_capacity(
+            len_to_block_len::<Block>(element_bits, capacity)
                 .expect("VectorBase::with_capacity: overflow"))
     }
 
     #[inline]
-    pub fn with_block_fill(element_bits: usize, block_len: usize, fill: Block)
+    pub fn block_with_fill(element_bits: usize, block_len: usize, fill: Block)
                            -> Self {
         let mut result = VectorBase {
             len: 0,
@@ -65,6 +71,23 @@ impl<Block: BlockType> VectorBase<Block> {
         };
 
         result.set_len_from_blocks(element_bits);
+        result
+    }
+
+    #[inline]
+    pub fn with_fill(element_bits: usize, len: u64, value: Block) -> Self {
+        let block_len = len_to_block_len::<Block>(element_bits, len)
+                            .expect("VectorBase::with_fill: overflow");
+        let mut result = VectorBase {
+            len: len,
+            vec: vec![ Block::zero(); block_len ],
+        };
+
+        for i in 0 .. len {
+            result.set_bits(element_bits, i * element_bits as u64,
+                            element_bits, value);
+        }
+
         result
     }
 
@@ -141,13 +164,13 @@ impl<Block: BlockType> VectorBase<Block> {
     pub fn pop_bits(&mut self, element_bits: usize) -> Option<Block> {
         if self.len == 0 { return None; }
 
-        let new_bit_len = element_bits as u64 * (self.len - 1);
+        let bit_len = element_bits as u64 * (self.len - 1);
+        let block_len = Block::ceil_div_nbits(bit_len);
 
-        let result = self.get_bits(element_bits, new_bit_len, element_bits);
-        self.set_bits(element_bits, new_bit_len, element_bits, Block::zero());
+        let result = self.get_bits(element_bits, bit_len, element_bits);
+        self.set_bits(element_bits, bit_len, element_bits, Block::zero());
         self.len -= 1;
 
-        let block_len = Block::ceil_div_nbits(new_bit_len);
         if self.vec.len() > block_len { self.vec.pop(); }
 
         Some(result)
@@ -206,7 +229,7 @@ impl<Block: BlockType> VectorBase<Block> {
     }
 
     #[inline]
-    pub fn truncate_block(&mut self, element_bits: usize, block_len: usize) {
+    pub fn block_truncate(&mut self, element_bits: usize, block_len: usize) {
         if block_len < self.vec.len() {
             self.vec.truncate(block_len);
             self.set_len_from_blocks(element_bits);
@@ -229,38 +252,38 @@ impl<Block: BlockType> VectorBase<Block> {
     }
 
     #[inline]
-    pub fn reserve_blocks(&mut self, additional: usize) {
+    pub fn block_reserve(&mut self, additional: usize) {
         self.vec.reserve(additional);
     }
 
     #[inline]
-    pub fn reserve_exact_blocks(&mut self, additional: usize) {
+    pub fn block_reserve_exact(&mut self, additional: usize) {
         self.vec.reserve_exact(additional);
     }
 
     fn additional_blocks(&self, element_bits: usize, additional: u64)
                          -> usize {
-        let goal_elements = self.len + additional;
-        let goal_bits = goal_elements * element_bits as u64;
-        let goal_blocks = Block::ceil_div_nbits_checked(goal_bits)
-                            .expect("VectorBase::reserve_(exact): overflow");
-        goal_blocks.saturating_sub(self.vec.capacity())
+        self.len.checked_add(additional)
+                .and_then(|e| e.checked_mul(element_bits as u64))
+                .and_then(Block::ceil_div_nbits_checked)
+                .expect("VectorBase::reserve_(exact): overflow")
+                .saturating_sub(self.vec.capacity())
     }
 
     #[inline]
     pub fn reserve(&mut self, element_bits: usize, additional: u64) {
         let difference = self.additional_blocks(element_bits, additional);
-        self.reserve_blocks(difference);
+        self.block_reserve(difference);
     }
 
     #[inline]
     pub fn reserve_exact(&mut self, element_bits: usize, additional: u64) {
         let difference = self.additional_blocks(element_bits, additional);
-        self.reserve_exact_blocks(difference);
+        self.block_reserve_exact(difference);
     }
 
     #[inline]
-    pub fn resize_blocks(&mut self, element_bits: usize,
+    pub fn block_resize(&mut self, element_bits: usize,
                          block_len: usize, fill: Block) {
         self.vec.resize(block_len, fill);
         self.set_len_from_blocks(element_bits);
@@ -268,9 +291,8 @@ impl<Block: BlockType> VectorBase<Block> {
 
     #[inline]
     pub fn resize(&mut self, element_bits: usize, len: u64, fill: Block) {
-        let bit_len = element_bits as u64 * len;
-        let block_len = Block::ceil_div_nbits_checked(bit_len)
-            .expect("VectorBase::resize: overflow");
+        let block_len = len_to_block_len::<Block>(element_bits, len)
+                            .expect("VectorBase::resize: overflow");
 
         self.vec.resize(block_len, Block::zero());
         let old_len = self.len;
@@ -303,8 +325,8 @@ mod test {
     }
 
     #[test]
-    fn with_block_capacity() {
-        let v = VB::with_block_capacity(7);
+    fn block_with_capacity() {
+        let v = VB::block_with_capacity(7);
         assert_eq!(0, v.len());
         assert_eq!(0, v.block_len());
         assert_eq!(7, v.capacity(8));
@@ -324,8 +346,8 @@ mod test {
     }
 
     #[test]
-    fn with_block_fill() {
-        let v = VB::with_block_fill(5, 3, 0b01010101);
+    fn block_with_fill() {
+        let v = VB::block_with_fill(5, 3, 0b01010101);
         assert_eq!(3, v.block_len());
         assert_eq!(4, v.len());
         assert_eq!(3, v.block_capacity());
@@ -349,16 +371,27 @@ mod test {
     }
 
     #[test]
-    fn with_block_fill_7() {
-        let v = VB::with_block_fill(7, 3, 0b01010101);
+    fn block_with_fill_7() {
+        let v = VB::block_with_fill(7, 3, 0b01010101);
         assert_eq!(0b01010101, v.get_block(0));
         assert_eq!(0b01010101, v.get_block(1));
         assert_eq!(0b00010101, v.get_block(2));
     }
 
     #[test]
+    fn with_fill() {
+        let mut v = VB::with_fill(5, 5, 0b10110);
+        assert_eq!(5, v.len());
+        assert_eq!(4, v.block_len());
+        for _ in 0 .. 5 {
+            assert_eq!(Some(0b10110), v.pop_bits(5));
+        }
+        assert_eq!(0, v.len());
+    }
+
+    #[test]
     fn set_block_5() {
-        let mut v = VB::with_block_fill(5, 3, 0b01010101);
+        let mut v = VB::block_with_fill(5, 3, 0b01010101);
         assert_eq!(0b01010101, v.get_block(0));
         assert_eq!(0b01010101, v.get_block(1));
         assert_eq!(0b00000101, v.get_block(2));
@@ -369,7 +402,7 @@ mod test {
 
     #[test]
     fn get_bits() {
-        let v = VB::with_block_fill(5, 5, 0b01010101);
+        let v = VB::block_with_fill(5, 5, 0b01010101);
         assert_eq!(0b10101, v.get_bits(5, 0, 5));
         assert_eq!(0b101, v.get_bits(5, 0, 3));
         assert_eq!(0b010101, v.get_bits(5, 6, 6));
@@ -377,7 +410,7 @@ mod test {
 
     #[test]
     fn set_bits() {
-        let mut v = VB::with_block_fill(5, 10, 0);
+        let mut v = VB::block_with_fill(5, 10, 0);
         assert_eq!(0, v.get_bits(5,  0, 5));
         assert_eq!(0, v.get_bits(5,  5, 5));
         assert_eq!(0, v.get_bits(5, 10, 5));
@@ -393,7 +426,7 @@ mod test {
 
     #[test]
     fn set_bit() {
-        let mut v = VB::with_block_fill(1, 2, 0);
+        let mut v = VB::block_with_fill(1, 2, 0);
         assert_eq!(16, v.len());
 
         assert_eq!(false, v.get_bit(0));
@@ -445,7 +478,7 @@ mod test {
 
     #[test]
     fn pop_block_after_fill() {
-        let mut v = VB::with_block_fill(6, 3, 0b11111111);
+        let mut v = VB::block_with_fill(6, 3, 0b11111111);
         assert_eq!(0b11111111, v.get_block(0));
         assert_eq!(0b11111111, v.get_block(1));
         assert_eq!(0b11111111, v.get_block(2));
@@ -509,7 +542,7 @@ mod test {
 
     #[test]
     fn pop_bit() {
-        let mut v = VB::with_block_fill(1, 2, 0b01010101);
+        let mut v = VB::block_with_fill(1, 2, 0b01010101);
 
         assert_eq!(2, v.block_len());
         assert_eq!(16, v.len());
@@ -526,7 +559,7 @@ mod test {
     }
 
     #[test]
-    fn truncate_block() {
+    fn block_truncate() {
         let mut v = VB::new();
         v.push_bits(5, 17);
         v.push_bits(5, 30);
@@ -534,7 +567,7 @@ mod test {
         assert_eq!(3, v.len());
         assert_eq!(2, v.block_len());
 
-        v.truncate_block(5, 1);
+        v.block_truncate(5, 1);
         assert_eq!(1, v.len());
         assert_eq!(1, v.block_len());
         assert_eq!(Some(17), v.pop_bits(5));
@@ -575,15 +608,15 @@ mod test {
     }
 
     #[test]
-    fn resize_blocks() {
+    fn block_resize() {
         let mut v = VB::new();
         v.push_bits(5, 0b11010);
-        v.resize_blocks(5, 3, 0b11111111);
+        v.block_resize(5, 3, 0b11111111);
         assert_eq!(0b11010, v.get_bits(5, 0, 5));
         assert_eq!(0b11000, v.get_bits(5, 5, 5));
         assert_eq!(0b11111, v.get_bits(5, 10, 5));
 
-        v.resize_blocks(5, 1, 0b11111111);
+        v.block_resize(5, 1, 0b11111111);
         assert_eq!(1, v.block_len());
         assert_eq!(1, v.len());
         assert_eq!(0b00011010, v.get_block(0));
@@ -616,14 +649,51 @@ mod test {
     }
 
     #[test] #[should_panic]
-    fn get_block_oob0() {
+    fn get_block_oob() {
         let v = VB::new();
         v.get_block(0);
     }
 
     #[test] #[should_panic]
-    fn get_block_oob2() {
-        let v = VB::with_block_fill(5, 2, 0);
-        v.get_block(2);
+    fn set_block_oob() {
+        let mut v = VB::block_with_fill(5, 2, 0);
+        v.set_block(5, 2, 0);
+    }
+
+    #[test] #[should_panic]
+    fn get_bits_oob1() {
+        let mut v = VB::new();
+        v.push_bits(5, 0);
+        v.get_bits(5, 5, 5);
+    }
+
+    #[test] #[should_panic]
+    fn get_bits_oob2() {
+        let v = VB::with_fill(5, 2, 0);
+        v.get_bits(5, 6, 5);
+    }
+
+    #[test] #[should_panic]
+    fn set_bits_oob() {
+        let mut v = VB::with_fill(5, 2, 0);
+        v.set_bits(5, 10, 5, 0);
+    }
+
+    #[test] #[should_panic]
+    fn get_bit_oob() {
+        let v = VB::with_fill(1, 6, 0);
+        v.get_bit(6);
+    }
+
+    #[test] #[should_panic]
+    fn set_bit_oob() {
+        let mut v = VB::with_fill(1, 5, 0);
+        v.set_bit(6, true);
+    }
+
+    #[test] #[should_panic]
+    fn reserve_overflow() {
+        let mut v = VB::new();
+        v.reserve(5, !0)
     }
 }
