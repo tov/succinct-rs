@@ -39,22 +39,21 @@ extern crate quickcheck;
 mod util;
 mod errors;
 
-pub mod bit_vector;
-pub use bit_vector::*;
-
-pub mod int_vector;
-pub use int_vector::{IntVec, IntVecBuilder};
-
 pub mod storage;
 pub mod stream;
 pub mod coding;
 
+pub mod bit_vector;
+pub use bit_vector::*;
+
+pub mod int_vector;
+pub use int_vector::*;
+
 pub mod rank;
-pub use rank::{JacobsonRank};
+pub use rank::JacobsonRank;
 
 pub mod select;
-pub use select::{BinSearchSelect};
+pub use select::BinSearchSelect;
 
 mod space_usage;
 pub use space_usage::SpaceUsage;
-

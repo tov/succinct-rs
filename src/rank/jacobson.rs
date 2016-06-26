@@ -1,6 +1,6 @@
 use num::PrimInt;
 
-use int_vector::{IntVector, IntVec, IntVecBuilder};
+use int_vector::{IntVector, IntVec};
 use space_usage::SpaceUsage;
 use storage::{Address, BlockType};
 use bit_vector::Bits;
@@ -36,11 +36,9 @@ JacobsonRank<'a, Store> {
         let small_meta_size   = (large_block_size + 1).ceil_lg();
 
         let mut large_block_ranks =
-            IntVecBuilder::new(large_meta_size)
-                .capacity(large_block_count).build();
+            IntVec::with_capacity(large_meta_size, large_block_count);
         let mut small_block_ranks =
-            IntVecBuilder::new(small_meta_size)
-                .capacity(small_block_count).build();
+            IntVec::with_capacity(small_meta_size, small_block_count);
 
         let mut current_rank: u64 = 0;
         let mut last_large_rank: u64 = 0;
