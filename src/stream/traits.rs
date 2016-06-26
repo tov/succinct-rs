@@ -1,6 +1,6 @@
 use std::io::Result;
 
-use errors::*;
+use internal::errors::*;
 
 use num::PrimInt;
 

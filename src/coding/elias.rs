@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use super::*;
-use errors::*;
+use internal::errors::*;
 use stream::*;
 
 /// An Elias code.

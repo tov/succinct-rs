@@ -1,7 +1,7 @@
 use std::mem;
 
 use super::*;
-use errors::*;
+use internal::errors::*;
 use stream::*;
 
 /// A Fibonacci code.

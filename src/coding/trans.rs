@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use super::*;
-use errors::*;
+use internal::errors::*;
 use stream::*;
 
 /// Lifts any code by adding one to each encoded value, and subtracting

@@ -1,4 +1,4 @@
-use util::binary_search_function;
+use internal::search::binary_search_function;
 use rank::{BitRankSupport, RankSupport};
 use space_usage::SpaceUsage;
 use bit_vector::Bits;

@@ -1,5 +1,5 @@
 use super::*;
-use errors::*;
+use internal::errors::*;
 use stream::*;
 
 /// Encodes _n_ as _n_ zeroes followed by a one.

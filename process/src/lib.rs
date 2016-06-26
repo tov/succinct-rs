@@ -39,8 +39,7 @@ extern crate num;
 #[cfg(test)]
 extern crate quickcheck;
 
-mod util;
-mod errors;
+mod internal;
 
 pub mod storage;
 pub mod stream;
