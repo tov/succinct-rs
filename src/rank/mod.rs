@@ -30,7 +30,8 @@ pub trait RankSupport {
 pub trait BitRankSupport : RankSupport<Over = bool> {
     /// Returns the rank of 1 at the given position.
     ///
-    /// This is the number of occurrences of 0 up to that position.
+    /// This is the number of occurrences of 1 up to and including that
+    /// position.
     fn rank1(&self, position: u64) -> u64 {
         self.rank(position, true)
     }
