@@ -1,6 +1,10 @@
 #![allow(dead_code)]
 
+#[cfg(target_pointer_width = "32")]
+use num::ToPrimitive;
+
 use bit_vector::{Bits, BitsMut};
+use space_usage::SpaceUsage;
 use storage::BlockType;
 
 /// VectorBase provides basic functionality for IntVec and BitVec. It
@@ -128,14 +132,14 @@ impl<Block: BlockType> VectorBase<Block> {
         self.vec.set_bits(index, count, value);
     }
 
-    // PRECONDITION: element_size == 1
+    // PRECONDITION: element_bits == 1
     #[inline]
     pub fn get_bit(&self, index: u64) -> bool {
         assert!(index < self.len, "VectorBase::get_bit: out of bounds");
         self.vec.get_bit(index)
     }
 
-    // PRECONDITION: element_size == 1
+    // PRECONDITION: element_bits == 1
     #[inline]
     pub fn set_bit(&mut self, index: u64, value: bool) {
         assert!(index < self.len, "VectorBase::set_bit: out of bounds");
@@ -183,7 +187,7 @@ impl<Block: BlockType> VectorBase<Block> {
         Some(result)
     }
 
-    // PRECONDITION: element_size == 1
+    // PRECONDITION: element_bits == 1
     #[inline]
     pub fn push_bit(&mut self, value: bool) {
         if self.len + 1 > Block::mul_nbits(self.vec.len()) {
@@ -254,6 +258,12 @@ impl<Block: BlockType> VectorBase<Block> {
     }
 
     #[inline]
+    pub fn clear(&mut self) {
+        self.vec.clear();
+        self.len = 0;
+    }
+
+    #[inline]
     pub fn shrink_to_fit(&mut self) {
         self.vec.shrink_to_fit()
     }
@@ -313,6 +323,95 @@ impl<Block: BlockType> VectorBase<Block> {
                               element_bits, fill);
             }
         }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct Iter<'a, Block: BlockType + 'a> {
+    start: u64,
+    limit: u64,
+    element_bits: usize,
+    data:  &'a VectorBase<Block>,
+}
+
+impl<'a, Block: BlockType> Iter<'a, Block> {
+    pub fn new(element_bits: usize, data: &'a VectorBase<Block>) -> Self {
+        Iter {
+            start: 0,
+            limit: data.len(),
+            element_bits: element_bits,
+            data: data,
+        }
+    }
+}
+
+impl<'a, Block: BlockType> Iterator for Iter<'a, Block> {
+    type Item = Block;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.start < self.limit {
+            let result = self.data.get_bits(
+                self.element_bits,
+                self.element_bits as u64 * self.start,
+                self.element_bits);
+            self.start += 1;
+            Some(result)
+        } else { None }
+    }
+
+    #[cfg(target_pointer_width = "32")]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        if let Some(len) = (self.limit - self.start).to_usize() {
+            (len, Some(len))
+        } else {
+            (0, None)
+        }
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.len();
+        (len, Some(len))
+    }
+
+    fn count(self) -> usize {
+        self.len()
+    }
+
+    fn last(mut self) -> Option<Self::Item> {
+        self.next_back()
+    }
+
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        self.start = self.start.checked_add(n as u64).unwrap_or(self.limit);
+        self.next()
+    }
+}
+
+#[cfg(target_pointer_width = "64")]
+impl<'a, Block: BlockType> ExactSizeIterator for Iter<'a, Block> {
+    fn len(&self) -> usize {
+        (self.limit - self.start) as usize
+    }
+}
+
+impl<'a, Block: BlockType> DoubleEndedIterator for Iter<'a, Block> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        if self.start < self.limit {
+            self.limit -= 1;
+            Some(self.data.get_bits(
+                self.element_bits,
+                self.element_bits as u64 * self.limit,
+                self.element_bits))
+        } else { None }
+    }
+}
+
+impl<Block: BlockType> SpaceUsage for VectorBase<Block> {
+    fn is_stack_only() -> bool { false }
+
+    fn heap_bytes(&self) -> usize {
+        self.vec.heap_bytes()
     }
 }
 
