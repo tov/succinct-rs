@@ -409,7 +409,7 @@ mod test {
     }
 
     #[test]
-    fn set_bit() {
+    fn with_bit() {
         assert_eq!(0b00100000, 0b00000000u8.with_bit(5, true));
         assert_eq!(0b00000000, 0b00000000u8.with_bit(5, false));
         assert_eq!(0b10101010, 0b10101010u8.with_bit(7, true));
