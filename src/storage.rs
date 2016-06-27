@@ -45,8 +45,17 @@ pub trait BlockType: PrimInt + Bits + BitsMut + fmt::Debug + SpaceUsage {
     /// This is intended for converting a bit address into a block
     /// address, which is why it takes `u64` and returns `usize`.
     #[inline]
-    fn div_nbits_checked(index: u64) -> Option<usize> {
+    fn checked_div_nbits(index: u64) -> Option<usize> {
         (index >> Self::lg_nbits()).to_usize()
+    }
+
+    /// Returns `index / Self::nbits()` rounded up, computed by shifting.
+    ///
+    /// This is intended for converting a bit size into a block
+    /// size, which is why it takes `u64` and returns `usize`.
+    #[inline]
+    fn ceil_div_nbits(index: u64) -> usize {
+        Self::div_nbits(index + Self::nbits() as u64 - 1)
     }
 
     /// Returns `index / Self::nbits()` rounded up, computed by shifting.
@@ -58,16 +67,7 @@ pub trait BlockType: PrimInt + Bits + BitsMut + fmt::Debug + SpaceUsage {
     /// be small enough.
     #[inline]
     fn checked_ceil_div_nbits(index: u64) -> Option<usize> {
-        Self::div_nbits_checked(index + Self::nbits() as u64 - 1)
-    }
-
-    /// Returns `index / Self::nbits()` rounded up, computed by shifting.
-    ///
-    /// This is intended for converting a bit size into a block
-    /// size, which is why it takes `u64` and returns `usize`.
-    #[inline]
-    fn ceil_div_nbits(index: u64) -> usize {
-        Self::div_nbits(index + Self::nbits() as u64 - 1)
+        Self::checked_div_nbits(index + Self::nbits() as u64 - 1)
     }
 
     /// Returns `index % Self::nbits()`, computed by masking.
@@ -323,9 +323,16 @@ pub struct Address {
 impl Address {
     /// Creates an `Address` for the given bit index for storage in
     /// block type `Block`.
-    pub fn new<Block: BlockType>(bit_index: u64) -> Address {
+    ///
+    /// # Panics
+    ///
+    /// Panics if `bit_index` divided by the block size doesn’t fit in a
+    /// `usize`.
+    #[inline]
+    pub fn new<Block: BlockType>(bit_index: u64) -> Self {
         Address {
-            block_index: Block::div_nbits(bit_index),
+            block_index: Block::checked_div_nbits(bit_index)
+                             .expect("Address::new: index overflow"),
             bit_offset: Block::mod_nbits(bit_index),
         }
     }
@@ -333,6 +340,7 @@ impl Address {
     /// Converts an `Address` back into a raw bit index.
     ///
     /// This method and `new` should be inverses.
+    #[inline]
     pub fn bit_index<Block: BlockType>(&self) -> u64 {
         Block::mul_nbits(self.block_index) + self.bit_offset as u64
     }
