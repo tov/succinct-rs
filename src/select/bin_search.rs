@@ -2,7 +2,7 @@ use internal::search::binary_search_function;
 use rank::{BitRankSupport, RankSupport};
 use space_usage::SpaceUsage;
 use bit_vector::Bits;
-pub use super::{SelectSupport, SelectSupport1, SelectSupport0};
+use super::{SelectSupport, SelectSupport1, SelectSupport0};
 
 /// Performs a select query by binary searching rank queries.
 pub struct BinSearchSelect<Rank> {
@@ -105,8 +105,8 @@ impl<Rank: BitRankSupport> SpaceUsage for BinSearchSelect<Rank> {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use rank::*;
+    use select::*;
 
     #[test]
     fn select1() {
