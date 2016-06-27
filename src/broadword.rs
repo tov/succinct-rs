@@ -10,6 +10,14 @@
 //!   - Arithmetic operations are assumed to wrap on overflow. If this
 //!     were not the case, Algorithm 1 ([count_ones](fn.count_ones.html))
 //!     would overflow its last line, when multiplying by L₈.
+//!
+//!   - Line 2 of Algorithm 2 should read
+//!
+//!     ```
+//!     s = (s & 0x3333_3333_3333_3333) + ((s >> 2) & 0x3333_3333_3333_3333);
+//!     ```
+//!
+//!     In the paper, the shifted `s` appears as `x`.
 
 /// Has the lowest bit of every octet set: `0x0101_0101_0101_0101`.
 pub const L8: u64 = 0x0101_0101_0101_0101;
