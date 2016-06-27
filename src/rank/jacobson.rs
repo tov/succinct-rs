@@ -107,9 +107,8 @@ impl<Store: Bits> RankSupport for JacobsonRank<Store> {
 
 impl<Store: Bits> BitRankSupport for JacobsonRank<Store> {
     fn rank1(&self, position: u64) -> u64 {
-        // Rank for any position past the end is the rank of the
-        // last position.
-        let position = ::std::cmp::min(position, self.bit_len() - 1);
+        assert!(position < self.bit_len(),
+                "JacobsonRank::rank1: out of bounds");
 
         let large_block = position / self.large_block_size as u64;
         let address     = Address::new::<Store::Block>(position);
@@ -158,7 +157,7 @@ mod test {
         assert_eq!(2048, rank.rank1(512 * 32 - 1));
         assert_eq!(2049, rank.rank1(512 * 32));
 
-        assert_eq!(4096, rank.rank1(1000000));
+        assert_eq!(4096, rank.rank1(1024 * 32 - 1));
     }
 
     // This test is a sanity check that we aren’t taking up too much

@@ -11,13 +11,13 @@ pub trait RankSupport {
     ///
     /// This is the number of occurrences of `value` up to and including
     /// that position.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `position >= self.limit()`.
     fn rank(&self, position: u64, value: Self::Over) -> u64;
 
     /// The size of the vector being ranked.
-    ///
-    /// Rank queries beyond this point will continue to return the same
-    /// value, so you can think of `limit` as one past the end of the
-    /// last place that the rank changes.
     fn limit(&self) -> u64;
 }
 
