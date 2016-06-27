@@ -5,7 +5,7 @@ use std::io;
 use std::mem;
 
 use byteorder::{ByteOrder, ReadBytesExt, WriteBytesExt};
-use num::{PrimInt, ToPrimitive};
+use num::{One, PrimInt, ToPrimitive};
 
 use bit_vector::{Bits, BitsMut};
 use rank::{BitRankSupport, RankSupport};
@@ -237,6 +237,24 @@ pub trait BlockType: PrimInt + Bits + BitsMut + BitRankSupport +
         where W: io::Write, T: ByteOrder;
 }
 
+macro_rules! fn_low_mask {
+    ( $ty:ident )
+        =>
+    {
+        #[inline]
+        fn low_mask(k: usize) -> $ty {
+            debug_assert!(k <= Self::nbits());
+
+            // Compute the mask when element_bits is not the word size:
+            let a = $ty::one().wrapping_shl(k as u32) - 1;
+
+            // Special case for the word size:
+            let b = (Self::div_nbits(k as u64) & 1) as $ty * !0;
+
+            a | b
+        }
+    }
+}
 
 impl BlockType for u8 {
     fn read_block<R, T>(source: &mut R) -> io::Result<Self>
@@ -250,6 +268,8 @@ impl BlockType for u8 {
               T: ByteOrder {
         sink.write_u8(*self)
     }
+
+    fn_low_mask!(u8);
 }
 
 macro_rules! impl_block_type {
@@ -268,6 +288,8 @@ macro_rules! impl_block_type {
                       T: ByteOrder {
                 sink.$write::<T>(*self)
             }
+
+            fn_low_mask!($ty);
         }
     }
 }
@@ -276,34 +298,37 @@ impl_block_type!(u16, read_u16, write_u16);
 impl_block_type!(u32, read_u32, write_u32);
 impl_block_type!(u64, read_u64, write_u64);
 
-#[cfg(target_pointer_width = "64")]
 impl BlockType for usize {
+    #[cfg(target_pointer_width = "64")]
     fn read_block<R, T>(source: &mut R) -> io::Result<Self>
         where R: io::Read,
               T: ByteOrder {
         source.read_u64::<T>().map(|x| x as usize)
     }
 
-    fn write_block<W, T>(&self, sink: &mut W) -> io::Result<()>
-        where W: io::Write,
-              T: ByteOrder {
-        sink.write_u64::<T>(*self as u64)
-    }
-}
-
-#[cfg(target_pointer_width = "32")]
-impl BlockType for usize {
+    #[cfg(target_pointer_width = "32")]
     fn read_block<R, T>(source: &mut R) -> io::Result<Self>
         where R: io::Read,
               T: ByteOrder {
         source.read_u32::<T>().map(|x| x as usize)
     }
 
+    #[cfg(target_pointer_width = "64")]
+    fn write_block<W, T>(&self, sink: &mut W) -> io::Result<()>
+        where W: io::Write,
+              T: ByteOrder {
+        sink.write_u64::<T>(*self as u64)
+    }
+
+    #[cfg(target_pointer_width = "32")]
     fn write_block<W, T>(&self, sink: &mut W) -> io::Result<()>
         where W: io::Write,
               T: ByteOrder {
         sink.write_u32::<T>(*self as u32)
     }
+
+    fn_low_mask!(usize);
+
 }
 
 /// Represents the address of a bit, broken into a block component
@@ -351,6 +376,7 @@ mod test {
     fn low_mask() {
         assert_eq!(0b00011111, u8::low_mask(5));
         assert_eq!(0b0011111111111111, u16::low_mask(14));
+        assert_eq!(0b1111111111111111, u16::low_mask(16));
     }
 
     #[test]

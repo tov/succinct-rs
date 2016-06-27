@@ -39,3 +39,4 @@ pub trait BitRankSupport: RankSupport<Over = bool> {
         position + 1 - self.rank1(position)
     }
 }
+

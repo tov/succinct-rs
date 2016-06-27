@@ -14,10 +14,40 @@
 //!   - Line 2 of Algorithm 2 should read
 //!
 //!     ```
+//!     # let mut s = 0;
 //!     s = (s & 0x3333_3333_3333_3333) + ((s >> 2) & 0x3333_3333_3333_3333);
 //!     ```
 //!
 //!     In the paper, the shifted `s` appears as `x`.
+
+use rank::{BitRankSupport, RankSupport};
+use select::SelectSupport1;
+use storage::BlockType;
+
+/// Newtype for treating a `u64` as a rank or select structure.
+pub struct Broadword(pub u64);
+
+impl BitRankSupport for Broadword {
+    fn rank1(&self, position: u64) -> u64 {
+        count_ones(self.0 & u64::low_mask(position as usize + 1)) as u64
+    }
+}
+
+impl RankSupport for Broadword {
+    type Over = bool;
+
+    fn rank(&self, position: u64, value: bool) -> u64 {
+        if value {self.rank1(position)} else {self.rank0(position)}
+    }
+
+    fn limit(&self) -> u64 { 64 }
+}
+
+impl SelectSupport1 for Broadword {
+    fn select1(&self, index: u64) -> Option<u64> {
+        select1(index as usize, self.0).map(|u| u as u64)
+    }
+}
 
 /// Has the lowest bit of every octet set: `0x0101_0101_0101_0101`.
 pub const L8: u64 = 0x0101_0101_0101_0101;
