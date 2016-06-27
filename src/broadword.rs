@@ -29,6 +29,7 @@ pub struct Broadword(pub u64);
 
 impl BitRankSupport for Broadword {
     fn rank1(&self, position: u64) -> u64 {
+        debug_assert!(position < 64);
         count_ones(self.0 & u64::low_mask(position as usize + 1)) as u64
     }
 }
