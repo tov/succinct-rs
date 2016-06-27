@@ -113,6 +113,16 @@ impl_stack_only_space_usage!(isize);
 impl_stack_only_space_usage!(f32);
 impl_stack_only_space_usage!(f64);
 
+impl<'a, T> SpaceUsage for &'a T {
+    fn is_stack_only() -> bool { true }
+    fn heap_bytes(&self) -> usize { 0 }
+}
+
+impl<'a, T> SpaceUsage for &'a [T] {
+    fn is_stack_only() -> bool { true }
+    fn heap_bytes(&self) -> usize { 0 }
+}
+
 macro_rules! impl_tuple_space_usage {
     ( $( $tv:ident ),+ ) =>
     {

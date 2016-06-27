@@ -122,13 +122,14 @@ impl<Store: Bits> BitRankSupport for JacobsonRank<Store> {
     }
 }
 
-impl<Store: Bits> SpaceUsage for JacobsonRank<Store> {
+impl<Store: SpaceUsage + Bits> SpaceUsage for JacobsonRank<Store> {
     #[inline]
     fn is_stack_only() -> bool { false }
 
     fn heap_bytes(&self) -> usize {
         self.large_block_ranks.heap_bytes()
-            + self.small_block_ranks.heap_bytes()
+                + self.small_block_ranks.heap_bytes()
+                + self.bit_store.heap_bytes()
     }
 }
 
@@ -172,7 +173,7 @@ mod test {
             let rank = JacobsonRank::new(&*vec);
 
             assert!((rank.total_bytes() as f64 / vec.total_bytes() as f64)
-                        < 0.5);
+                        < 1.5);
         }
     }
 }
