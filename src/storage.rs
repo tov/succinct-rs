@@ -8,6 +8,7 @@ use byteorder::{ByteOrder, ReadBytesExt, WriteBytesExt};
 use num::{PrimInt, ToPrimitive};
 
 use bit_vector::{Bits, BitsMut};
+use rank::{BitRankSupport, RankSupport};
 use space_usage::SpaceUsage;
 
 /// Types that can be used for `IntVec` and `BitVec` storage.
@@ -19,7 +20,8 @@ use space_usage::SpaceUsage;
 ///   - a method for computing rank,
 ///   - three arithmetic methods that probably belong elsewhere, and
 ///   - block-based, endian-specified I/O.
-pub trait BlockType: PrimInt + Bits + BitsMut + fmt::Debug + SpaceUsage {
+pub trait BlockType: PrimInt + Bits + BitsMut + BitRankSupport +
+                     RankSupport<Over = bool> + SpaceUsage + fmt::Debug {
     // Methods for computing sizes and offsets relative to the block size.
 
     /// The number of bits in a block.
@@ -200,12 +202,6 @@ pub trait BlockType: PrimInt + Bits + BitsMut + fmt::Debug + SpaceUsage {
         let shifted_value = value << start;
 
         (self & !mask) | (shifted_value & mask)
-    }
-
-    /// Returns the total count of ones up through the `index`th digit,
-    /// little-endian style.
-    fn rank1(self, index: usize) -> usize {
-        (self & Self::low_mask(index + 1)).count_ones() as usize
     }
 
     // Arithmetic methods that probably belong elsewhere.
@@ -481,28 +477,6 @@ mod test {
         }
 
         quickcheck(prop as fn(u64, u64) -> TestResult);
-    }
-
-    #[test]
-    fn rank1() {
-        assert_eq!(0, 0b00000000u8.rank1(0));
-        assert_eq!(0, 0b00000000u8.rank1(7));
-        assert_eq!(1, 0b01010101u8.rank1(0));
-        assert_eq!(1, 0b01010101u8.rank1(1));
-        assert_eq!(2, 0b01010101u8.rank1(2));
-        assert_eq!(2, 0b01010101u8.rank1(3));
-
-        assert_eq!(3, 0b00001111u8.rank1(2));
-        assert_eq!(4, 0b00001111u8.rank1(3));
-        assert_eq!(4, 0b00001111u8.rank1(4));
-        assert_eq!(4, 0b00001111u8.rank1(5));
-        assert_eq!(4, 0b00001111u8.rank1(7));
-
-        assert_eq!(0, 0b11110000u8.rank1(0));
-        assert_eq!(0, 0b11110000u8.rank1(3));
-        assert_eq!(1, 0b11110000u8.rank1(4));
-        assert_eq!(2, 0b11110000u8.rank1(5));
-        assert_eq!(4, 0b11110000u8.rank1(7));
     }
 }
 

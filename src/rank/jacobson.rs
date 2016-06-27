@@ -5,7 +5,7 @@ use int_vector::{IntVector, IntVec};
 use space_usage::SpaceUsage;
 use storage::{Address, BlockType};
 
-pub use super::{RankSupport, BitRankSupport};
+use super::{RankSupport, BitRankSupport};
 
 /// Add-on to `Bits` to support fast rank queries.
 ///
@@ -117,7 +117,7 @@ impl<Store: Bits> BitRankSupport for JacobsonRank<Store> {
         let large_rank = self.large_block_ranks.get(large_block);
         let small_rank = self.small_block_ranks.get(address.block_index as u64);
         let bits_rank  = self.bit_store.get_block(address.block_index)
-                             .rank1(address.bit_offset) as u64;
+                             .rank1(address.bit_offset as u64);
 
         large_rank + small_rank + bits_rank
     }
@@ -136,6 +136,7 @@ impl<Store: Bits> SpaceUsage for JacobsonRank<Store> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use rank::BitRankSupport;
 
     #[test]
     fn rank1() {
