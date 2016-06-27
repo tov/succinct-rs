@@ -12,6 +12,10 @@ build:
 clippy:
 	rustup run nightly cargo build --features=clippy
 
+stewie:
+	rsync -az --progress --exclude target\* ./ stewie:succinct-rs/
+	ssh stewie cd succinct-rs\; cargo test
+
 stable beta nightly:
 	mkdir -p target.$@
 	rm -f target
