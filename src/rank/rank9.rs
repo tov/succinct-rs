@@ -6,7 +6,7 @@ use storage::BlockType;
 
 /// Rank support structure from Sebastiano Vigna.
 #[derive(Clone, Debug)]
-pub struct Rank9<Store: Bits> {
+pub struct Rank9<Store: Bits<Block = u64>> {
     bit_store: Store,
     counts: Vec<Rank9Cell>,
 }
@@ -18,6 +18,7 @@ struct Rank9Cell {
     level2: Level2,
 }
 
+#[repr(C)]
 #[derive(Clone, Copy, Debug)]
 struct Level2(u64);
 
@@ -45,14 +46,46 @@ impl Level2 {
     }
 }
 
-impl<Store: Bits> Rank9<Store> {
+impl<Store: Bits<Block = u64>> Rank9<Store> {
+    /// Creates a new rank9 structure.
     pub fn new(bits: Store) -> Self {
-        let basic_block_bits = 8 * 64;
-        let basic_block_count = bits.bit_len()
-                                    .ceil_div(basic_block_bits)
-                                    .to_usize()
-                                    .expect("Rank9::new: overflow");
-        let result = Vec::with_capacity(basic_block_count);
+        let bb_count = bits.block_len().ceil_div(8);
+        let mut result = Vec::with_capacity(bb_count + 1);
+
+        let mut level1_count = 0;
+        let mut level2_count = 0;
+
+        // Scope for store_counts's borrow of result
+        {
+            let mut store_counts = |i: usize,
+                                    level1_count: &mut u64,
+                                    level2_count: &mut u64| {
+                let basic_block_index = i / 8;
+                let word_offset       = i % 8;
+
+                if word_offset == 0 {
+                    result.push(Rank9Cell {
+                        level1: *level1_count,
+                        level2: Level2::new(),
+                    });
+                    *level2_count = 0;
+                } else {
+                    result[basic_block_index].level2
+                            .set(word_offset, *level2_count);
+                }
+            };
+
+            for i in 0..bits.block_len() {
+                store_counts(i, &mut level1_count, &mut level2_count);
+
+                let word_count = bits.get_block(i).count_ones() as u64;
+                level1_count += word_count;
+                level2_count += word_count;
+            }
+
+            store_counts(bits.block_len(),
+                         &mut level1_count, &mut level2_count);
+        }
 
         Rank9 {
             bit_store: bits,
@@ -60,6 +93,41 @@ impl<Store: Bits> Rank9<Store> {
         }
     }
 }
+
+impl<Store: Bits<Block = u64>> BitRankSupport for Rank9<Store> {
+    fn rank1(&self, position: u64) -> u64 {
+        let bb_index = (position / 512).to_usize()
+                                       .expect("Rank9::rank1: index overflow");
+        let word_index = (position / 64).to_usize()
+                                        .expect("Rank9::rank1: index overflow");
+        let word_offset = word_index % 8;
+        let bit_offset = position % 64;
+
+        let cell = self.counts[bb_index];
+
+        let bb_portion = cell.level1;
+        let word_portion = cell.level2.get(word_offset);
+        let bit_portion = self.bit_store.get_block(word_index)
+                                        .rank1(bit_offset);
+
+        bb_portion + word_portion + bit_portion
+    }
+}
+
+impl<Store: Bits<Block = u64>> RankSupport for Rank9<Store> {
+    type Over = bool;
+
+    fn rank(&self, position: u64, value: bool) -> u64 {
+        if value {self.rank1(position)} else {self.rank0(position)}
+    }
+
+    fn limit(&self) -> u64 {
+        self.bit_store.bit_len()
+    }
+}
+
+impl_stack_only_space_usage!(Rank9Cell);
+impl_stack_only_space_usage!(Level2);
 
 #[test]
 fn level2() {
