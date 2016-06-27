@@ -41,9 +41,10 @@ extern crate quickcheck;
 
 mod internal;
 
+pub mod broadword;
+pub mod coding;
 pub mod storage;
 pub mod stream;
-pub mod coding;
 
 #[macro_use]
 mod space_usage;
