@@ -55,7 +55,7 @@ pub trait BlockType: PrimInt + Bits + BitsMut + fmt::Debug + SpaceUsage {
     /// size, which is why it takes `u64` and returns `usize`.
     #[inline]
     fn ceil_div_nbits(index: u64) -> usize {
-        Self::div_nbits(index + Self::nbits() as u64 - 1)
+        Self::div_nbits(index + (Self::nbits() as u64 - 1))
     }
 
     /// Returns `index / Self::nbits()` rounded up, computed by shifting.
@@ -67,7 +67,7 @@ pub trait BlockType: PrimInt + Bits + BitsMut + fmt::Debug + SpaceUsage {
     /// be small enough.
     #[inline]
     fn checked_ceil_div_nbits(index: u64) -> Option<usize> {
-        Self::checked_div_nbits(index + Self::nbits() as u64 - 1)
+        Self::checked_div_nbits(index + (Self::nbits() as u64 - 1))
     }
 
     /// Returns `index % Self::nbits()`, computed by masking.
