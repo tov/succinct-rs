@@ -2,6 +2,7 @@ use num::ToPrimitive;
 
 use bit_vector::Bits;
 use rank::{RankSupport, BitRankSupport};
+use space_usage::SpaceUsage;
 use storage::BlockType;
 
 /// Rank support structure from Sebastiano Vigna.
@@ -129,6 +130,16 @@ impl<Store: Bits<Block = u64>> RankSupport for Rank9<Store> {
 impl_stack_only_space_usage!(Rank9Cell);
 impl_stack_only_space_usage!(Level2);
 
+impl<Store> SpaceUsage for Rank9<Store>
+    where Store: SpaceUsage + Bits<Block = u64>
+{
+    fn is_stack_only() -> bool { false }
+
+    fn heap_bytes(&self) -> usize {
+        self.bit_store.heap_bytes() + self.counts.heap_bytes()
+    }
+}
+
 #[test]
 fn level2() {
     let mut l2 =
@@ -164,4 +175,48 @@ fn level2() {
     assert_eq!(1, l2.get(5));
     assert_eq!(0, l2.get(6));
     assert_eq!(511, l2.get(7));
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use rank::BitRankSupport;
+
+    #[test]
+    fn rank1() {
+        let vec = vec![ 0b00000000000001110000000000000001u64; 1024 ];
+        let rank = Rank9::new(vec);
+
+        assert_eq!(1, rank.rank1(0));
+        assert_eq!(1, rank.rank1(1));
+        assert_eq!(1, rank.rank1(2));
+        assert_eq!(1, rank.rank1(7));
+        assert_eq!(2, rank.rank1(16));
+        assert_eq!(3, rank.rank1(17));
+        assert_eq!(4, rank.rank1(18));
+        assert_eq!(4, rank.rank1(19));
+        assert_eq!(4, rank.rank1(20));
+
+        assert_eq!(16, rank.rank1(4 * 64 - 1));
+        assert_eq!(17, rank.rank1(4 * 64));
+        assert_eq!(2048, rank.rank1(512 * 64 - 1));
+        assert_eq!(2049, rank.rank1(512 * 64));
+
+        assert_eq!(4096, rank.rank1(1024 * 64 - 1));
+    }
+
+    // This test is a sanity check that we aren’t taking up too much
+    // space with the metadata.
+    #[test]
+    fn space() {
+        use space_usage::*;
+
+        for i in 0 .. 50 {
+            let vec = vec![ 0u64; 1000 + i ];
+            let vec_bytes = vec.total_bytes() as f64;
+            let rank = Rank9::new(vec);
+
+            assert!(rank.total_bytes() as f64 / vec_bytes < 1.3);
+        }
+    }
 }
