@@ -50,10 +50,10 @@ impl SelectSupport1 for Broadword {
     }
 }
 
-/// Has the lowest bit of every octet set: `0x0101_0101_0101_0101`.
+/// Has the lowest bit of every byte set: `0x0101_0101_0101_0101`.
 pub const L8: u64 = 0x0101_0101_0101_0101;
 
-/// Has the highest bit of every octet set: `0x8080_8080_8080_8080`.
+/// Has the highest bit of every byte set: `0x8080_8080_8080_8080`.
 pub const H8: u64 = 0x8080_8080_8080_8080;
 
 /// Counts the number of ones in a `u64`.
