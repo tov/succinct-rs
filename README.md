@@ -19,7 +19,7 @@ It’s [on crates.io](https://crates.io/crates/succinct), so you can add
 
 ```toml
 [dependencies]
-succinct = "0.3.2"
+succinct = "0.4.0"
 ```
 
 to your `Cargo.toml` and
