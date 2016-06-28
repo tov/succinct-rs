@@ -2,6 +2,7 @@ use std::ops::{Range, RangeTo, RangeFrom, RangeFull};
 
 use bit_vec::traits::*;
 use space_usage::SpaceUsage;
+use storage::BlockType;
 
 /// A borrowed slice of a bit vector.
 #[derive(Clone, Copy, Debug)]
@@ -99,7 +100,16 @@ impl<'a, Base: 'a + BitVec + ?Sized> BitVec for BitSlice<'a, Base> {
         self.data.get_bit(self.start + position)
     }
 
-    // TODO: efficient get_block
+    fn get_bits(&self, position: u64, count: usize) -> Self::Block {
+        let end = position.checked_add(count as u64)
+                          .expect("BitSlice::get_bits: index overflow");
+        assert!(end <= self.len, "BitSlice::get_bits: out of bounds");
+        self.data.get_bits(self.start + position, count)
+    }
+
+    fn get_block(&self, position: usize) -> Self::Block {
+        self.get_bits(Self::Block::mul_nbits(position), Self::Block::nbits())
+    }
 }
 
 impl<'a, Base: 'a + BitVecMut + ?Sized> BitVec for BitSliceMut<'a, Base> {
@@ -116,18 +126,36 @@ impl<'a, Base: 'a + BitVecMut + ?Sized> BitVec for BitSliceMut<'a, Base> {
         self.data.get_bit(self.start + position)
     }
 
-    // TODO: efficient get_block
+    fn get_bits(&self, position: u64, count: usize) -> Self::Block {
+        let end = position.checked_add(count as u64)
+                          .expect("BitSliceMut::get_bits: index overflow");
+        assert!(end <= self.len, "BitSliceMut::get_bits: out of bounds");
+        self.data.get_bits(self.start + position, count)
+    }
+
+    fn get_block(&self, position: usize) -> Self::Block {
+        self.get_bits(Self::Block::mul_nbits(position), Self::Block::nbits())
+    }
 }
 
 impl<'a, Base: 'a + BitVecMut + ?Sized> BitVecMut for BitSliceMut<'a, Base> {
     #[inline]
     fn set_bit(&mut self, position: u64, value: bool) {
         assert!(position < self.len, "BitSlice::set_bit: out of bounds");
-        let start = self.start;
-        self.data.set_bit(start + position, value);
+        self.data.set_bit(self.start + position, value);
     }
 
-    // TODO: efficient set_block
+    fn set_bits(&mut self, position: u64, count: usize, value: Self::Block) {
+        let end = position.checked_add(count as u64)
+                          .expect("BitSliceMut::get_bits: index overflow");
+        assert!(end <= self.len, "BitSliceMut::get_bits: out of bounds");
+        self.data.set_bits(self.start + position, count, value);
+    }
+
+    fn set_block(&mut self, position: usize, value: Self::Block) {
+        self.set_bits(Self::Block::mul_nbits(position),
+                      Self::Block::nbits(), value);
+    }
 }
 
 impl<'a, Base: 'a + BitVec + ?Sized> SpaceUsage for BitSlice<'a, Base> {
@@ -176,4 +204,3 @@ impl<T> IntoRange<T> for RangeFrom<T> {
 impl<T> IntoRange<T> for RangeFull {
     fn into_range(self, start: T, end: T) -> Range<T> { start .. end }
 }
-
