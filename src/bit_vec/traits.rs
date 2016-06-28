@@ -9,7 +9,7 @@ use storage::{Address, BlockType};
 /// `get_bit` is inefficient, and thus you should implement `get_block`
 /// directly if possible.
 pub trait BitVec {
-    /// The underlying block type used to store the bits of the slice.
+    /// The underlying block type used to store the bits of the vector.
     type Block: BlockType;
 
     /// The length of the slice in bits.

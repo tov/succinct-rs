@@ -5,7 +5,7 @@ use space_usage::SpaceUsage;
 
 /// A borrowed slice of a bit vector.
 #[derive(Clone, Copy, Debug)]
-pub struct BitSlice<'a, Base: 'a + BitVec> {
+pub struct BitSlice<'a, Base: 'a + BitVec + ?Sized> {
     data: &'a Base,
     start: u64,
     len: u64,
@@ -13,13 +13,13 @@ pub struct BitSlice<'a, Base: 'a + BitVec> {
 
 /// A borrowed, mutable slice of a bit vector.
 #[derive(Debug)]
-pub struct BitSliceMut<'a, Base: 'a + BitVecMut> {
+pub struct BitSliceMut<'a, Base: 'a + BitVecMut + ?Sized> {
     data: &'a mut Base,
     start: u64,
     len: u64,
 }
 
-impl<'a, Base: 'a + BitVec> BitSlice<'a, Base> {
+impl<'a, Base: 'a + BitVec + ?Sized> BitSlice<'a, Base> {
     /// Slices base to the specified range.
     pub fn new<R: IntoRange<u64>>(base: &'a Base, range: R) -> Self {
         let range = range.into_range(0, base.bit_len());
@@ -46,7 +46,7 @@ impl<'a, Base: 'a + BitVec> BitSlice<'a, Base> {
     }
 }
 
-impl<'a, Base: 'a + BitVecMut> BitSliceMut<'a, Base> {
+impl<'a, Base: 'a + BitVecMut + ?Sized> BitSliceMut<'a, Base> {
     /// Slices base to the specified range.
     pub fn new<R: IntoRange<u64>>(base: &'a mut Base, range: R) -> Self {
         let range = range.into_range(0, base.bit_len());
@@ -85,7 +85,7 @@ impl<'a, Base: 'a + BitVecMut> BitSliceMut<'a, Base> {
     }
 }
 
-impl<'a, Base: 'a + BitVec> BitVec for BitSlice<'a, Base> {
+impl<'a, Base: 'a + BitVec + ?Sized> BitVec for BitSlice<'a, Base> {
     type Block = Base::Block;
 
     #[inline]
@@ -102,7 +102,7 @@ impl<'a, Base: 'a + BitVec> BitVec for BitSlice<'a, Base> {
     // TODO: efficient get_block
 }
 
-impl<'a, Base: 'a + BitVecMut> BitVec for BitSliceMut<'a, Base> {
+impl<'a, Base: 'a + BitVecMut + ?Sized> BitVec for BitSliceMut<'a, Base> {
     type Block = Base::Block;
 
     #[inline]
@@ -119,7 +119,7 @@ impl<'a, Base: 'a + BitVecMut> BitVec for BitSliceMut<'a, Base> {
     // TODO: efficient get_block
 }
 
-impl<'a, Base: 'a + BitVecMut> BitVecMut for BitSliceMut<'a, Base> {
+impl<'a, Base: 'a + BitVecMut + ?Sized> BitVecMut for BitSliceMut<'a, Base> {
     #[inline]
     fn set_bit(&mut self, position: u64, value: bool) {
         assert!(position < self.len, "BitSlice::set_bit: out of bounds");
@@ -130,12 +130,12 @@ impl<'a, Base: 'a + BitVecMut> BitVecMut for BitSliceMut<'a, Base> {
     // TODO: efficient set_block
 }
 
-impl<'a, Base: 'a + BitVec> SpaceUsage for BitSlice<'a, Base> {
+impl<'a, Base: 'a + BitVec + ?Sized> SpaceUsage for BitSlice<'a, Base> {
     fn is_stack_only() -> bool { true }
     fn heap_bytes(&self) -> usize { 0 }
 }
 
-impl<'a, Base: 'a + BitVecMut> SpaceUsage for BitSliceMut<'a, Base> {
+impl<'a, Base: 'a + BitVecMut + ?Sized> SpaceUsage for BitSliceMut<'a, Base> {
     fn is_stack_only() -> bool { true }
     fn heap_bytes(&self) -> usize { 0 }
 }
