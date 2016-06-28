@@ -1,8 +1,8 @@
 use internal::search::binary_search_function;
 use rank::{BitRankSupport, RankSupport};
 use space_usage::SpaceUsage;
-use bit_vector::Bits;
-use super::{SelectSupport, SelectSupport1, SelectSupport0};
+use bit_vec::BitVec;
+use super::{SelectSupport, Select1Support, Select0Support};
 
 /// Performs a select query by binary searching rank queries.
 pub struct BinSearchSelect<Rank> {
@@ -30,8 +30,8 @@ impl<Rank: RankSupport> BinSearchSelect<Rank> {
     }
 }
 
-impl<Rank: Bits> Bits for BinSearchSelect<Rank> {
-    impl_bits_adapter!(Rank::Block, rank_support);
+impl<Rank: BitVec> BitVec for BinSearchSelect<Rank> {
+    impl_bit_vec_adapter!(Rank::Block, rank_support);
 }
 
 impl<Rank: RankSupport> RankSupport for BinSearchSelect<Rank> {
@@ -60,8 +60,8 @@ macro_rules! impl_select_support_b {
     }
 }
 
-impl_select_support_b!(SelectSupport1, select1, rank1);
-impl_select_support_b!(SelectSupport0, select0, rank0);
+impl_select_support_b!(Select1Support, select1, rank1);
+impl_select_support_b!(Select0Support, select0, rank0);
 
 impl<Rank: RankSupport> SelectSupport for BinSearchSelect<Rank> {
     type Over = Rank::Over;

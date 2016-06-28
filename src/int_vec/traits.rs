@@ -2,7 +2,7 @@ use storage::BlockType;
 
 /// Types that can be accessed as immutable arrays of integers of
 /// limited width.
-pub trait IntVector {
+pub trait IntVec {
     /// The type of primitive value to represent elements.
     type Block: BlockType;
 
@@ -28,7 +28,7 @@ pub trait IntVector {
 
 /// Types that can be accessed as mutable arrays of integers of limited
 /// width.
-pub trait IntVectorMut: IntVector {
+pub trait IntVecMut: IntVec {
     /// Updates the value of the `index`th element.
     ///
     /// # Panics

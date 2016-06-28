@@ -2,9 +2,9 @@
 //!
 //! This library is a very early work in progress. So far we have:
 //!
-//!   - [integer vectors](int_vector/struct.IntVec.html) with arbitrary-sized
+//!   - [integer vectors](int_vec/struct.IntVector.html) with arbitrary-sized
 //!     (1- to 64-bit) elements;
-//!   - [bit vectors](bit_vector/struct.BitVec.html) and [bit
+//!   - [bit vectors](bit_vec/struct.BitVector.html) and [bit
 //!     buffers](stream/struct.BitBuffer.html),
 //!   - a variety of [universal codes](coding/index.html),
 //!   - constant-time [rank](struct.JacobsonRank.html) queries; and
@@ -52,15 +52,15 @@ pub mod stream;
 mod space_usage;
 pub use space_usage::SpaceUsage;
 
-pub mod bit_vector;
-pub use bit_vector::{Bits, BitsMut, BitVector, BitVec};
+pub mod bit_vec;
+pub use bit_vec::{BitVec, BitVecMut, BitVecPush, BitVector};
 
-pub mod int_vector;
-pub use int_vector::{IntVector, IntVectorMut, IntVec};
+pub mod int_vec;
+pub use int_vec::{IntVec, IntVecMut, IntVector};
 
 pub mod rank;
 pub use rank::{BitRankSupport, JacobsonRank, Rank9};
 
 pub mod select;
-pub use select::{SelectSupport1, BinSearchSelect};
+pub use select::{Select1Support, BinSearchSelect};
 

@@ -1,7 +1,7 @@
 use std::fmt;
 
 use super::*;
-use bit_vector::{Bits, BitsMut};
+use bit_vec::{BitVec, BitVecMut};
 use internal::vector_base::{VectorBase, self};
 use space_usage::SpaceUsage;
 use storage::BlockType;
@@ -12,33 +12,33 @@ use storage::BlockType;
 /// `Block` gives the representation type. The element size *k* can
 /// never exceed the number of bits in `Block`.
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct IntVec<Block: BlockType = usize> {
+pub struct IntVector<Block: BlockType = usize> {
     element_bits: usize,
     base: VectorBase<Block>,
 }
 
-impl<Block: BlockType> IntVec<Block> {
+impl<Block: BlockType> IntVector<Block> {
     /// Asserts that `element_bits` is valid.
     fn check_element_bits(element_bits: usize) {
         assert!(element_bits != 0,
-                "IntVec: cannot have zero-size elements");
+                "IntVector: cannot have zero-size elements");
         assert!(element_bits <= Block::nbits(),
-                "IntVec: element size cannot exceed block size");
+                "IntVector: element size cannot exceed block size");
     }
 
     fn check_value_random(element_bits: usize, element_value: Block) {
         assert!(element_value <= Block::low_mask(element_bits),
-                "IntVec: value to large for element size");
+                "IntVector: value to large for element size");
     }
 
     fn check_value(&self, element_value: Block) {
         Self::check_value_random(self.element_bits, element_value);
     }
 
-    /// Checks `element_bits` before assembling an `IntVec`.
+    /// Checks `element_bits` before assembling an `IntVector`.
     fn create(element_bits: usize, base: VectorBase<Block>) -> Self {
         Self::check_element_bits(element_bits);
-        IntVec {
+        IntVector {
             element_bits: element_bits,
             base: base,
         }
@@ -50,14 +50,14 @@ impl<Block: BlockType> IntVec<Block> {
         element_index
         .checked_mul(element_bits as u64)
         .and_then(|offset| offset.checked_add(bit_offset))
-        .expect("IntVec: index overflow")
+        .expect("IntVector: index overflow")
     }
 
     #[inline]
     fn compute_address(&self, element_index: u64) -> u64 {
         element_index
         .checked_mul(self.element_bits as u64)
-        .expect("IntVec: index overflow")
+        .expect("IntVector: index overflow")
     }
 
     /// Creates a new integer vector.
@@ -192,7 +192,7 @@ impl<Block: BlockType> IntVec<Block> {
     }
 
     /// Reserves capacity for at least `additional` more elements to be
-    /// inserted in the given `IntVec<Block>`.
+    /// inserted in the given `IntVector<Block>`.
     ///
     /// The collection may reserve more space to avoid frequent
     /// reallocations.
@@ -200,7 +200,7 @@ impl<Block: BlockType> IntVec<Block> {
     /// # Panics
     ///
     /// Panics if the size conditions of
-    /// [`IntVec::<Block>::is_okay_size()`](struct.IntVec.html#method.is_okay_size)
+    /// [`IntVector::<Block>::is_okay_size()`](struct.IntVector.html#method.is_okay_size)
     /// are not met. This will happen if the total number of bits
     /// overflows `u64`.
     pub fn reserve(&mut self, additional: u64) {
@@ -221,7 +221,7 @@ impl<Block: BlockType> IntVec<Block> {
     }
 
     /// Reserves capacity for at least `additional` more elements to be
-    /// inserted in the given `IntVec<Block>`.
+    /// inserted in the given `IntVector<Block>`.
     ///
     /// Unlike [`reserve`](#method.reserve), does nothing if the
     /// capacity is already sufficient.
@@ -229,7 +229,7 @@ impl<Block: BlockType> IntVec<Block> {
     /// # Panics
     ///
     /// Panics if the size conditions of
-    /// [`IntVec::<Block>::is_okay_size()`](struct.IntVec.html#method.is_okay_size)
+    /// [`IntVector::<Block>::is_okay_size()`](struct.IntVector.html#method.is_okay_size)
     /// are not met. This will happen if the total number of bits
     /// overflows `u64`.
     pub fn reserve_exact(&mut self, additional: u64) {
@@ -294,7 +294,7 @@ impl<Block: BlockType> IntVec<Block> {
     }
 }
 
-impl<Block: BlockType> IntVector for IntVec<Block> {
+impl<Block: BlockType> IntVec for IntVector<Block> {
     type Block = Block;
 
     fn len(&self) -> u64 {
@@ -315,7 +315,7 @@ impl<Block: BlockType> IntVector for IntVec<Block> {
     }
 }
 
-impl<Block: BlockType> IntVectorMut for IntVec<Block> {
+impl<Block: BlockType> IntVecMut for IntVector<Block> {
     fn set(&mut self, element_index: u64, element_value: Block) {
         if self.is_packed() {
             self.base.set_block(self.element_bits,
@@ -332,7 +332,7 @@ impl<Block: BlockType> IntVectorMut for IntVec<Block> {
     }
 }
 
-impl<Block: BlockType> Bits for IntVec<Block> {
+impl<Block: BlockType> BitVec for IntVector<Block> {
     type Block = Block;
 
     fn block_len(&self) -> usize {
@@ -348,13 +348,13 @@ impl<Block: BlockType> Bits for IntVec<Block> {
     }
 }
 
-impl<Block: BlockType> BitsMut for IntVec<Block> {
+impl<Block: BlockType> BitVecMut for IntVector<Block> {
     fn set_block(&mut self, position: usize, value: Block) {
         self.base.set_block(self.element_bits, position, value);
     }
 }
 
-/// An iterator over the elements of an [`IntVec`](struct.IntVec.html).
+/// An iterator over the elements of an [`IntVector`](struct.IntVector.html).
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct Iter<'a, Block: BlockType + 'a = usize>
     (vector_base::Iter<'a, Block>);
@@ -396,7 +396,7 @@ impl<'a, Block: BlockType> DoubleEndedIterator for Iter<'a, Block> {
     }
 }
 
-impl<'a, Block: BlockType + 'a> IntoIterator for &'a IntVec<Block> {
+impl<'a, Block: BlockType + 'a> IntoIterator for &'a IntVector<Block> {
     type Item = Block;
     type IntoIter = Iter<'a, Block>;
 
@@ -405,11 +405,11 @@ impl<'a, Block: BlockType + 'a> IntoIterator for &'a IntVec<Block> {
     }
 }
 
-impl<Block> fmt::Debug for IntVec<Block>
+impl<Block> fmt::Debug for IntVector<Block>
         where Block: BlockType + fmt::Debug {
 
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        try!(write!(formatter, "IntVec {{ element_bits: {}, elements: {{ ",
+        try!(write!(formatter, "IntVector {{ element_bits: {}, elements: {{ ",
                     self.element_bits()));
 
         for element in self {
@@ -420,7 +420,7 @@ impl<Block> fmt::Debug for IntVec<Block>
     }
 }
 
-impl<A: BlockType> SpaceUsage for IntVec<A> {
+impl<A: BlockType> SpaceUsage for IntVector<A> {
     #[inline]
     fn is_stack_only() -> bool { false }
 
@@ -432,18 +432,18 @@ impl<A: BlockType> SpaceUsage for IntVec<A> {
 
 #[cfg(test)]
 mod test {
-    use int_vector::{IntVec, IntVector, IntVectorMut};
-    use bit_vector::*;
+    use int_vec::{IntVector, IntVec, IntVecMut};
+    use bit_vec::*;
 
     #[test]
     fn create_empty() {
-        let v: IntVec = IntVec::new(4);
+        let v: IntVector = IntVector::new(4);
         assert!(v.is_empty());
     }
 
     #[test]
     fn packed() {
-        let mut v = IntVec::<u32>::with_fill(32, 10, 0);
+        let mut v = IntVector::<u32>::with_fill(32, 10, 0);
         assert_eq!(10, v.len());
 
         assert_eq!(0, v.get(0));
@@ -466,13 +466,13 @@ mod test {
     #[test]
     #[should_panic]
     fn packed_oob() {
-        let v = IntVec::<u32>::with_fill(32, 10, 0);
+        let v = IntVector::<u32>::with_fill(32, 10, 0);
         assert_eq!(0, v.get(10));
     }
 
     #[test]
     fn aligned() {
-        let mut v = IntVec::<u32>::with_fill(4, 20, 0);
+        let mut v = IntVector::<u32>::with_fill(4, 20, 0);
         assert_eq!(20, v.len());
 
         assert_eq!(0, v.get(0));
@@ -498,13 +498,13 @@ mod test {
     #[test]
     #[should_panic]
     fn aligned_oob() {
-        let v = IntVec::<u32>::with_fill(4, 20, 0);
+        let v = IntVector::<u32>::with_fill(4, 20, 0);
         assert_eq!(0, v.get(20));
     }
 
     #[test]
     fn unaligned() {
-        let mut v = IntVec::<u32>::with_fill(5, 20, 0);
+        let mut v = IntVector::<u32>::with_fill(5, 20, 0);
         assert_eq!(20, v.len());
 
         assert_eq!(0, v.get(0));
@@ -530,13 +530,13 @@ mod test {
     #[test]
     #[should_panic]
     fn unaligned_oob() {
-        let v = IntVec::<u32>::with_fill(5, 20, 0);
+        let v = IntVector::<u32>::with_fill(5, 20, 0);
         assert_eq!(0, v.get(20));
     }
 
     #[test]
     fn pop() {
-        let mut v = IntVec::<u32>::new(7);
+        let mut v = IntVector::<u32>::new(7);
         assert_eq!(None, v.pop());
         v.push(1);
         v.push(2);
@@ -553,7 +553,7 @@ mod test {
 
     #[test]
     fn iter() {
-        let mut v = IntVec::<u16>::new(13);
+        let mut v = IntVector::<u16>::new(13);
         v.push(1);
         v.push(1);
         v.push(2);
@@ -565,29 +565,29 @@ mod test {
 
     #[test]
     fn debug() {
-        let mut v = IntVec::<u16>::new(13);
+        let mut v = IntVector::<u16>::new(13);
         v.push(1);
         v.push(1);
         v.push(2);
         v.push(3);
         v.push(5);
 
-        assert_eq!("IntVec { element_bits: 13, elements: { 1, 1, 2, 3, 5, } }".to_owned(),
+        assert_eq!("IntVector { element_bits: 13, elements: { 1, 1, 2, 3, 5, } }".to_owned(),
                    format!("{:?}", v));
     }
 
     #[test]
     #[should_panic]
     fn value_overflow() {
-        let mut v = IntVec::<u32>::new(3);
+        let mut v = IntVector::<u32>::new(3);
         v.push(78); // 78 is too big
     }
 
     #[test]
-    fn bit_vector() {
+    fn bit_vec() {
         use storage::*;
 
-        let mut v = IntVec::<u32>::new(1);
+        let mut v = IntVector::<u32>::new(1);
         v.push(1);
         v.push(0);
         v.push(0);
@@ -608,8 +608,8 @@ mod test {
 
     #[test]
     fn push_pop_equals() {
-        let mut v = IntVec::<u32>::new(5);
-        let mut u = IntVec::<u32>::new(5);
+        let mut v = IntVector::<u32>::new(5);
+        let mut u = IntVector::<u32>::new(5);
 
         v.push(5);
         u.push(5);
@@ -626,7 +626,7 @@ mod test {
 
     #[test]
     fn block_size_elements_u16() {
-        let mut v = IntVec::<u16>::new(16);
+        let mut v = IntVector::<u16>::new(16);
         v.push(0);
         v.push(!0);
         assert_eq!(Some(!0), v.pop());
@@ -636,7 +636,7 @@ mod test {
 
     #[test]
     fn block_size_elements_u64() {
-        let mut v = IntVec::<u64>::new(64);
+        let mut v = IntVector::<u64>::new(64);
         v.push(0);
         v.push(!0);
         assert_eq!(Some(!0), v.pop());

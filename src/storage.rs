@@ -7,11 +7,11 @@ use std::mem;
 use byteorder::{ByteOrder, ReadBytesExt, WriteBytesExt};
 use num::{One, PrimInt, ToPrimitive};
 
-use bit_vector::{Bits, BitsMut};
+use bit_vec::{BitVec, BitVecMut};
 use rank::{BitRankSupport, RankSupport};
 use space_usage::SpaceUsage;
 
-/// Types that can be used for `IntVec` and `BitVec` storage.
+/// Types that can be used for `IntVector` and `BitVector` storage.
 ///
 /// This trait is kind of a grab bag of methods right now. It includes:
 ///
@@ -20,7 +20,7 @@ use space_usage::SpaceUsage;
 ///   - a method for computing rank,
 ///   - three arithmetic methods that probably belong elsewhere, and
 ///   - block-based, endian-specified I/O.
-pub trait BlockType: PrimInt + Bits + BitsMut + BitRankSupport +
+pub trait BlockType: PrimInt + BitVec + BitVecMut + BitRankSupport +
                      RankSupport<Over = bool> + SpaceUsage + fmt::Debug {
     // Methods for computing sizes and offsets relative to the block size.
 
@@ -133,7 +133,7 @@ pub trait BlockType: PrimInt + Bits + BitsMut + BitRankSupport +
 
     /// The bit mask with the `bit_index`th bit set.
     ///
-    /// Bits are index in little-endian style based at 0.
+    /// BitVec are index in little-endian style based at 0.
     ///
     /// # Precondition
     ///

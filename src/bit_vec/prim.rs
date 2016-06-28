@@ -1,11 +1,11 @@
 use storage::BlockType;
-use bit_vector::traits::*;
+use bit_vec::traits::*;
 
 macro_rules! impl_bits_prim {
     ( $t:ident )
         =>
     {
-        impl Bits for $t {
+        impl BitVec for $t {
             type Block = $t;
 
             #[inline]
@@ -39,7 +39,7 @@ macro_rules! impl_bits_prim {
             }
         }
 
-        impl BitsMut for $t {
+        impl BitVecMut for $t {
             #[inline]
             fn set_bit(&mut self, position: u64, value: bool) {
                 assert!(position < self.bit_len(),

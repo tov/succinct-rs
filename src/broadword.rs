@@ -21,7 +21,7 @@
 //!     In the paper, the shifted `s` appears as `x`.
 
 use rank::{BitRankSupport, RankSupport};
-use select::SelectSupport1;
+use select::Select1Support;
 use storage::BlockType;
 
 /// Newtype for treating a `u64` as a rank or select structure.
@@ -44,7 +44,7 @@ impl RankSupport for Broadword {
     fn limit(&self) -> u64 { 64 }
 }
 
-impl SelectSupport1 for Broadword {
+impl Select1Support for Broadword {
     fn select1(&self, index: u64) -> Option<u64> {
         select1(index as usize, self.0).map(|u| u as u64)
     }
@@ -111,8 +111,8 @@ mod test {
     use quickcheck::{quickcheck, TestResult};
 
     use super::*;
-    use bit_vector::Bits;
-    use select::{BinSearchSelect, SelectSupport1};
+    use bit_vec::BitVec;
+    use select::{BinSearchSelect, Select1Support};
 
     #[test]
     fn count_ones_0() {

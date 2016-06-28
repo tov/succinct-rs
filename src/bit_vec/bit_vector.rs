@@ -10,12 +10,12 @@ use super::traits::*;
 
 /// A bit vector implementation.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct BitVec<Block: BlockType = usize>(VectorBase<Block>);
+pub struct BitVector<Block: BlockType = usize>(VectorBase<Block>);
 
-impl<Block: BlockType> BitVec<Block> {
+impl<Block: BlockType> BitVector<Block> {
     /// Creates a new, empty bit vector.
     pub fn new() -> Self {
-        BitVec(VectorBase::new())
+        BitVector(VectorBase::new())
     }
 
     /// Creates a new, empty bit vector with space allocated for `capacity`
@@ -27,13 +27,13 @@ impl<Block: BlockType> BitVec<Block> {
     /// blocks required by the capacity (`capacity / Block::nbits()`)
     /// must fit in a `usize`.
     pub fn with_capacity(capacity: u64) -> Self {
-        BitVec(VectorBase::with_capacity(1, capacity))
+        BitVector(VectorBase::with_capacity(1, capacity))
     }
 
     /// Creates a new, empty bit vector with space allocated for `capacity`
     /// blocks.
     pub fn block_with_capacity(capacity: usize) -> Self {
-        BitVec(VectorBase::block_with_capacity(capacity))
+        BitVector(VectorBase::block_with_capacity(capacity))
     }
 
     /// Creates a new bit vector of `len` bits initialized to `value`.
@@ -45,7 +45,7 @@ impl<Block: BlockType> BitVec<Block> {
     /// must fit in a `usize`.
     pub fn with_fill(len: u64, value: bool) -> Self {
         let block_size = Block::checked_ceil_div_nbits(len)
-                             .expect("BitVec::with_fill: overflow");
+                             .expect("BitVector::with_fill: overflow");
         let block_value = if value {!Block::zero()} else {Block::zero()};
         let mut result = Self::block_with_fill(block_size, block_value);
         result.0.truncate(1, len);
@@ -54,7 +54,7 @@ impl<Block: BlockType> BitVec<Block> {
 
     /// Creates a new bit vector of `block_len` blocks initialized to `value`.
     pub fn block_with_fill(block_len: usize, value: Block) -> Self {
-        BitVec(VectorBase::block_with_fill(1, block_len, value))
+        BitVector(VectorBase::block_with_fill(1, block_len, value))
     }
 
     /// How many bits the bit vector can hold without reallocating.
@@ -77,7 +77,7 @@ impl<Block: BlockType> BitVec<Block> {
     /// must fit in a `usize`.
     pub fn resize(&mut self, new_len: u64, value: bool) {
         let new_block_len = Block::checked_ceil_div_nbits(new_len)
-                                .expect("BitVec::resize: overflow");
+                                .expect("BitVector::resize: overflow");
 
         if new_len < self.bit_len() || !value {
             self.block_resize(new_block_len, Block::zero());
@@ -181,7 +181,7 @@ impl<Block: BlockType> BitVec<Block> {
     }
 }
 
-impl<Block: BlockType> Bits for BitVec<Block> {
+impl<Block: BlockType> BitVec for BitVector<Block> {
     type Block = Block;
 
     #[inline]
@@ -199,7 +199,7 @@ impl<Block: BlockType> Bits for BitVec<Block> {
     }
 }
 
-impl<Block: BlockType> BitsMut for BitVec<Block> {
+impl<Block: BlockType> BitVecMut for BitVector<Block> {
     fn set_bit(&mut self, index: u64, value: bool) {
         self.0.set_bit(index, value);
     }
@@ -210,7 +210,7 @@ impl<Block: BlockType> BitsMut for BitVec<Block> {
     }
 }
 
-impl<Block: BlockType> BitVector for BitVec<Block> {
+impl<Block: BlockType> BitVecPush for BitVector<Block> {
     fn push_bit(&mut self, value: bool) {
         self.0.push_bit(value);
     }
@@ -224,7 +224,7 @@ impl<Block: BlockType> BitVector for BitVec<Block> {
     }
 }
 
-impl<Block: BlockType> fmt::Binary for BitVec<Block> {
+impl<Block: BlockType> fmt::Binary for BitVector<Block> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         for bit in self {
             let bit = if bit {"1"} else {"0"};
@@ -235,7 +235,7 @@ impl<Block: BlockType> fmt::Binary for BitVec<Block> {
     }
 }
 
-impl<Block: BlockType> SpaceUsage for BitVec<Block> {
+impl<Block: BlockType> SpaceUsage for BitVector<Block> {
     fn is_stack_only() -> bool { false }
 
     fn heap_bytes(&self) -> usize {
@@ -243,13 +243,13 @@ impl<Block: BlockType> SpaceUsage for BitVec<Block> {
     }
 }
 
-impl<Block: BlockType> Default for BitVec<Block> {
+impl<Block: BlockType> Default for BitVector<Block> {
     fn default() -> Self {
-        BitVec::new()
+        BitVector::new()
     }
 }
 
-/// Iterator over `BitVec`.
+/// Iterator over `BitVector`.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct Iter<'a, Block: BlockType + 'a = usize>
     (vector_base::Iter<'a, Block>);
@@ -291,7 +291,7 @@ impl<'a, Block: BlockType> DoubleEndedIterator for Iter<'a, Block> {
     }
 }
 
-impl<'a, Block: BlockType + 'a> IntoIterator for &'a BitVec<Block> {
+impl<'a, Block: BlockType + 'a> IntoIterator for &'a BitVector<Block> {
     type Item = bool;
     type IntoIter = Iter<'a, Block>;
 
@@ -302,7 +302,7 @@ impl<'a, Block: BlockType + 'a> IntoIterator for &'a BitVec<Block> {
 
 #[cfg(test)]
 mod test {
-    use bit_vector::*;
+    use bit_vec::*;
 
     macro_rules! assert_bv {
         ($expected:expr, $actual:expr) => {
@@ -312,40 +312,40 @@ mod test {
 
     #[test]
     fn new() {
-        let bv: BitVec = BitVec::new();
-        assert_eq!(0, bv.bit_len());
-        assert_eq!(0, bv.block_len());
+        let bit_vector: BitVector = BitVector::new();
+        assert_eq!(0, bit_vector.bit_len());
+        assert_eq!(0, bit_vector.block_len());
     }
 
     #[test]
     fn capacity() {
-        let bv: BitVec<u32> = BitVec::new();
-        assert_eq!(0, bv.capacity());
+        let bit_vector: BitVector<u32> = BitVector::new();
+        assert_eq!(0, bit_vector.capacity());
 
-        let bv: BitVec<u32> = BitVec::with_capacity(65);
-        assert_eq!(96, bv.capacity());
+        let bit_vector: BitVector<u32> = BitVector::with_capacity(65);
+        assert_eq!(96, bit_vector.capacity());
     }
 
     #[test]
     fn push_binary() {
-        let mut bv: BitVec = BitVec::new();
-        bv.push_bit(true);
-        bv.push_bit(false);
-        bv.push_bit(false);
-        assert_eq!("100", format!("{:b}", bv));
+        let mut bit_vector: BitVector = BitVector::new();
+        bit_vector.push_bit(true);
+        bit_vector.push_bit(false);
+        bit_vector.push_bit(false);
+        assert_eq!("100", format!("{:b}", bit_vector));
     }
 
     #[test]
     fn block_with_fill() {
-        let bv: BitVec<u8> = BitVec::block_with_fill(3, 0b101);
-        assert_eq!(3, bv.block_capacity());
-        assert_bv!("101000001010000010100000", bv);
+        let bit_vector: BitVector<u8> = BitVector::block_with_fill(3, 0b101);
+        assert_eq!(3, bit_vector.block_capacity());
+        assert_bv!("101000001010000010100000", bit_vector);
     }
 
     #[test]
     fn with_fill() {
-        let bv0: BitVec = BitVec::with_fill(20, false);
-        let bv1: BitVec = BitVec::with_fill(20, true);
+        let bv0: BitVector = BitVector::with_fill(20, false);
+        let bv1: BitVector = BitVector::with_fill(20, true);
 
         assert_eq!(false, bv0.get_bit(3));
         assert_eq!(true, bv1.get_bit(3));
@@ -356,158 +356,158 @@ mod test {
 
     #[test]
     fn push_pop() {
-        let mut bv: BitVec = BitVec::new();
-        bv.push_bit(true);
-        bv.push_bit(false);
-        bv.push_bit(false);
-        assert_eq!(Some(false), bv.pop_bit());
-        assert_eq!(Some(false), bv.pop_bit());
-        assert_eq!(Some(true), bv.pop_bit());
-        assert_eq!(None, bv.pop_bit());
+        let mut bit_vector: BitVector = BitVector::new();
+        bit_vector.push_bit(true);
+        bit_vector.push_bit(false);
+        bit_vector.push_bit(false);
+        assert_eq!(Some(false), bit_vector.pop_bit());
+        assert_eq!(Some(false), bit_vector.pop_bit());
+        assert_eq!(Some(true), bit_vector.pop_bit());
+        assert_eq!(None, bit_vector.pop_bit());
     }
 
     #[test]
     fn push_get() {
-        let mut bv: BitVec = BitVec::new();
-        bv.push_bit(true);
-        bv.push_bit(false);
-        bv.push_bit(false);
-        assert_eq!(3, bv.bit_len());
-        assert_eq!(1, bv.block_len());
-        assert_eq!(true, bv.get_bit(0));
-        assert_eq!(false, bv.get_bit(1));
-        assert_eq!(false, bv.get_bit(2));
+        let mut bit_vector: BitVector = BitVector::new();
+        bit_vector.push_bit(true);
+        bit_vector.push_bit(false);
+        bit_vector.push_bit(false);
+        assert_eq!(3, bit_vector.bit_len());
+        assert_eq!(1, bit_vector.block_len());
+        assert_eq!(true, bit_vector.get_bit(0));
+        assert_eq!(false, bit_vector.get_bit(1));
+        assert_eq!(false, bit_vector.get_bit(2));
     }
 
     #[test]
     #[should_panic]
     fn get_oob() {
-        let mut bv: BitVec = BitVec::new();
-        bv.push_bit(true);
-        bv.get_bit(3);
+        let mut bit_vector: BitVector = BitVector::new();
+        bit_vector.push_bit(true);
+        bit_vector.get_bit(3);
     }
 
     #[test]
     fn push_block() {
-        let mut bv: BitVec<u32> = BitVec::new();
-        bv.push_block(0);
-        assert_bv!("00000000000000000000000000000000", bv);
+        let mut bit_vector: BitVector<u32> = BitVector::new();
+        bit_vector.push_block(0);
+        assert_bv!("00000000000000000000000000000000", bit_vector);
     }
 
     #[test]
     fn push_bits_get_block() {
-        let mut bv: BitVec = BitVec::new();
-        bv.push_bit(true);  // 1
-        bv.push_bit(true);  // 2
-        bv.push_bit(false); // (4)
-        bv.push_bit(false); // (8)
-        bv.push_bit(true);  // 16
+        let mut bit_vector: BitVector = BitVector::new();
+        bit_vector.push_bit(true);  // 1
+        bit_vector.push_bit(true);  // 2
+        bit_vector.push_bit(false); // (4)
+        bit_vector.push_bit(false); // (8)
+        bit_vector.push_bit(true);  // 16
 
-        assert_eq!(19, bv.get_block(0));
+        assert_eq!(19, bit_vector.get_block(0));
     }
 
     #[test]
     fn push_block_get_block() {
-        let mut bv: BitVec = BitVec::new();
-        bv.push_block(358);
-        bv.push_block(!0);
-        assert_eq!(358, bv.get_block(0));
-        assert_eq!(!0, bv.get_block(1));
+        let mut bit_vector: BitVector = BitVector::new();
+        bit_vector.push_block(358);
+        bit_vector.push_block(!0);
+        assert_eq!(358, bit_vector.get_block(0));
+        assert_eq!(!0, bit_vector.get_block(1));
     }
 
     #[test]
     #[should_panic]
     fn get_block_oob() {
-        let mut bv: BitVec = BitVec::new();
-        bv.push_bit(true);
-        bv.get_block(3);
+        let mut bit_vector: BitVector = BitVector::new();
+        bit_vector.push_bit(true);
+        bit_vector.get_block(3);
     }
 
     #[test]
     fn push_block_get_bit() {
-        let mut bv: BitVec = BitVec::new();
-        bv.push_block(0b10101);
-        assert_eq!(true, bv.get_bit(0));
-        assert_eq!(false, bv.get_bit(1));
-        assert_eq!(true, bv.get_bit(2));
-        assert_eq!(false, bv.get_bit(3));
-        assert_eq!(true, bv.get_bit(4));
-        assert_eq!(false, bv.get_bit(5));
+        let mut bit_vector: BitVector = BitVector::new();
+        bit_vector.push_block(0b10101);
+        assert_eq!(true, bit_vector.get_bit(0));
+        assert_eq!(false, bit_vector.get_bit(1));
+        assert_eq!(true, bit_vector.get_bit(2));
+        assert_eq!(false, bit_vector.get_bit(3));
+        assert_eq!(true, bit_vector.get_bit(4));
+        assert_eq!(false, bit_vector.get_bit(5));
     }
 
     #[test]
     fn push_block_set_get() {
-        let mut bv: BitVec = BitVec::new();
-        bv.push_block(0);
-        bv.set_bit(0, true);
-        bv.set_bit(1, true);
-        bv.set_bit(2, false);
-        bv.set_bit(3, true);
-        bv.set_bit(4, false);
-        assert_eq!(true, bv.get_bit(0));
-        assert_eq!(true, bv.get_bit(1));
-        assert_eq!(false, bv.get_bit(2));
-        assert_eq!(true, bv.get_bit(3));
-        assert_eq!(false, bv.get_bit(4));
+        let mut bit_vector: BitVector = BitVector::new();
+        bit_vector.push_block(0);
+        bit_vector.set_bit(0, true);
+        bit_vector.set_bit(1, true);
+        bit_vector.set_bit(2, false);
+        bit_vector.set_bit(3, true);
+        bit_vector.set_bit(4, false);
+        assert_eq!(true, bit_vector.get_bit(0));
+        assert_eq!(true, bit_vector.get_bit(1));
+        assert_eq!(false, bit_vector.get_bit(2));
+        assert_eq!(true, bit_vector.get_bit(3));
+        assert_eq!(false, bit_vector.get_bit(4));
     }
 
     #[test]
     fn set_block_mask() {
-        let mut bv: BitVec = BitVec::new();
+        let mut bit_vector: BitVector = BitVector::new();
 
-        bv.push_bit(false);
-        bv.set_block(0, 0b11);
-        assert_eq!(0b01, bv.get_block(0));
+        bit_vector.push_bit(false);
+        bit_vector.set_block(0, 0b11);
+        assert_eq!(0b01, bit_vector.get_block(0));
 
-        bv.push_bit(false);
-        bv.set_block(0, 0b11);
-        assert_eq!(0b11, bv.get_block(0));
+        bit_vector.push_bit(false);
+        bit_vector.set_block(0, 0b11);
+        assert_eq!(0b11, bit_vector.get_block(0));
     }
 
     #[test]
     fn resize() {
-        let mut bv: BitVec<u8> = BitVec::new();
+        let mut bit_vector: BitVector<u8> = BitVector::new();
 
-        bv.push_bit(true);
-        bv.push_bit(false);
-        bv.push_bit(true);
-        assert_bv!("101", bv);
+        bit_vector.push_bit(true);
+        bit_vector.push_bit(false);
+        bit_vector.push_bit(true);
+        assert_bv!("101", bit_vector);
 
-        bv.resize(21, false);
-        assert_bv!("101000000000000000000", bv);
+        bit_vector.resize(21, false);
+        assert_bv!("101000000000000000000", bit_vector);
 
-        bv.resize(22, false);
-        assert_bv!("1010000000000000000000", bv);
+        bit_vector.resize(22, false);
+        assert_bv!("1010000000000000000000", bit_vector);
 
-        bv.resize(5, false);
-        assert_bv!("10100", bv);
+        bit_vector.resize(5, false);
+        assert_bv!("10100", bit_vector);
 
-        bv.resize(21, true);
-        assert_bv!("101001111111111111111", bv);
+        bit_vector.resize(21, true);
+        assert_bv!("101001111111111111111", bit_vector);
 
-        bv.resize(4, true);
-        assert_bv!("1010", bv);
+        bit_vector.resize(4, true);
+        assert_bv!("1010", bit_vector);
 
-        bv.push_block(0b11111111);
-        assert_bv!("1010000011111111", bv);
+        bit_vector.push_block(0b11111111);
+        assert_bv!("1010000011111111", bit_vector);
     }
 
     #[test]
     fn block_resize() {
-        let mut bv: BitVec<u8> = BitVec::new();
+        let mut bit_vector: BitVector<u8> = BitVector::new();
 
-        bv.push_bit(true);
-        bv.push_bit(false);
-        bv.push_bit(true);
-        assert_bv!("101", bv);
+        bit_vector.push_bit(true);
+        bit_vector.push_bit(false);
+        bit_vector.push_bit(true);
+        assert_bv!("101", bit_vector);
 
-        bv.block_resize(1, 0);
-        assert_bv!("10100000", bv);
+        bit_vector.block_resize(1, 0);
+        assert_bv!("10100000", bit_vector);
 
-        bv.block_resize(3, 0b01000101);
-        assert_bv!("101000001010001010100010", bv);
+        bit_vector.block_resize(3, 0b01000101);
+        assert_bv!("101000001010001010100010", bit_vector);
 
-        bv.block_resize(2, 0);
-        assert_bv!("1010000010100010", bv);
+        bit_vector.block_resize(2, 0);
+        assert_bv!("1010000010100010", bit_vector);
     }
 }

@@ -8,7 +8,7 @@ use storage::{Address, BlockType};
 /// is defined in terms of the other. Note that `get_block` in terms of
 /// `get_bit` is inefficient, and thus you should implement `get_block`
 /// directly if possible.
-pub trait Bits {
+pub trait BitVec {
     /// The underlying block type used to store the bits of the slice.
     type Block: BlockType;
 
@@ -29,7 +29,7 @@ pub trait Bits {
     ///
     /// Panics if `position` is out of bounds.
     fn get_bit(&self, position: u64) -> bool {
-        assert!(position < self.bit_len(), "Bits::get_bit: out of bounds");
+        assert!(position < self.bit_len(), "BitVec::get_bit: out of bounds");
 
         let address = Address::new::<Self::Block>(position);
         let block = self.get_block(address.block_index);
@@ -76,7 +76,7 @@ pub trait Bits {
     /// Panics if the bit span goes out of bounds.
     fn get_bits(&self, start: u64, count: usize) -> Self::Block {
         let limit = start + count as u64;
-        assert!(limit <= self.bit_len(), "Bits::get_bits: out of bounds");
+        assert!(limit <= self.bit_len(), "BitVec::get_bits: out of bounds");
 
         let address = Address::new::<Self::Block>(start);
         let margin = Self::Block::nbits() - address.bit_offset;
@@ -105,7 +105,7 @@ pub trait Bits {
 /// is defined in terms of the other. Note that `set_block` in terms of
 /// `set_bit` is inefficient, and thus you should implement `set_block`
 /// directly if possible.
-pub trait BitsMut: Bits {
+pub trait BitVecMut: BitVec {
     /// Sets the bit at `position` to `value`.
     ///
     /// The default implementation uses `get_block` and `set_block`.
@@ -114,7 +114,7 @@ pub trait BitsMut: Bits {
     ///
     /// Panics if `position` is out of bounds.
     fn set_bit(&mut self, position: u64, value: bool) {
-        assert!(position < self.bit_len(), "BitsMut::set_bit: out of bounds");
+        assert!(position < self.bit_len(), "BitVecMut::set_bit: out of bounds");
 
         let address = Address::new::<Self::Block>(position);
         let old_block = self.get_block(address.block_index);
@@ -159,7 +159,7 @@ pub trait BitsMut: Bits {
     /// Panics if the bit span goes out of bounds.
     fn set_bits(&mut self, start: u64, count: usize, value: Self::Block) {
         let limit = start + count as u64;
-        assert!(limit <= self.bit_len(), "BitsMut::set_bits: out of bounds");
+        assert!(limit <= self.bit_len(), "BitVecMut::set_bits: out of bounds");
 
         let address = Address::new::<Self::Block>(start);
         let margin = Self::Block::nbits() - address.bit_offset;
@@ -188,7 +188,7 @@ pub trait BitsMut: Bits {
 }
 
 /// Interface for full bit vector operations.
-pub trait BitVector: BitsMut {
+pub trait BitVecPush: BitVecMut {
     /// Adds the given bit to the end of the bit vector.
     fn push_bit(&mut self, value: bool);
 
@@ -220,7 +220,7 @@ pub trait BitVector: BitsMut {
     }
 }
 
-impl<Block: BlockType> Bits for [Block] {
+impl<Block: BlockType> BitVec for [Block] {
     type Block = Block;
 
     #[inline]
@@ -239,14 +239,14 @@ impl<Block: BlockType> Bits for [Block] {
     }
 }
 
-impl<Block: BlockType> BitsMut for [Block] {
+impl<Block: BlockType> BitVecMut for [Block] {
     #[inline]
     fn set_block(&mut self, position: usize, value: Block) {
         self[position] = value;
     }
 }
 
-impl<'a, Block: BlockType> Bits for &'a [Block] {
+impl<'a, Block: BlockType> BitVec for &'a [Block] {
     type Block = Block;
 
     #[inline]
@@ -265,7 +265,7 @@ impl<'a, Block: BlockType> Bits for &'a [Block] {
     }
 }
 
-impl<'a, Block: BlockType> Bits for &'a mut [Block] {
+impl<'a, Block: BlockType> BitVec for &'a mut [Block] {
     type Block = Block;
 
     #[inline]
@@ -284,14 +284,14 @@ impl<'a, Block: BlockType> Bits for &'a mut [Block] {
     }
 }
 
-impl<'a, Block: BlockType> BitsMut for &'a mut [Block] {
+impl<'a, Block: BlockType> BitVecMut for &'a mut [Block] {
     #[inline]
     fn set_block(&mut self, position: usize, value: Block) {
         self[position] = value;
     }
 }
 
-impl<Block: BlockType> Bits for Vec<Block> {
+impl<Block: BlockType> BitVec for Vec<Block> {
     type Block = Block;
 
     #[inline]
@@ -310,14 +310,14 @@ impl<Block: BlockType> Bits for Vec<Block> {
     }
 }
 
-impl<Block: BlockType> BitsMut for Vec<Block> {
+impl<Block: BlockType> BitVecMut for Vec<Block> {
     #[inline]
     fn set_block(&mut self, position: usize, value: Block) {
         self[position] = value;
     }
 }
 
-impl Bits for Vec<bool> {
+impl BitVec for Vec<bool> {
     type Block = u8; // This is bogus
 
     #[inline]
@@ -330,7 +330,7 @@ impl Bits for Vec<bool> {
     }
 }
 
-impl BitsMut for Vec<bool> {
+impl BitVecMut for Vec<bool> {
     fn set_bit(&mut self, position: u64, value: bool) {
         let position = position.to_usize()
                                .expect("Vec<bool>::set_bit: overflow");
@@ -338,7 +338,7 @@ impl BitsMut for Vec<bool> {
     }
 }
 
-impl BitVector for Vec<bool> {
+impl BitVecPush for Vec<bool> {
     fn push_bit(&mut self, value: bool) {
         self.push(value);
     }

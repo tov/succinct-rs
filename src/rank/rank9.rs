@@ -1,6 +1,6 @@
 use num::ToPrimitive;
 
-use bit_vector::Bits;
+use bit_vec::BitVec;
 use rank::{RankSupport, BitRankSupport};
 use space_usage::SpaceUsage;
 use storage::BlockType;
@@ -47,7 +47,7 @@ impl Level2 {
     }
 }
 
-impl<Store: Bits<Block = u64>> Rank9<Store> {
+impl<Store: BitVec<Block = u64>> Rank9<Store> {
     /// Creates a new rank9 structure.
     pub fn new(bits: Store) -> Self {
         let bb_count = bits.block_len().ceil_div(8);
@@ -105,7 +105,7 @@ impl<Store: Bits<Block = u64>> Rank9<Store> {
     }
 }
 
-impl<Store: Bits<Block = u64>> BitRankSupport for Rank9<Store> {
+impl<Store: BitVec<Block = u64>> BitRankSupport for Rank9<Store> {
     fn rank1(&self, position: u64) -> u64 {
         let bb_index = (position / 512).to_usize()
                                        .expect("Rank9::rank1: index overflow");
@@ -125,7 +125,7 @@ impl<Store: Bits<Block = u64>> BitRankSupport for Rank9<Store> {
     }
 }
 
-impl<Store: Bits<Block = u64>> RankSupport for Rank9<Store> {
+impl<Store: BitVec<Block = u64>> RankSupport for Rank9<Store> {
     type Over = bool;
 
     fn rank(&self, position: u64, value: bool) -> u64 {
@@ -137,8 +137,8 @@ impl<Store: Bits<Block = u64>> RankSupport for Rank9<Store> {
     }
 }
 
-impl<Store: Bits<Block = u64>> Bits for Rank9<Store> {
-    impl_bits_adapter!(u64, bit_store);
+impl<Store: BitVec<Block = u64>> BitVec for Rank9<Store> {
+    impl_bit_vec_adapter!(u64, bit_store);
 }
 
 impl_stack_only_space_usage!(Rank9Cell);

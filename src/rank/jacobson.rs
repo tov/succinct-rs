@@ -1,24 +1,24 @@
 use num::PrimInt;
 
-use bit_vector::Bits;
-use int_vector::{IntVector, IntVec};
+use bit_vec::BitVec;
+use int_vec::{IntVec, IntVector};
 use space_usage::SpaceUsage;
 use storage::{Address, BlockType};
 
 use super::{RankSupport, BitRankSupport};
 
-/// Add-on to `Bits` to support fast rank queries.
+/// Add-on to `BitVec` to support fast rank queries.
 ///
 /// Construct with `JacobsonRank::new`.
 #[derive(Clone, Debug)]
 pub struct JacobsonRank<Store> {
     bit_store: Store,
     large_block_size: usize,
-    large_block_ranks: IntVec<u64>,
-    small_block_ranks: IntVec<u64>,
+    large_block_ranks: IntVector<u64>,
+    small_block_ranks: IntVector<u64>,
 }
 
-impl<Store: Bits> JacobsonRank<Store> {
+impl<Store: BitVec> JacobsonRank<Store> {
     /// Creates a new rank support structure for the given bit vector.
     pub fn new(bits: Store) -> Self {
         let n = bits.bit_len();
@@ -35,9 +35,9 @@ impl<Store: Bits> JacobsonRank<Store> {
         let small_meta_size   = (large_block_size + 1).ceil_lg();
 
         let mut large_block_ranks =
-            IntVec::with_capacity(large_meta_size, large_block_count);
+            IntVector::with_capacity(large_meta_size, large_block_count);
         let mut small_block_ranks =
-            IntVec::with_capacity(small_meta_size, small_block_count);
+            IntVector::with_capacity(small_meta_size, small_block_count);
 
         let mut current_rank: u64 = 0;
         let mut last_large_rank: u64 = 0;
@@ -83,7 +83,7 @@ impl<Store: Bits> JacobsonRank<Store> {
     }
 }
 
-impl<Store: Bits> RankSupport for JacobsonRank<Store> {
+impl<Store: BitVec> RankSupport for JacobsonRank<Store> {
     type Over = bool;
 
     fn rank(&self, position: u64, value: bool) -> u64 {
@@ -95,7 +95,7 @@ impl<Store: Bits> RankSupport for JacobsonRank<Store> {
     }
 }
 
-impl<Store: Bits> BitRankSupport for JacobsonRank<Store> {
+impl<Store: BitVec> BitRankSupport for JacobsonRank<Store> {
     fn rank1(&self, position: u64) -> u64 {
         assert!(position < self.bit_len(),
                 "JacobsonRank::rank1: out of bounds");
@@ -112,8 +112,8 @@ impl<Store: Bits> BitRankSupport for JacobsonRank<Store> {
     }
 }
 
-impl<Store: Bits> Bits for JacobsonRank<Store> {
-    impl_bits_adapter!(Store::Block, bit_store);
+impl<Store: BitVec> BitVec for JacobsonRank<Store> {
+    impl_bit_vec_adapter!(Store::Block, bit_store);
 }
 
 impl<Store: SpaceUsage> SpaceUsage for JacobsonRank<Store> {

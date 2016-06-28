@@ -3,11 +3,11 @@
 #[cfg(target_pointer_width = "32")]
 use num::ToPrimitive;
 
-use bit_vector::{Bits, BitsMut};
+use bit_vec::{BitVec, BitVecMut};
 use space_usage::SpaceUsage;
 use storage::BlockType;
 
-/// VectorBase provides basic functionality for IntVec and BitVec. It
+/// VectorBase provides basic functionality for IntVector and BitVector. It
 /// doesn’t know its element size, but it does know (once provided its
 /// element size) how to maintain the invariants:
 ///

@@ -30,9 +30,9 @@ macro_rules! impl_stack_only_space_usage {
     };
 }
 
-/// Implements `Bits` for a type that contains a `Bits` field.
+/// Implements `BitVec` for a type that contains a `BitVec` field.
 #[macro_export]
-macro_rules! impl_bits_adapter {
+macro_rules! impl_bit_vec_adapter {
     ( $block:ty, $field:ident )
         =>
     {
@@ -91,10 +91,10 @@ macro_rules! impl_bit_rank_support_adapter {
     }
 }
 
-/// Implements `SelectSupport1` for a type that contains a `SelectSupport1`
+/// Implements `Select1Support` for a type that contains a `Select1Support`
 /// field.
 #[macro_export]
-macro_rules! impl_select_support1_adapter {
+macro_rules! impl_select1_support_adapter {
     ( $field:ident )
         =>
     {
@@ -104,10 +104,10 @@ macro_rules! impl_select_support1_adapter {
     }
 }
 
-/// Implements `SelectSupport0` for a type that contains a `SelectSupport0`
+/// Implements `Select0Support` for a type that contains a `Select0Support`
 /// field.
 #[macro_export]
-macro_rules! impl_select_support0_adapter {
+macro_rules! impl_select0_support_adapter {
     ( $field:ident )
         =>
     {
