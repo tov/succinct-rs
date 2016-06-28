@@ -1,7 +1,7 @@
 //! Broadword operations treating `u64` as a parallel vector.
 //!
 //! From [Sebastiano Vigna, “Broadword Implementation of
-//! Rank/Select Queries”](http://sux.di.unimi.it/paper.pdf). Changes from
+//! Rank/Select Queries.”](http://sux.di.unimi.it/paper.pdf) Changes from
 //! that work:
 //!
 //!   - It uses a 17-digit (68-bit) constant “0x0F0F0F0F0F0F0F0F0.” I believe
