@@ -31,7 +31,19 @@ impl<'a, Base: 'a + BitVec> BitSlice<'a, Base> {
         }
     }
 
-    // TODO: slice
+    /// Slices this slice into a subslice.
+    ///
+    /// Unlike `BitSlice::new`, does not create an additional layer of
+    /// indirection.
+    pub fn slice<R: IntoRange<u64>>(&self, range: R) -> Self {
+        let range = range.into_range(0, self.len);
+        assert!(range.end <= self.len, "BitSlice::slice: out of bounds");
+        BitSlice {
+            data: self.data,
+            start: self.start + range.start,
+            len: range.end.saturating_sub(range.start),
+        }
+    }
 }
 
 impl<'a, Base: 'a + BitVecMut> BitSliceMut<'a, Base> {
@@ -46,7 +58,31 @@ impl<'a, Base: 'a + BitVecMut> BitSliceMut<'a, Base> {
         }
     }
 
-    // TODO: slice_mut
+    /// Slices this slice into a mutable subslice.
+    ///
+    /// Unlike `BitSliceMut::new`, does not create an additional layer of
+    /// indirection.
+    pub fn slice_mut<R: IntoRange<u64>>(&mut self, range: R)
+                                        -> BitSliceMut<Base> {
+        let range = range.into_range(0, self.len);
+        assert!(range.end <= self.len, "BitSlice::slice: out of bounds");
+        BitSliceMut {
+            data: self.data,
+            start: self.start + range.start,
+            len: range.end.saturating_sub(range.start),
+        }
+    }
+
+    /// Slices this slice into an immutable subslice.
+    pub fn slice<R: IntoRange<u64>>(&self, range: R) -> BitSlice<Base> {
+        let range = range.into_range(0, self.len);
+        assert!(range.end <= self.len, "BitSlice::slice: out of bounds");
+        BitSlice {
+            data: self.data,
+            start: self.start + range.start,
+            len: range.end.saturating_sub(range.start),
+        }
+    }
 }
 
 impl<'a, Base: 'a + BitVec> BitVec for BitSlice<'a, Base> {
