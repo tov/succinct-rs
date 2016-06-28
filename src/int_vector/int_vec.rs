@@ -27,7 +27,7 @@ impl<Block: BlockType> IntVec<Block> {
     }
 
     fn check_value_random(element_bits: usize, element_value: Block) {
-        assert!(element_value < Block::one() << element_bits,
+        assert!(element_value <= Block::low_mask(element_bits),
                 "IntVec: value to large for element size");
     }
 
@@ -622,5 +622,13 @@ mod test {
         v.pop();
         u.pop();
         assert!( v == u );
+    }
+
+    #[test]
+    fn block_size_elements() {
+        let mut v = IntVec::<u16>::new(16);
+        v.push(0);
+        v.push(65535);
+        assert_eq!(Some(15), v.pop());
     }
 }
