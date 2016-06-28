@@ -347,3 +347,4 @@ impl BitVector for Vec<bool> {
         self.pop()
     }
 }
+

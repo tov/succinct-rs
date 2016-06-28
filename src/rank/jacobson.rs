@@ -11,7 +11,7 @@ use super::{RankSupport, BitRankSupport};
 ///
 /// Construct with `JacobsonRank::new`.
 #[derive(Clone, Debug)]
-pub struct JacobsonRank<Store: Bits> {
+pub struct JacobsonRank<Store> {
     bit_store: Store,
     large_block_size: usize,
     large_block_ranks: IntVec<u64>,
@@ -71,25 +71,15 @@ impl<Store: Bits> JacobsonRank<Store> {
             small_block_ranks: small_block_ranks,
         }
     }
-}
 
-impl<Store: Bits> Bits for JacobsonRank<Store> {
-    type Block = Store::Block;
-
-    fn block_len(&self) -> usize {
-        self.bit_store.block_len()
+    /// Borrows a reference to the underlying bit store.
+    pub fn inner(&self) -> &Store {
+        &self.bit_store
     }
 
-    fn bit_len(&self) -> u64 {
-        self.bit_store.bit_len()
-    }
-
-    fn get_block(&self, index: usize) -> Self::Block {
-        self.bit_store.get_block(index)
-    }
-
-    fn get_bit(&self, index: u64) -> bool {
-        self.bit_store.get_bit(index)
+    /// Returns the underlying bit store.
+    pub fn into_inner(self) -> Store {
+        self.bit_store
     }
 }
 
@@ -122,7 +112,11 @@ impl<Store: Bits> BitRankSupport for JacobsonRank<Store> {
     }
 }
 
-impl<Store: SpaceUsage + Bits> SpaceUsage for JacobsonRank<Store> {
+impl<Store: Bits> Bits for JacobsonRank<Store> {
+    impl_bits_adapter!(Store::Block, bit_store);
+}
+
+impl<Store: SpaceUsage> SpaceUsage for JacobsonRank<Store> {
     #[inline]
     fn is_stack_only() -> bool { false }
 

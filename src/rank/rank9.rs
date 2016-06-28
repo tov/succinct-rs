@@ -7,7 +7,7 @@ use storage::BlockType;
 
 /// Rank support structure from Sebastiano Vigna.
 #[derive(Clone, Debug)]
-pub struct Rank9<Store: Bits<Block = u64>> {
+pub struct Rank9<Store> {
     bit_store: Store,
     counts: Vec<Rank9Cell>,
 }
@@ -93,6 +93,16 @@ impl<Store: Bits<Block = u64>> Rank9<Store> {
             counts: result,
         }
     }
+
+    /// Borrows a reference to the underlying bit store.
+    pub fn inner(&self) -> &Store {
+        &self.bit_store
+    }
+
+    /// Returns the underlying bit store.
+    pub fn into_inner(self) -> Store {
+        self.bit_store
+    }
 }
 
 impl<Store: Bits<Block = u64>> BitRankSupport for Rank9<Store> {
@@ -127,12 +137,14 @@ impl<Store: Bits<Block = u64>> RankSupport for Rank9<Store> {
     }
 }
 
+impl<Store: Bits<Block = u64>> Bits for Rank9<Store> {
+    impl_bits_adapter!(u64, bit_store);
+}
+
 impl_stack_only_space_usage!(Rank9Cell);
 impl_stack_only_space_usage!(Level2);
 
-impl<Store> SpaceUsage for Rank9<Store>
-    where Store: SpaceUsage + Bits<Block = u64>
-{
+impl<Store: SpaceUsage> SpaceUsage for Rank9<Store> {
     fn is_stack_only() -> bool { false }
 
     fn heap_bytes(&self) -> usize {

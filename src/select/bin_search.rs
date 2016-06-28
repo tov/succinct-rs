@@ -31,41 +31,15 @@ impl<Rank: RankSupport> BinSearchSelect<Rank> {
 }
 
 impl<Rank: Bits> Bits for BinSearchSelect<Rank> {
-    type Block = Rank::Block;
-
-    fn block_len(&self) -> usize {
-        self.rank_support.block_len()
-    }
-
-    fn bit_len(&self) -> u64 {
-        self.rank_support.bit_len()
-    }
-
-    fn get_block(&self, index: usize) -> Self::Block {
-        self.rank_support.get_block(index)
-    }
-
-    fn get_bit(&self, index: u64) -> bool {
-        self.rank_support.get_bit(index)
-    }
+    impl_bits_adapter!(Rank::Block, rank_support);
 }
 
 impl<Rank: RankSupport> RankSupport for BinSearchSelect<Rank> {
-    type Over = Rank::Over;
-
-    fn rank(&self, index: u64, value: Self::Over) -> u64 {
-        self.rank_support.rank(index, value)
-    }
-
-    fn limit(&self) -> u64 {
-        self.rank_support.limit()
-    }
+    impl_rank_support_adapter!(Rank::Over, rank_support);
 }
 
 impl<Rank: BitRankSupport> BitRankSupport for BinSearchSelect<Rank> {
-    fn rank1(&self, index: u64) -> u64 {
-        self.rank_support.rank1(index)
-    }
+    impl_bit_rank_support_adapter!(rank_support);
 }
 
 // If we had access to the representation of the rank structure, we

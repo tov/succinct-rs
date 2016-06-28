@@ -39,6 +39,9 @@ extern crate num;
 #[cfg(test)]
 extern crate quickcheck;
 
+#[macro_use]
+mod macros;
+
 mod internal;
 
 pub mod broadword;
