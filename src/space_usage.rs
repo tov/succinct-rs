@@ -69,36 +69,6 @@ pub trait SpaceUsage: Sized {
     fn heap_bytes(&self) -> usize;
 }
 
-/// Implements `SpaceUsage` for a stack-only (`Copy`) type.
-///
-/// # Example
-///
-/// ```
-/// # #[macro_use] extern crate succinct;
-/// use std::mem;
-/// use succinct::SpaceUsage;
-///
-/// # #[allow(dead_code)]
-/// struct Point { x: u32, y: u32 }
-///
-/// impl_stack_only_space_usage!(Point);
-///
-/// fn main() {
-///     let point = Point { x: 0, y: 0 };
-///     assert_eq!(point.total_bytes(), mem::size_of::<Point>());
-/// }
-/// ```
-#[macro_export]
-macro_rules! impl_stack_only_space_usage {
-    ( $t:ty ) =>
-    {
-        impl $crate::SpaceUsage for $t {
-            #[inline] fn is_stack_only() -> bool { true }
-            #[inline] fn heap_bytes(&self) -> usize { 0 }
-        }
-    };
-}
-
 impl_stack_only_space_usage!(());
 impl_stack_only_space_usage!(u8);
 impl_stack_only_space_usage!(u16);

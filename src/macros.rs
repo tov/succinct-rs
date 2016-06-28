@@ -1,5 +1,36 @@
 //! Macros for export.
 
+/// Implements `SpaceUsage` for a stack-only (`Copy`) type.
+///
+/// # Example
+///
+/// ```
+/// # #[macro_use] extern crate succinct;
+/// use std::mem;
+/// use succinct::SpaceUsage;
+///
+/// # #[allow(dead_code)]
+/// struct Point { x: u32, y: u32 }
+///
+/// impl_stack_only_space_usage!(Point);
+///
+/// fn main() {
+///     let point = Point { x: 0, y: 0 };
+///     assert_eq!(point.total_bytes(), mem::size_of::<Point>());
+/// }
+/// ```
+#[macro_export]
+macro_rules! impl_stack_only_space_usage {
+    ( $t:ty ) =>
+    {
+        impl $crate::SpaceUsage for $t {
+            #[inline] fn is_stack_only() -> bool { true }
+            #[inline] fn heap_bytes(&self) -> usize { 0 }
+        }
+    };
+}
+
+/// Implements `Bits` for a type that contains a `Bits` field.
 #[macro_export]
 macro_rules! impl_bits_adapter {
     ( $block:ty, $field:ident )
@@ -25,6 +56,7 @@ macro_rules! impl_bits_adapter {
     }
 }
 
+/// Implements `RankSupport` for a type that contains a `RankSupport` field.
 #[macro_export]
 macro_rules! impl_rank_support_adapter {
     ( $over:ty, $field:ident )
@@ -42,6 +74,8 @@ macro_rules! impl_rank_support_adapter {
     }
 }
 
+/// Implements `BitRankSupport` for a type that contains a `BitRankSupport`
+/// field.
 #[macro_export]
 macro_rules! impl_bit_rank_support_adapter {
     ( $field:ident )
@@ -57,6 +91,8 @@ macro_rules! impl_bit_rank_support_adapter {
     }
 }
 
+/// Implements `SelectSupport1` for a type that contains a `SelectSupport1`
+/// field.
 #[macro_export]
 macro_rules! impl_select_support1_adapter {
     ( $field:ident )
@@ -68,6 +104,8 @@ macro_rules! impl_select_support1_adapter {
     }
 }
 
+/// Implements `SelectSupport0` for a type that contains a `SelectSupport0`
+/// field.
 #[macro_export]
 macro_rules! impl_select_support0_adapter {
     ( $field:ident )
@@ -79,6 +117,8 @@ macro_rules! impl_select_support0_adapter {
     }
 }
 
+/// Implements `SelectSupport` for a type that contains a `SelectSupport`
+/// field.
 #[macro_export]
 macro_rules! impl_select_support_adapter {
     ( $over:ty, $field:ident )

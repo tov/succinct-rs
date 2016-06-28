@@ -49,7 +49,6 @@ pub mod coding;
 pub mod storage;
 pub mod stream;
 
-#[macro_use]
 mod space_usage;
 pub use space_usage::SpaceUsage;
 
@@ -60,8 +59,8 @@ pub mod int_vector;
 pub use int_vector::{IntVector, IntVectorMut, IntVec};
 
 pub mod rank;
-pub use rank::JacobsonRank;
+pub use rank::{BitRankSupport, JacobsonRank, Rank9};
 
 pub mod select;
-pub use select::BinSearchSelect;
+pub use select::{SelectSupport1, BinSearchSelect};
 
