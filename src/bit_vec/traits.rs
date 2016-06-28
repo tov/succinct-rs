@@ -2,7 +2,7 @@ use num::{One, Zero, ToPrimitive};
 
 use storage::{Address, BlockType};
 
-/// Interface for read-only bit vector operations.
+/// Read-only bit vector operations.
 ///
 /// Minimal complete definition is `get_bit` or `get_block`, since each
 /// is defined in terms of the other. Note that `get_block` in terms of
@@ -98,8 +98,7 @@ pub trait BitVec {
     }
 }
 
-/// Interface for mutable bit vector operations that don’t affect the
-/// length.
+/// Mutable bit vector operations that don’t affect the length.
 ///
 /// Minimal complete definition is `set_bit` or `set_block`, since each
 /// is defined in terms of the other. Note that `set_block` in terms of
@@ -187,7 +186,7 @@ pub trait BitVecMut: BitVec {
     }
 }
 
-/// Interface for full bit vector operations.
+/// Bit vector operations that change the length.
 pub trait BitVecPush: BitVecMut {
     /// Adds the given bit to the end of the bit vector.
     fn push_bit(&mut self, value: bool);

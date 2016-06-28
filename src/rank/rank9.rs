@@ -5,7 +5,7 @@ use rank::{RankSupport, BitRankSupport};
 use space_usage::SpaceUsage;
 use storage::BlockType;
 
-/// Rank support structure from Sebastiano Vigna.
+/// Vigna’s rank structure for fast rank queries over a `BitVec`.
 #[derive(Clone, Debug)]
 pub struct Rank9<Store> {
     bit_store: Store,

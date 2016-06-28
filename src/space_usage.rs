@@ -2,9 +2,9 @@
 
 use std::mem;
 
-/// Types that know how to compute their space usage.
+/// Computes the space usage of an object.
 ///
-/// We calculate the space usage is split into two portions, the heap
+/// We calculate the space usage as split into two portions, the heap
 /// portion (returned by `heap_bytes` and the stack portion (returned by
 /// `stack_bytes`). The stack portion is the statically-known size for
 /// every object of its type as allocated on the stack; the dynamic

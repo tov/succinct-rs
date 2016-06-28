@@ -6,10 +6,11 @@ use internal::vector_base::{VectorBase, self};
 use space_usage::SpaceUsage;
 use storage::BlockType;
 
-/// A vector of *k*-bit unsigned integers, where *k* is determined at
-/// run time.
+/// Uncompressed vector of *k*-bit unsigned integers.
 ///
-/// `Block` gives the representation type. The element size *k* can
+/// The element width *k* is determined at vector creation time.
+///
+/// `Block` gives the representation type. The element width *k* can
 /// never exceed the number of bits in `Block`.
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct IntVector<Block: BlockType = usize> {

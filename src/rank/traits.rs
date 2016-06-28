@@ -1,4 +1,4 @@
-/// Interface for types that support rank queries.
+/// Supports fast rank queries.
 ///
 /// Associated type `Over` gives the type that we can query about. For
 /// example, `RankSupport<Over=bool>` lets us rank `0` and `1`, whereas
@@ -21,7 +21,7 @@ pub trait RankSupport {
     fn limit(&self) -> u64;
 }
 
-/// Convenience trait for `RankSupport` over `bool`.
+/// Supports fast rank queries over `bool`s.
 pub trait BitRankSupport: RankSupport<Over = bool> {
     /// Returns the rank of 1 at the given position.
     ///

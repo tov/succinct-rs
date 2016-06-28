@@ -1,7 +1,6 @@
 use storage::BlockType;
 
-/// Types that can be accessed as immutable arrays of integers of
-/// limited width.
+/// An immutable array of integers of limited width.
 pub trait IntVec {
     /// The type of primitive value to represent elements.
     type Block: BlockType;
@@ -26,8 +25,7 @@ pub trait IntVec {
     fn get(&self, index: u64) -> Self::Block;
 }
 
-/// Types that can be accessed as mutable arrays of integers of limited
-/// width.
+/// A mutable array of integers of limited width.
 pub trait IntVecMut: IntVec {
     /// Updates the value of the `index`th element.
     ///

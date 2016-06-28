@@ -8,7 +8,7 @@ use space_usage::SpaceUsage;
 use storage::BlockType;
 use super::traits::*;
 
-/// A bit vector implementation.
+/// Uncompressed vector of bits.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct BitVector<Block: BlockType = usize>(VectorBase<Block>);
 

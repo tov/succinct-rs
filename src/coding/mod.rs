@@ -1,4 +1,8 @@
-//! Codes used for data compression.
+//! Codes for data compression.
+//!
+//! These universal codes currently know how to encode to a `BitWrite`
+//! and decode from a `BitRead`. However, the code that would use them
+//! to implement compressed vectors and such isn’t written yet.
 
 mod traits;
 pub use self::traits::*;

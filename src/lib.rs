@@ -52,15 +52,15 @@ pub mod stream;
 mod space_usage;
 pub use space_usage::SpaceUsage;
 
-pub mod bit_vector;
-pub use bit_vector::{Bits, BitsMut, BitVector, BitVec};
+pub mod bit_vec;
+pub use bit_vec::{BitVec, BitVecMut, BitVecPush, BitVector};
 
-pub mod int_vector;
-pub use int_vector::{IntVector, IntVectorMut, IntVec};
+pub mod int_vec;
+pub use int_vec::{IntVec, IntVecMut, IntVector};
 
 pub mod rank;
 pub use rank::{BitRankSupport, JacobsonRank, Rank9};
 
 pub mod select;
-pub use select::{SelectSupport1, BinSearchSelect};
+pub use select::{Select1Support, BinSearchSelect};
 

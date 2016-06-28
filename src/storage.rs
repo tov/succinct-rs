@@ -1,4 +1,4 @@
-//! Traits for describing how bits and arrays of bits are stored.
+//! Traits describing how bits and arrays of bits are stored.
 
 use std::fmt;
 use std::io;

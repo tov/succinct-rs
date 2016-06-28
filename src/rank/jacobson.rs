@@ -7,7 +7,7 @@ use storage::{Address, BlockType};
 
 use super::{RankSupport, BitRankSupport};
 
-/// Add-on to `BitVec` to support fast rank queries.
+/// Jacobson’s rank structure for fast rank queries over a `BitVec`.
 ///
 /// Construct with `JacobsonRank::new`.
 #[derive(Clone, Debug)]
