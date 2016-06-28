@@ -282,9 +282,9 @@ impl<Block: BlockType> IntVector<Block> {
         Iter(vector_base::Iter::new(self.element_bits, &self.base))
     }
 
-    /// True if elements are packed one per block.
+    /// True if the element size matches the block size.
     #[inline]
-    pub fn is_packed(&self) -> bool {
+    pub fn is_block_sized(&self) -> bool {
         self.element_bits() == Block::nbits()
     }
 
@@ -303,7 +303,7 @@ impl<Block: BlockType> IntVec for IntVector<Block> {
     }
 
     fn get(&self, element_index: u64) -> Block {
-        if self.is_packed() {
+        if self.is_block_sized() {
             return self.base.get_block(element_index as usize);
         }
 
@@ -318,7 +318,7 @@ impl<Block: BlockType> IntVec for IntVector<Block> {
 
 impl<Block: BlockType> IntVecMut for IntVector<Block> {
     fn set(&mut self, element_index: u64, element_value: Block) {
-        if self.is_packed() {
+        if self.is_block_sized() {
             self.base.set_block(self.element_bits,
                                 element_index as usize,
                                 element_value);
@@ -443,7 +443,7 @@ mod test {
     }
 
     #[test]
-    fn packed() {
+    fn block_sized() {
         let mut v = IntVector::<u32>::with_fill(32, 10, 0);
         assert_eq!(10, v.len());
 
@@ -466,7 +466,7 @@ mod test {
 
     #[test]
     #[should_panic]
-    fn packed_oob() {
+    fn block_sized_oob() {
         let v = IntVector::<u32>::with_fill(32, 10, 0);
         assert_eq!(0, v.get(10));
     }
