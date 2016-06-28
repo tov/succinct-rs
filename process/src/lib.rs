@@ -1,6 +1,6 @@
 //! Succinct data structures for Rust.
 //!
-//! This library is a very early work in progress. So far we have:
+//! This library is an early work in progress. So far we have:
 //!
 //!   - [integer vectors](int_vector/struct.IntVec.html) with arbitrary-sized
 //!     (1- to 64-bit) elements;

@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE-MIT)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache_2.0-blue.svg)](LICENSE-APACHE)
 
-This library is a very early work in progress. So far we have:
+This library is an early work in progress. So far we have:
 
   - integer vectors with arbitrary-sized (1- to 64-bit) elements;
   - bit vectors and bit buffers,
