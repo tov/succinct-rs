@@ -625,10 +625,22 @@ mod test {
     }
 
     #[test]
-    fn block_size_elements() {
+    fn block_size_elements_u16() {
         let mut v = IntVec::<u16>::new(16);
         v.push(0);
-        v.push(65535);
-        assert_eq!(Some(15), v.pop());
+        v.push(!0);
+        assert_eq!(Some(!0), v.pop());
+        assert_eq!(Some(0), v.pop());
+        assert_eq!(None, v.pop());
+    }
+
+    #[test]
+    fn block_size_elements_u64() {
+        let mut v = IntVec::<u64>::new(64);
+        v.push(0);
+        v.push(!0);
+        assert_eq!(Some(!0), v.pop());
+        assert_eq!(Some(0), v.pop());
+        assert_eq!(None, v.pop());
     }
 }
