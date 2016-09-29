@@ -72,9 +72,9 @@ impl<Rank: RankSupport> SelectSupport for BinSearchSelect<Rank> {
     }
 }
 
-impl<Rank: BitRankSupport> SpaceUsage for BinSearchSelect<Rank> {
-    fn is_stack_only() -> bool { true }
-    fn heap_bytes(&self) -> usize { 0 }
+impl<Rank: SpaceUsage> SpaceUsage for BinSearchSelect<Rank> {
+    fn is_stack_only() -> bool { Rank::is_stack_only() }
+    fn heap_bytes(&self) -> usize { self.rank_support.heap_bytes() }
 }
 
 #[cfg(test)]
