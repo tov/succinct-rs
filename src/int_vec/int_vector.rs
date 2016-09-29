@@ -586,8 +586,6 @@ mod test {
 
     #[test]
     fn bit_vec() {
-        use storage::*;
-
         let mut v = IntVector::<u32>::new(1);
         v.push(1);
         v.push(0);
