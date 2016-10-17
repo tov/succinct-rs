@@ -12,40 +12,52 @@ pub trait BitRead {
     fn read_bit(&mut self) -> Result<Option<bool>>;
 
     /// Reads `nbits` bits as an integer, least-significant bit first.
-    fn read_int<N: PrimInt>(&mut self, nbits: usize) -> Result<N> {
+    fn read_int<N: PrimInt>(&mut self, nbits: usize) -> Result<Option<N>> {
         let mut result = N::zero();
         let mut mask = N::one();
+        let mut consumed = false;
 
         for _ in 0 .. nbits {
             if let Some(bit) = try!(self.read_bit()) {
+                consumed = true;
                 if bit {
                     result = result | mask;
                 }
                 mask = mask << 1;
             } else {
-                return out_of_bits("BitRead::read_int");
+                if consumed {
+                    return out_of_bits("BitRead::read_int");
+                } else {
+                    return Ok(None);
+                }
             }
         }
 
-        Ok(result)
+        Ok(Some(result))
     }
 
     /// Reads `nbits` bits as an integer, most-significant bit first.
-    fn read_int_be<N: PrimInt>(&mut self, nbits: usize) -> Result<N> {
+    fn read_int_be<N: PrimInt>(&mut self, nbits: usize) -> Result<Option<N>> {
         let mut result = N::zero();
+        let mut consumed = false;
 
         for _ in 0 .. nbits {
             if let Some(bit) = try!(self.read_bit()) {
+                consumed = true;
                 result = result << 1;
                 if bit {
                     result = result | N::one()
                 }
             } else {
-                return out_of_bits("BitRead::read_int");
+                if consumed {
+                    return out_of_bits("BitRead::read_int");
+                } else {
+                    return Ok(None)
+                }
             }
         }
 
-        Ok(result)
+        Ok(Some(result))
     }
 }
 
@@ -133,28 +145,28 @@ mod test {
         let mut vd = VecDeque::new();
 
         vd.write_bit(false).unwrap();
-        assert_eq!(Some(0), vd.read_int(1).ok());
+        assert_eq!(Some(Some(0)), vd.read_int(1).ok());
 
         vd.write_bit(true).unwrap();
-        assert_eq!(Some(1), vd.read_int(1).ok());
+        assert_eq!(Some(Some(1)), vd.read_int(1).ok());
 
         vd.write_bit(true).unwrap();
         vd.write_bit(false).unwrap();
-        assert_eq!(Some(1), vd.read_int(2).ok());
+        assert_eq!(Some(Some(1)), vd.read_int(2).ok());
 
         vd.write_bit(false).unwrap();
         vd.write_bit(true).unwrap();
-        assert_eq!(Some(2), vd.read_int(2).ok());
+        assert_eq!(Some(Some(2)), vd.read_int(2).ok());
 
         vd.write_bit(true).unwrap();
         vd.write_bit(true).unwrap();
-        assert_eq!(Some(3), vd.read_int(2).ok());
+        assert_eq!(Some(Some(3)), vd.read_int(2).ok());
 
         vd.write_bit(true).unwrap();
         vd.write_bit(true).unwrap();
         vd.write_bit(false).unwrap();
         vd.write_bit(false).unwrap();
-        assert_eq!(Some(3), vd.read_int(4).ok());
+        assert_eq!(Some(Some(3)), vd.read_int(4).ok());
     }
 
     #[test]
@@ -162,28 +174,28 @@ mod test {
         let mut vd = VecDeque::new();
 
         vd.write_bit(false).unwrap();
-        assert_eq!(Some(0), vd.read_int_be(1).ok());
+        assert_eq!(Some(Some(0)), vd.read_int_be(1).ok());
 
         vd.write_bit(true).unwrap();
-        assert_eq!(Some(1), vd.read_int_be(1).ok());
+        assert_eq!(Some(Some(1)), vd.read_int_be(1).ok());
 
         vd.write_bit(true).unwrap();
         vd.write_bit(false).unwrap();
-        assert_eq!(Some(2), vd.read_int_be(2).ok());
+        assert_eq!(Some(Some(2)), vd.read_int_be(2).ok());
 
         vd.write_bit(false).unwrap();
         vd.write_bit(true).unwrap();
-        assert_eq!(Some(1), vd.read_int_be(2).ok());
+        assert_eq!(Some(Some(1)), vd.read_int_be(2).ok());
 
         vd.write_bit(true).unwrap();
         vd.write_bit(true).unwrap();
-        assert_eq!(Some(3), vd.read_int_be(2).ok());
+        assert_eq!(Some(Some(3)), vd.read_int_be(2).ok());
 
         vd.write_bit(true).unwrap();
         vd.write_bit(true).unwrap();
         vd.write_bit(false).unwrap();
         vd.write_bit(false).unwrap();
-        assert_eq!(Some(12), vd.read_int_be(4).ok());
+        assert_eq!(Some(Some(12)), vd.read_int_be(4).ok());
     }
 
     #[test]
@@ -198,13 +210,13 @@ mod test {
         vd.write_int(4, 0).unwrap();
         vd.write_int(4, 6).unwrap();
 
-        assert_eq!(Some(6), vd.read_int(5).ok());
-        assert_eq!(Some(7), vd.read_int(5).ok());
-        assert_eq!(Some(2), vd.read_int(5).ok());
-        assert_eq!(Some(3), vd.read_int(4).ok());
-        assert_eq!(Some(1), vd.read_int(4).ok());
-        assert_eq!(Some(0), vd.read_int(4).ok());
-        assert_eq!(Some(6), vd.read_int(4).ok());
+        assert_eq!(Some(Some(6)), vd.read_int(5).ok());
+        assert_eq!(Some(Some(7)), vd.read_int(5).ok());
+        assert_eq!(Some(Some(2)), vd.read_int(5).ok());
+        assert_eq!(Some(Some(3)), vd.read_int(4).ok());
+        assert_eq!(Some(Some(1)), vd.read_int(4).ok());
+        assert_eq!(Some(Some(0)), vd.read_int(4).ok());
+        assert_eq!(Some(Some(6)), vd.read_int(4).ok());
     }
 
     #[test]
@@ -219,12 +231,12 @@ mod test {
         vd.write_int_be(4, 0).unwrap();
         vd.write_int_be(4, 6).unwrap();
 
-        assert_eq!(Some(6), vd.read_int_be(5).ok());
-        assert_eq!(Some(7), vd.read_int_be(5).ok());
-        assert_eq!(Some(2), vd.read_int_be(5).ok());
-        assert_eq!(Some(3), vd.read_int_be(4).ok());
-        assert_eq!(Some(1), vd.read_int_be(4).ok());
-        assert_eq!(Some(0), vd.read_int_be(4).ok());
-        assert_eq!(Some(6), vd.read_int_be(4).ok());
+        assert_eq!(Some(Some(6)), vd.read_int_be(5).ok());
+        assert_eq!(Some(Some(7)), vd.read_int_be(5).ok());
+        assert_eq!(Some(Some(2)), vd.read_int_be(5).ok());
+        assert_eq!(Some(Some(3)), vd.read_int_be(4).ok());
+        assert_eq!(Some(Some(1)), vd.read_int_be(4).ok());
+        assert_eq!(Some(Some(0)), vd.read_int_be(4).ok());
+        assert_eq!(Some(Some(6)), vd.read_int_be(4).ok());
     }
 }

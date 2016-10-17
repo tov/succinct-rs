@@ -42,8 +42,12 @@ impl<Header: UniversalCode> UniversalCode for Elias<Header> {
                 return too_many_bits("Elias::decode");
             }
 
-            let low_bits: u64 = try!(source.read_int(nbits as usize));
-            Ok(Some(low_bits | (1 << nbits)))
+            if let Some(low_bits) = try!(source.read_int::<u64>(nbits as usize))
+            {
+                Ok(Some(low_bits | (1 << nbits)))
+            } else {
+                out_of_bits("Elias::decode")
+            }
         } else {
             Ok(None)
         }
@@ -75,8 +79,12 @@ impl UniversalCode for Omega {
             if let Some(bit) = try!(source.read_bit()) {
                 if !bit { return Ok(Some(result)); }
 
-                let next: u64 = try!(source.read_int_be(result as usize));
-                result = next | (1 << result as u32)
+                if let Some(next) =
+                       try!(source.read_int_be::<u64>(result as usize)) {
+                    result = next | (1 << result as u32)
+                } else {
+                    return out_of_bits("Omega::decode");
+                }
             } else if result == 1 {
                 return Ok(None);
             } else {
