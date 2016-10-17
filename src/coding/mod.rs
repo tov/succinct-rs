@@ -24,14 +24,15 @@ mod properties {
     use std::collections::VecDeque;
     use super::*;
 
-    pub fn code_decode<Code: UniversalCode>(vec: Vec<u64>) -> bool {
+    pub fn code_decode<Code: UniversalCode>(code: &Code, vec: Vec<u64>)
+                                            -> bool {
         let mut dv = VecDeque::<bool>::new();
         for &i in &vec {
-            Code::encode(&mut dv, i + 1).unwrap();
+            code.encode(&mut dv, i + 1).unwrap();
         }
 
         let mut vec2 = Vec::<u64>::new();
-        while let Ok(Some(i)) = Code::decode(&mut dv) {
+        while let Ok(Some(i)) = code.decode(&mut dv) {
             vec2.push(i - 1)
         }
 

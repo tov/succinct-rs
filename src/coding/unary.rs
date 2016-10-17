@@ -6,7 +6,7 @@ use stream::*;
 pub struct Unary;
 
 impl UniversalCode for Unary {
-    fn encode<W: BitWrite>(sink: &mut W, mut value: u64) -> Result<()> {
+    fn encode<W: BitWrite>(&self, sink: &mut W, mut value: u64) -> Result<()> {
         while value > 0 {
             try!(sink.write_bit(false));
             value = value - 1;
@@ -17,7 +17,7 @@ impl UniversalCode for Unary {
         Ok(())
     }
 
-    fn decode<R: BitRead>(source: &mut R) -> Result<Option<u64>> {
+    fn decode<R: BitRead>(&self, source: &mut R) -> Result<Option<u64>> {
         let mut result = 0;
         let mut consumed = false;
 
@@ -46,13 +46,13 @@ mod test {
     fn test234() {
         let mut dv = VecDeque::<bool>::new();
 
-        Unary::encode(&mut dv, 2).unwrap();
-        Unary::encode(&mut dv, 3).unwrap();
-        Unary::encode(&mut dv, 4).unwrap();
+        Unary.encode(&mut dv, 2).unwrap();
+        Unary.encode(&mut dv, 3).unwrap();
+        Unary.encode(&mut dv, 4).unwrap();
 
-        assert_eq!(Some(2), Unary::decode(&mut dv).unwrap());
-        assert_eq!(Some(3), Unary::decode(&mut dv).unwrap());
-        assert_eq!(Some(4), Unary::decode(&mut dv).unwrap());
-        assert_eq!(None, Unary::decode(&mut dv).unwrap());
+        assert_eq!(Some(2), Unary.decode(&mut dv).unwrap());
+        assert_eq!(Some(3), Unary.decode(&mut dv).unwrap());
+        assert_eq!(Some(4), Unary.decode(&mut dv).unwrap());
+        assert_eq!(None, Unary.decode(&mut dv).unwrap());
     }
 }

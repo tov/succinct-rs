@@ -37,7 +37,7 @@ impl Fib {
 }
 
 impl UniversalCode for Fibonacci {
-    fn encode<W: BitWrite>(sink: &mut W, mut value: u64) -> Result<()> {
+    fn encode<W: BitWrite>(&self, sink: &mut W, mut value: u64) -> Result<()> {
         assert!(value != 0, "Fibonacci codes cannot handle 0.");
         let mut fib = Fib::new();
 
@@ -68,7 +68,7 @@ impl UniversalCode for Fibonacci {
         Ok(())
     }
 
-    fn decode<R: BitRead>(source: &mut R) -> Result<Option<u64>> {
+    fn decode<R: BitRead>(&self, source: &mut R) -> Result<Option<u64>> {
         let mut result  = 0;
         let mut fib = Fib::new();
         let mut previous = false;
@@ -105,19 +105,22 @@ mod test {
     fn enc234() {
         let mut dv = VecDeque::<bool>::new();
 
-        Fibonacci::encode(&mut dv, 2).unwrap();
-        Fibonacci::encode(&mut dv, 3).unwrap();
-        Fibonacci::encode(&mut dv, 4).unwrap();
+        Fibonacci.encode(&mut dv, 2).unwrap();
+        Fibonacci.encode(&mut dv, 3).unwrap();
+        Fibonacci.encode(&mut dv, 4).unwrap();
 
-        assert_eq!(Some(2), Fibonacci::decode(&mut dv).unwrap());
-        assert_eq!(Some(3), Fibonacci::decode(&mut dv).unwrap());
-        assert_eq!(Some(4), Fibonacci::decode(&mut dv).unwrap());
-        assert_eq!(None::<u64>, Fibonacci::decode(&mut dv).unwrap());
+        assert_eq!(Some(2), Fibonacci.decode(&mut dv).unwrap());
+        assert_eq!(Some(3), Fibonacci.decode(&mut dv).unwrap());
+        assert_eq!(Some(4), Fibonacci.decode(&mut dv).unwrap());
+        assert_eq!(None::<u64>, Fibonacci.decode(&mut dv).unwrap());
     }
 
     #[test]
     fn qc() {
-        quickcheck(properties::code_decode::<Fibonacci>
-                        as fn(Vec<u64>) -> bool);
+        fn prop(v: Vec<u64>) -> bool {
+            properties::code_decode(&Fibonacci, v)
+        }
+
+        quickcheck(prop as fn(Vec<u64>) -> bool);
     }
 }

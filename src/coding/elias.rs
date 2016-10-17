@@ -1,5 +1,3 @@
-use std::marker::PhantomData;
-
 use super::*;
 use internal::errors::*;
 use stream::*;
@@ -10,13 +8,19 @@ use stream::*;
 ///
 /// An Elias code first encodes the size of the number using some other
 /// code—this is the `Header` parameter.
-pub struct Elias<Header: UniversalCode>(PhantomData<Header>);
+pub struct Elias<Header: UniversalCode>(pub Header);
 
 /// An Elias gamma code encodes the header in unary.
 pub type Gamma = Elias<Unary>;
 
+/// An instance of `Gamma`.
+pub const GAMMA : Gamma = Elias(Unary);
+
 /// An Elias delta code encodes the header using the Elias gamma code.
 pub type Delta = Elias<Lift0<Gamma>>;
+
+/// An instance of `Delta`.
+pub const DELTA : Delta = Elias(Lift0(GAMMA));
 
 /// An Elias omega code iterates the Elias encoding.
 pub struct Omega;
@@ -24,16 +28,16 @@ pub struct Omega;
 const WORD_BITS: u32 = 64;
 
 impl<Header: UniversalCode> UniversalCode for Elias<Header> {
-    fn encode<W: BitWrite>(sink: &mut W, value: u64) -> Result<()> {
+    fn encode<W: BitWrite>(&self, sink: &mut W, value: u64) -> Result<()> {
         assert!(value != 0, "Elias codes do not handle 0");
 
         let nbits: u32 = WORD_BITS - 1 - value.leading_zeros();
-        try!(Header::encode(sink, nbits as u64));
+        try!(self.0.encode(sink, nbits as u64));
         sink.write_int(nbits as usize, value)
     }
 
-    fn decode<R: BitRead>(source: &mut R) -> Result<Option<u64>> {
-        if let Some(nbits) = try!(Header::decode(source)) {
+    fn decode<R: BitRead>(&self, source: &mut R) -> Result<Option<u64>> {
+        if let Some(nbits) = try!(self.0.decode(source)) {
             if nbits > WORD_BITS as u64 - 1 {
                 return too_many_bits("Elias::decode");
             }
@@ -47,7 +51,7 @@ impl<Header: UniversalCode> UniversalCode for Elias<Header> {
 }
 
 impl UniversalCode for Omega {
-    fn encode<W: BitWrite>(sink: &mut W, mut value: u64) -> Result<()> {
+    fn encode<W: BitWrite>(&self, sink: &mut W, mut value: u64) -> Result<()> {
         let mut stack = Vec::<(usize, u64)>::new();
 
         while value > 1 {
@@ -64,7 +68,7 @@ impl UniversalCode for Omega {
         Ok(())
     }
 
-    fn decode<R: BitRead>(source: &mut R) -> Result<Option<u64>> {
+    fn decode<R: BitRead>(&self, source: &mut R) -> Result<Option<u64>> {
         let mut result: u64 = 1;
 
         loop {
@@ -93,60 +97,72 @@ mod test {
     fn gamma() {
         let mut dv = VecDeque::<bool>::new();
 
-        Gamma::encode(&mut dv, 2).unwrap();
-        Gamma::encode(&mut dv, 3).unwrap();
-        Gamma::encode(&mut dv, 4).unwrap();
+        GAMMA.encode(&mut dv, 2).unwrap();
+        GAMMA.encode(&mut dv, 3).unwrap();
+        GAMMA.encode(&mut dv, 4).unwrap();
 
-        assert_eq!(Some(2), Gamma::decode(&mut dv).unwrap());
-        assert_eq!(Some(3), Gamma::decode(&mut dv).unwrap());
-        assert_eq!(Some(4), Gamma::decode(&mut dv).unwrap());
-        assert_eq!(None::<u64>, Gamma::decode(&mut dv).unwrap());
+        assert_eq!(Some(2), GAMMA.decode(&mut dv).unwrap());
+        assert_eq!(Some(3), GAMMA.decode(&mut dv).unwrap());
+        assert_eq!(Some(4), GAMMA.decode(&mut dv).unwrap());
+        assert_eq!(None::<u64>, GAMMA.decode(&mut dv).unwrap());
     }
 
     #[test]
     fn delta() {
         let mut dv = VecDeque::<bool>::new();
 
-        Delta::encode(&mut dv, 2).unwrap();
-        Delta::encode(&mut dv, 3).unwrap();
-        Delta::encode(&mut dv, 38932).unwrap();
-        Delta::encode(&mut dv, 4).unwrap();
+        DELTA.encode(&mut dv, 2).unwrap();
+        DELTA.encode(&mut dv, 3).unwrap();
+        DELTA.encode(&mut dv, 38932).unwrap();
+        DELTA.encode(&mut dv, 4).unwrap();
 
-        assert_eq!(Some(2), Delta::decode(&mut dv).unwrap());
-        assert_eq!(Some(3), Delta::decode(&mut dv).unwrap());
-        assert_eq!(Some(38932), Delta::decode(&mut dv).unwrap());
-        assert_eq!(Some(4), Delta::decode(&mut dv).unwrap());
-        assert_eq!(None::<u64>, Delta::decode(&mut dv).unwrap());
+        assert_eq!(Some(2), DELTA.decode(&mut dv).unwrap());
+        assert_eq!(Some(3), DELTA.decode(&mut dv).unwrap());
+        assert_eq!(Some(38932), DELTA.decode(&mut dv).unwrap());
+        assert_eq!(Some(4), DELTA.decode(&mut dv).unwrap());
+        assert_eq!(None::<u64>, DELTA.decode(&mut dv).unwrap());
     }
 
     #[test]
     fn omega() {
         let mut dv = VecDeque::<bool>::new();
 
-        Omega::encode(&mut dv, 2).unwrap();
-        Omega::encode(&mut dv, 3).unwrap();
-        Omega::encode(&mut dv, 38932).unwrap();
-        Omega::encode(&mut dv, 4).unwrap();
+        Omega.encode(&mut dv, 2).unwrap();
+        Omega.encode(&mut dv, 3).unwrap();
+        Omega.encode(&mut dv, 38932).unwrap();
+        Omega.encode(&mut dv, 4).unwrap();
 
-        assert_eq!(Some(2), Omega::decode(&mut dv).unwrap());
-        assert_eq!(Some(3), Omega::decode(&mut dv).unwrap());
-        assert_eq!(Some(38932), Omega::decode(&mut dv).unwrap());
-        assert_eq!(Some(4), Omega::decode(&mut dv).unwrap());
-        assert_eq!(None::<u64>, Omega::decode(&mut dv).unwrap());
+        assert_eq!(Some(2), Omega.decode(&mut dv).unwrap());
+        assert_eq!(Some(3), Omega.decode(&mut dv).unwrap());
+        assert_eq!(Some(38932), Omega.decode(&mut dv).unwrap());
+        assert_eq!(Some(4), Omega.decode(&mut dv).unwrap());
+        assert_eq!(None::<u64>, Omega.decode(&mut dv).unwrap());
     }
 
     #[test]
     fn qc_gamma() {
-        quickcheck(properties::code_decode::<Gamma> as fn(Vec<u64>) -> bool);
+        fn prop_gamma(v: Vec<u64>) -> bool {
+            properties::code_decode(&GAMMA, v)
+        }
+
+        quickcheck(prop_gamma as fn(Vec<u64>) -> bool);
     }
 
     #[test]
     fn qc_delta() {
-        quickcheck(properties::code_decode::<Delta> as fn(Vec<u64>) -> bool);
+        fn prop_delta(v: Vec<u64>) -> bool {
+            properties::code_decode(&DELTA, v)
+        }
+
+        quickcheck(prop_delta as fn(Vec<u64>) -> bool);
     }
 
     #[test]
     fn qc_omega() {
-        quickcheck(properties::code_decode::<Omega> as fn(Vec<u64>) -> bool);
+        fn prop_omega(v: Vec<u64>) -> bool {
+            properties::code_decode(&Omega, v)
+        }
+
+        quickcheck(prop_omega as fn(Vec<u64>) -> bool);
     }
 }
