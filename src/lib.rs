@@ -17,7 +17,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! succinct = "0.4.1"
+//! succinct = "0.4.2"
 //! ```
 //!
 //! to your `Cargo.toml` and
