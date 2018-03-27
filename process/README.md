@@ -5,11 +5,11 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE-MIT)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache_2.0-blue.svg)](LICENSE-APACHE)
 
-This library is an early work in progress. So far we have:
+So far we have:
 
+  - bit vectors and bit buffer;
   - integer vectors with arbitrary-sized (1- to 64-bit) elements;
-  - bit vectors and bit buffers,
-  - a variety of universal codes,
+  - a variety of universal codes;
   - constant-time rank queries; and
   - *O*(lg lg *n*)-time select queries based on binary search over ranks.
 
