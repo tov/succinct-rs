@@ -135,7 +135,6 @@ impl<Inner: BitVecPush> BitWrite for BitBuffer<Inner> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use bit_vec::*;
     use stream::{BitRead, BitWrite};
 
     #[test]

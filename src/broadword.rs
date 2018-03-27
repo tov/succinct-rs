@@ -111,7 +111,6 @@ mod test {
     use quickcheck::{quickcheck, TestResult};
 
     use super::*;
-    use bit_vec::BitVec;
     use select::{BinSearchSelect, Select1Support};
 
     #[test]
