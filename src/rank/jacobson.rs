@@ -1,4 +1,4 @@
-use num::PrimInt;
+use num_traits::PrimInt;
 
 use bit_vec::BitVec;
 use int_vec::{IntVec, IntVector};

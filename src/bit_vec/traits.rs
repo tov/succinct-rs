@@ -1,4 +1,4 @@
-use num::{One, Zero, ToPrimitive};
+use num_traits::{One, Zero, ToPrimitive};
 
 use storage::{Address, BlockType};
 

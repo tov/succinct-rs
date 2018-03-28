@@ -1,4 +1,4 @@
-use num::PrimInt;
+use num_traits::PrimInt;
 
 /// Averages two `PrimInt`s without overflowing.
 pub fn average<P: PrimInt>(x: P, y: P) -> P {

@@ -5,7 +5,7 @@ use std::io;
 use std::mem;
 
 use byteorder::{ByteOrder, ReadBytesExt, WriteBytesExt};
-use num::{One, PrimInt, ToPrimitive};
+use num_traits::{One, PrimInt, ToPrimitive};
 
 use bit_vec::{BitVec, BitVecMut};
 use rank::{BitRankSupport, RankSupport};

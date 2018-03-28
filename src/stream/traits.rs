@@ -2,7 +2,7 @@ use std::io::Result;
 
 use internal::errors::*;
 
-use num::PrimInt;
+use num_traits::PrimInt;
 
 /// Allows reading bits from a source.
 pub trait BitRead {

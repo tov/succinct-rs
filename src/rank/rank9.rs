@@ -1,4 +1,4 @@
-use num::ToPrimitive;
+use num_traits::ToPrimitive;
 
 use bit_vec::BitVec;
 use rank::{RankSupport, BitRankSupport};

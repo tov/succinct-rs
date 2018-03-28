@@ -34,7 +34,7 @@
 #![cfg_attr(feature = "clippy", plugin(clippy))]
 
 extern crate byteorder;
-extern crate num;
+extern crate num_traits;
 
 #[cfg(test)]
 extern crate quickcheck;
