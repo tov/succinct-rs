@@ -2,7 +2,7 @@ use super::*;
 use internal::errors::*;
 use stream::*;
 
-/// `Comma(n)` encodes in base 2^n - 1, using n bits per digit.
+/// `Comma(n)` encodes in base 2<sup>n</sup> - 1, using n bits per digit.
 pub struct Comma(pub u8);
 
 /// `Comma(2)` encodes in base 3.
