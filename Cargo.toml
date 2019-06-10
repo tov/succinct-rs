@@ -16,4 +16,4 @@ num-traits = "0.2"
 byteorder = "1.2"
 
 [dev-dependencies]
-quickcheck = "0.6.2"
+quickcheck = "0.8.5"
