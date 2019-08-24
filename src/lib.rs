@@ -29,7 +29,6 @@
 //! to your crate root.
 
 #![warn(missing_docs)]
-
 #![cfg_attr(feature = "clippy", feature(plugin))]
 #![cfg_attr(feature = "clippy", plugin(clippy))]
 
@@ -62,5 +61,4 @@ pub mod rank;
 pub use rank::{BitRankSupport, JacobsonRank, Rank9};
 
 pub mod select;
-pub use select::{Select1Support, BinSearchSelect};
-
+pub use select::{BinSearchSelect, Select1Support};

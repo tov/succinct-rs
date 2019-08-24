@@ -2,14 +2,16 @@ use rank::{BitRankSupport, RankSupport};
 use storage::BlockType;
 
 macro_rules! impl_rank_support_prim {
-    ( $t:ident )
-        =>
-    {
+    ( $t:ident ) => {
         impl RankSupport for $t {
             type Over = bool;
 
             fn rank(&self, position: u64, value: bool) -> u64 {
-                if value {self.rank1(position)} else {self.rank0(position)}
+                if value {
+                    self.rank1(position)
+                } else {
+                    self.rank0(position)
+                }
             }
 
             fn limit(&self) -> u64 {
@@ -25,7 +27,7 @@ macro_rules! impl_rank_support_prim {
                 (*self & mask).count_ones() as u64
             }
         }
-    }
+    };
 }
 
 impl_rank_support_prim!(u8);

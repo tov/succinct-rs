@@ -1,8 +1,8 @@
 use std::io::{Error, ErrorKind, Result};
 
-use storage::{BlockType};
-use stream::{BitRead, BitWrite};
 use bit_vec::*;
+use storage::BlockType;
+use stream::{BitRead, BitWrite};
 
 /// A bit buffer can be used to read bits from or write bits to an
 /// underlying bit vector.
@@ -53,8 +53,7 @@ impl<Inner: BitVec> BitBuffer<Inner> {
             self.pos = position;
             Ok(())
         } else {
-            Err(Error::new(ErrorKind::NotFound,
-                           "position out of bounds"))
+            Err(Error::new(ErrorKind::NotFound, "position out of bounds"))
         }
     }
 }

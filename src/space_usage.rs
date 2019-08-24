@@ -84,13 +84,21 @@ impl_stack_only_space_usage!(f32);
 impl_stack_only_space_usage!(f64);
 
 impl<'a, T> SpaceUsage for &'a T {
-    fn is_stack_only() -> bool { true }
-    fn heap_bytes(&self) -> usize { 0 }
+    fn is_stack_only() -> bool {
+        true
+    }
+    fn heap_bytes(&self) -> usize {
+        0
+    }
 }
 
 impl<'a, T> SpaceUsage for &'a [T] {
-    fn is_stack_only() -> bool { true }
-    fn heap_bytes(&self) -> usize { 0 }
+    fn is_stack_only() -> bool {
+        true
+    }
+    fn heap_bytes(&self) -> usize {
+        0
+    }
 }
 
 macro_rules! impl_tuple_space_usage {
@@ -126,12 +134,14 @@ impl_tuple_space_usage!(A, B, C, D, E, F, G, H, I, J, K, L);
 
 impl<A: SpaceUsage + ::std::fmt::Debug> SpaceUsage for Vec<A> {
     #[inline]
-    fn is_stack_only() -> bool { false }
+    fn is_stack_only() -> bool {
+        false
+    }
 
     fn heap_bytes(&self) -> usize {
         let mut result = self.capacity() * A::stack_bytes();
 
-        if ! A::is_stack_only() {
+        if !A::is_stack_only() {
             for each in self {
                 result += each.heap_bytes();
             }
@@ -143,7 +153,9 @@ impl<A: SpaceUsage + ::std::fmt::Debug> SpaceUsage for Vec<A> {
 
 impl<A: SpaceUsage> SpaceUsage for Box<A> {
     #[inline]
-    fn is_stack_only() -> bool { false }
+    fn is_stack_only() -> bool {
+        false
+    }
 
     fn stack_bytes() -> usize {
         mem::size_of::<Self>()
@@ -162,12 +174,12 @@ mod test {
 
     #[test]
     fn is_stack_only() {
-        assert!(  u32::is_stack_only());
-        assert!(  isize::is_stack_only());
-        assert!(! Vec::<u64>::is_stack_only());
-        assert!(! Vec::<Vec<u64>>::is_stack_only());
-        assert!(  <(u32, u32, u32)>::is_stack_only());
-        assert!(! <(u32, Vec<u32>, u32)>::is_stack_only());
+        assert!(u32::is_stack_only());
+        assert!(isize::is_stack_only());
+        assert!(!Vec::<u64>::is_stack_only());
+        assert!(!Vec::<Vec<u64>>::is_stack_only());
+        assert!(<(u32, u32, u32)>::is_stack_only());
+        assert!(!<(u32, Vec<u32>, u32)>::is_stack_only());
     }
 
     #[test]
@@ -189,8 +201,7 @@ mod test {
         let v = Vec::<u64>::with_capacity(8);
         assert_eq!(8, v.capacity());
         assert_eq!(64, v.heap_bytes());
-        assert_eq!(64 + size_of::<Vec<u64>>(),
-                   v.total_bytes());
+        assert_eq!(64 + size_of::<Vec<u64>>(), v.total_bytes());
     }
 
     #[test]
@@ -199,8 +210,9 @@ mod test {
         let v2 = Vec::<u64>::with_capacity(8);
         let w = vec![v1, v2];
         assert_eq!(2, w.capacity());
-        assert_eq!(128 + 2 * size_of::<Vec<u64>>() +
-                      size_of::<Vec<Vec<u64>>>(),
-                   w.total_bytes());
+        assert_eq!(
+            128 + 2 * size_of::<Vec<u64>>() + size_of::<Vec<Vec<u64>>>(),
+            w.total_bytes()
+        );
     }
 }

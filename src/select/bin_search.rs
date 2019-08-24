@@ -1,8 +1,8 @@
+use super::{Select0Support, Select1Support, SelectSupport};
+use bit_vec::BitVec;
 use internal::search::binary_search_function;
 use rank::{BitRankSupport, RankSupport};
 use space_usage::SpaceUsage;
-use bit_vec::BitVec;
-use super::{SelectSupport, Select1Support, Select0Support};
 
 /// Performs a select query by binary searching rank queries.
 pub struct BinSearchSelect<Rank> {
@@ -47,17 +47,13 @@ impl<Rank: BitRankSupport> BitRankSupport for BinSearchSelect<Rank> {
 // But then this algorithm would be tied to that representation.
 
 macro_rules! impl_select_support_b {
-    ($select_support:ident, $select:ident, $rank: ident)
-        =>
-    {
-        impl<Rank: BitRankSupport>
-        $select_support for BinSearchSelect<Rank> {
+    ($select_support:ident, $select:ident, $rank: ident) => {
+        impl<Rank: BitRankSupport> $select_support for BinSearchSelect<Rank> {
             fn $select(&self, index: u64) -> Option<u64> {
-                binary_search_function(0, self.limit(), index + 1,
-                                       |i| self.$rank(i))
+                binary_search_function(0, self.limit(), index + 1, |i| self.$rank(i))
             }
         }
-    }
+    };
 }
 
 impl_select_support_b!(Select1Support, select1, rank1);
@@ -67,14 +63,17 @@ impl<Rank: RankSupport> SelectSupport for BinSearchSelect<Rank> {
     type Over = Rank::Over;
 
     fn select(&self, index: u64, value: Rank::Over) -> Option<u64> {
-        binary_search_function(0, self.limit(), index + 1,
-                               |i| self.rank(i, value))
+        binary_search_function(0, self.limit(), index + 1, |i| self.rank(i, value))
     }
 }
 
 impl<Rank: SpaceUsage> SpaceUsage for BinSearchSelect<Rank> {
-    fn is_stack_only() -> bool { Rank::is_stack_only() }
-    fn heap_bytes(&self) -> usize { self.rank_support.heap_bytes() }
+    fn is_stack_only() -> bool {
+        Rank::is_stack_only()
+    }
+    fn heap_bytes(&self) -> usize {
+        self.rank_support.heap_bytes()
+    }
 }
 
 #[cfg(test)]
@@ -84,7 +83,7 @@ mod test {
 
     #[test]
     fn select1() {
-        let vec = vec![ 0b00000000000001110000000000000001u32; 1024 ];
+        let vec = vec![0b00000000000001110000000000000001u32; 1024];
         let rank = JacobsonRank::new(vec);
         let select = BinSearchSelect::new(rank);
 
@@ -116,7 +115,7 @@ mod test {
 
     #[test]
     fn select2() {
-        let vec = vec![ 0b10101010101010101010101010101010u32; 1024 ];
+        let vec = vec![0b10101010101010101010101010101010u32; 1024];
         let rank = JacobsonRank::new(vec);
         let select = BinSearchSelect::new(rank);
 
@@ -129,7 +128,7 @@ mod test {
 
     #[test]
     fn select3() {
-        let vec = vec![ 0b11111111111111111111111111111111u32; 1024 ];
+        let vec = vec![0b11111111111111111111111111111111u32; 1024];
         let rank = JacobsonRank::new(vec);
         let select = BinSearchSelect::new(rank);
 

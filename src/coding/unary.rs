@@ -22,7 +22,9 @@ impl UniversalCode for Unary {
         let mut consumed = false;
 
         while let Some(bit) = try!(source.read_bit()) {
-            if bit { return Ok(Some(result)); }
+            if bit {
+                return Ok(Some(result));
+            }
             // This can't overflow because it would require too many
             // unary digits to get there:
             result = result + 1;
@@ -39,8 +41,8 @@ impl UniversalCode for Unary {
 
 #[cfg(test)]
 mod test {
-    use std::collections::VecDeque;
     use coding::*;
+    use std::collections::VecDeque;
 
     #[test]
     fn test234() {

@@ -21,11 +21,16 @@
 /// ```
 #[macro_export]
 macro_rules! impl_stack_only_space_usage {
-    ( $t:ty ) =>
-    {
+    ( $t:ty ) => {
         impl $crate::SpaceUsage for $t {
-            #[inline] fn is_stack_only() -> bool { true }
-            #[inline] fn heap_bytes(&self) -> usize { 0 }
+            #[inline]
+            fn is_stack_only() -> bool {
+                true
+            }
+            #[inline]
+            fn heap_bytes(&self) -> usize {
+                0
+            }
         }
     };
 }

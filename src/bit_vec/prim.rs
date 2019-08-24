@@ -1,10 +1,8 @@
-use storage::BlockType;
 use bit_vec::traits::*;
+use storage::BlockType;
 
 macro_rules! impl_bits_prim {
-    ( $t:ident )
-        =>
-    {
+    ( $t:ident ) => {
         impl BitVec for $t {
             type Block = $t;
 
@@ -20,8 +18,7 @@ macro_rules! impl_bits_prim {
 
             #[inline]
             fn get_bit(&self, position: u64) -> bool {
-                assert!(position < self.bit_len(),
-                        "prim::get_bit: out of bounds");
+                assert!(position < self.bit_len(), "prim::get_bit: out of bounds");
                 BlockType::get_bit(*self, position as usize)
             }
 
@@ -33,8 +30,10 @@ macro_rules! impl_bits_prim {
 
             #[inline]
             fn get_bits(&self, start: u64, count: usize) -> Self {
-                assert!(start + count as u64 <= Self::nbits() as u64,
-                        "prim::get_bits: out of bounds");
+                assert!(
+                    start + count as u64 <= Self::nbits() as u64,
+                    "prim::get_bits: out of bounds"
+                );
                 BlockType::get_bits(*self, start as usize, count)
             }
         }
@@ -42,8 +41,7 @@ macro_rules! impl_bits_prim {
         impl BitVecMut for $t {
             #[inline]
             fn set_bit(&mut self, position: u64, value: bool) {
-                assert!(position < self.bit_len(),
-                        "prim::set_bit: out of bounds");
+                assert!(position < self.bit_len(), "prim::set_bit: out of bounds");
                 *self = self.with_bit(position as usize, value);
             }
 
@@ -55,12 +53,14 @@ macro_rules! impl_bits_prim {
 
             #[inline]
             fn set_bits(&mut self, start: u64, count: usize, value: Self::Block) {
-                assert!(start + count as u64 <= Self::nbits() as u64,
-                        "prim::set_bits: out of bounds");
+                assert!(
+                    start + count as u64 <= Self::nbits() as u64,
+                    "prim::set_bits: out of bounds"
+                );
                 *self = self.with_bits(start as usize, count, value);
             }
         }
-    }
+    };
 }
 
 impl_bits_prim!(u8);

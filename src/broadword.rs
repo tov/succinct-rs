@@ -38,10 +38,16 @@ impl RankSupport for Broadword {
     type Over = bool;
 
     fn rank(&self, position: u64, value: bool) -> u64 {
-        if value {self.rank1(position)} else {self.rank0(position)}
+        if value {
+            self.rank1(position)
+        } else {
+            self.rank0(position)
+        }
     }
 
-    fn limit(&self) -> u64 { 64 }
+    fn limit(&self) -> u64 {
+        64
+    }
 }
 
 impl Select1Support for Broadword {
@@ -71,7 +77,11 @@ pub fn count_ones(mut x: u64) -> usize {
 /// Uses the broadword algorithm from Vigna.
 pub fn select1(r: usize, x: u64) -> Option<usize> {
     let result = select1_raw(r, x);
-    if result == 72 {None} else {Some(result)}
+    if result == 72 {
+        None
+    } else {
+        Some(result)
+    }
 }
 
 /// Finds the index of the `r`th one bit in `x`, returning 72 when not found.
@@ -82,11 +92,10 @@ pub fn select1_raw(r: usize, x: u64) -> usize {
     let mut s = x - ((x & 0xAAAA_AAAA_AAAA_AAAA) >> 1);
     s = (s & 0x3333_3333_3333_3333) + ((s >> 2) & 0x3333_3333_3333_3333);
     s = ((s + (s >> 4)) & 0x0F0F_0F0F_0F0F_0F0F).wrapping_mul(L8);
-    let b = (le8(s, r.wrapping_mul(L8)) >> 7).wrapping_mul(L8)>> 53 & !7;
+    let b = (le8(s, r.wrapping_mul(L8)) >> 7).wrapping_mul(L8) >> 53 & !7;
     let l = r - ((s << 8).wrapping_shr(b as u32) & 0xFF);
-    s = (u_nz8((x.wrapping_shr(b as u32) & 0xFF)
-                       .wrapping_mul(L8) & 0x8040_2010_0804_0201) >> 7)
-            .wrapping_mul(L8);
+    s = (u_nz8((x.wrapping_shr(b as u32) & 0xFF).wrapping_mul(L8) & 0x8040_2010_0804_0201) >> 7)
+        .wrapping_mul(L8);
     (b + ((le8(s, l.wrapping_mul(L8)) >> 7).wrapping_mul(L8) >> 56)) as usize
 }
 
@@ -107,9 +116,9 @@ pub fn u_nz8(x: u64) -> u64 {
 
 #[cfg(test)]
 mod test {
-    use std::hash::{Hash, Hasher};
-    use std::collections::hash_map::DefaultHasher;
     use quickcheck::{quickcheck, TestResult};
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
 
     use super::*;
     use select::{BinSearchSelect, Select1Support};
@@ -138,7 +147,6 @@ mod test {
     fn count_ones_ffff_ffff_ffff_ffff() {
         assert_eq!(64, count_ones(0xFFFF_FFFF_FFFF_FFFF));
     }
-
 
     fn count_ones_prop(word: u64) -> bool {
         count_ones(word) == word.count_ones() as usize
@@ -194,12 +202,12 @@ mod test {
     }
 
     fn select1_prop(r: u8, x: u64) -> TestResult {
-        if r > 64 { return TestResult::discard(); }
+        if r > 64 {
+            return TestResult::discard();
+        }
 
         let ss = BinSearchSelect::new(x);
-        TestResult::from_bool(
-            select1(r as usize, x).map(|n| n as u64)
-                    == ss.select1(r as u64))
+        TestResult::from_bool(select1(r as usize, x).map(|n| n as u64) == ss.select1(r as u64))
     }
 
     fn select1_prop_hash(r: u8, x: u64) -> TestResult {
@@ -237,67 +245,68 @@ mod test {
 
     #[test]
     fn u_nz8_works() {
-        assert_eq!(b(0, 0, 0, 0, 0, 0, 0, 0),
-             u_nz8(u(0, 0, 0, 0, 0, 0, 0, 0)));
+        assert_eq!(b(0, 0, 0, 0, 0, 0, 0, 0), u_nz8(u(0, 0, 0, 0, 0, 0, 0, 0)));
 
-        assert_eq!(b( 1,  1, 0,   1, 0, 1,  1, 1),
-             u_nz8(u(45, 12, 0, 129, 0, 3, 80, 1)));
+        assert_eq!(
+            b(1, 1, 0, 1, 0, 1, 1, 1),
+            u_nz8(u(45, 12, 0, 129, 0, 3, 80, 1))
+        );
 
-        assert_eq!(b(1, 1, 1, 1, 1, 1, 1, 1),
-             u_nz8(u(1, 2, 3, 4, 5, 6, 7, 8)));
+        assert_eq!(b(1, 1, 1, 1, 1, 1, 1, 1), u_nz8(u(1, 2, 3, 4, 5, 6, 7, 8)));
 
-        assert_eq!(b( 1, 1, 1, 1, 0, 1, 1, 1),
-             u_nz8(0xFF_FF_FF_FF_00_FF_FF_FF));
+        assert_eq!(b(1, 1, 1, 1, 0, 1, 1, 1), u_nz8(0xFF_FF_FF_FF_00_FF_FF_FF));
     }
 
-//    // I don’t understand le8, apparently.
+    //    // I don’t understand le8, apparently.
 
-//    #[test]
-//    fn le8_128_0() {
-//        let n = 128;
-//        let m = 0;
-//        let r = le8(n, m);
-//        let n0 = n.get_bits(0, 8) as u8 as i8;
-//        let m0 = m.get_bits(0, 8) as u8 as i8;
-//        let r0 = r.get_bits(0, 8);
-//        println!("n0: {}, m0: {}, r0: {}", n0, m0, r0);
-//        assert_eq!(n0 <= m0, r0 == 0x80);
-//    }
+    //    #[test]
+    //    fn le8_128_0() {
+    //        let n = 128;
+    //        let m = 0;
+    //        let r = le8(n, m);
+    //        let n0 = n.get_bits(0, 8) as u8 as i8;
+    //        let m0 = m.get_bits(0, 8) as u8 as i8;
+    //        let r0 = r.get_bits(0, 8);
+    //        println!("n0: {}, m0: {}, r0: {}", n0, m0, r0);
+    //        assert_eq!(n0 <= m0, r0 == 0x80);
+    //    }
 
-//    fn le8_prop_hashed((n0, n1, n2, n3): (u64, u64, u64, u64),
-//                       (m0, m1, m2, m3): (u64, u64, u64, u64)) -> bool {
-//        let n = hash(&(n0, n1, n2, n3));
-//        let m = hash(&(m0, m1, m2, m3));
-//        le8_prop(n, m)
-//    }
-//
-//    fn le8_prop(n: u64, m: u64) -> bool {
-//        let r = le8(n, m);
-//        for i in 0..8 {
-//            let ni = n.get_bits(8 * i, 8) as u8 as i8;
-//            let mi = m.get_bits(8 * i, 8) as u8 as i8;
-//            let ri = r.get_bits(8 * i, 8);
-//            if (ni <= mi) != (ri == 0x80) {
-//                return false;
-//            }
-//        }
-//
-//        true
-//    }
-//
-//    #[test]
-//    fn le8_qc() {
-//        quickcheck(le8_prop as fn(u64, u64) -> bool);
-//    }
-//
-//    #[test]
-//    fn le8_qc_hashed() {
-//        quickcheck(le8_prop_hashed as fn((u64, u64, u64, u64),
-//                                         (u64, u64, u64, u64)) -> bool);
-//    }
+    //    fn le8_prop_hashed((n0, n1, n2, n3): (u64, u64, u64, u64),
+    //                       (m0, m1, m2, m3): (u64, u64, u64, u64)) -> bool {
+    //        let n = hash(&(n0, n1, n2, n3));
+    //        let m = hash(&(m0, m1, m2, m3));
+    //        le8_prop(n, m)
+    //    }
+    //
+    //    fn le8_prop(n: u64, m: u64) -> bool {
+    //        let r = le8(n, m);
+    //        for i in 0..8 {
+    //            let ni = n.get_bits(8 * i, 8) as u8 as i8;
+    //            let mi = m.get_bits(8 * i, 8) as u8 as i8;
+    //            let ri = r.get_bits(8 * i, 8);
+    //            if (ni <= mi) != (ri == 0x80) {
+    //                return false;
+    //            }
+    //        }
+    //
+    //        true
+    //    }
+    //
+    //    #[test]
+    //    fn le8_qc() {
+    //        quickcheck(le8_prop as fn(u64, u64) -> bool);
+    //    }
+    //
+    //    #[test]
+    //    fn le8_qc_hashed() {
+    //        quickcheck(le8_prop_hashed as fn((u64, u64, u64, u64),
+    //                                         (u64, u64, u64, u64)) -> bool);
+    //    }
 
-    fn u_le8_prop_hashed((n0, n1, n2, n3): (u64, u64, u64, u64),
-                         (m0, m1, m2, m3): (u64, u64, u64, u64)) -> bool {
+    fn u_le8_prop_hashed(
+        (n0, n1, n2, n3): (u64, u64, u64, u64),
+        (m0, m1, m2, m3): (u64, u64, u64, u64),
+    ) -> bool {
         let n = hash(&(n0, n1, n2, n3));
         let m = hash(&(m0, m1, m2, m3));
         u_le8_prop(n, m)
@@ -324,76 +333,90 @@ mod test {
 
     #[test]
     fn u_le8_qc_hashed() {
-        quickcheck(u_le8_prop_hashed as fn((u64, u64, u64, u64),
-                                           (u64, u64, u64, u64)) -> bool);
+        quickcheck(u_le8_prop_hashed as fn((u64, u64, u64, u64), (u64, u64, u64, u64)) -> bool);
     }
 
     #[test]
     fn le8_works() {
-        assert_eq!(b( 1,  1,  1,  1,  0,  0,  0,  0),
-               le8(i( 0,  0,  0,  0,  0,  0,  0,  0),
-                   i( 3,  2,  1,  0, -1, -2, -3, -4)));
+        assert_eq!(
+            b(1, 1, 1, 1, 0, 0, 0, 0),
+            le8(i(0, 0, 0, 0, 0, 0, 0, 0), i(3, 2, 1, 0, -1, -2, -3, -4))
+        );
 
-        assert_eq!(b( 0,  0,  0,  1,  1,  1,  1,  1),
-               le8(i( 3,  2,  1,  0, -1, -2, -3, -4),
-                   i( 0,  0,  0,  0,  0,  0,  0,  0)));
+        assert_eq!(
+            b(0, 0, 0, 1, 1, 1, 1, 1),
+            le8(i(3, 2, 1, 0, -1, -2, -3, -4), i(0, 0, 0, 0, 0, 0, 0, 0))
+        );
 
-        assert_eq!(b( 0,  0,  1,  1,  1,  1,  1,  1),
-               le8(i(19, 18, 17, 16, 15,  0, -1, -2),
-                   i(17, 17, 17, 17, 17, 17, 17, 17)));
+        assert_eq!(
+            b(0, 0, 1, 1, 1, 1, 1, 1),
+            le8(
+                i(19, 18, 17, 16, 15, 0, -1, -2),
+                i(17, 17, 17, 17, 17, 17, 17, 17)
+            )
+        );
 
-        assert_eq!(b( 1,  1,  0,  0,  0,  0,  0,  0),
-               le8(i(-9, -8, -7,  0,  1,  2,  3,  4),
-                   i(-8, -8, -8, -8, -8, -8, -8, -8)));
+        assert_eq!(
+            b(1, 1, 0, 0, 0, 0, 0, 0),
+            le8(
+                i(-9, -8, -7, 0, 1, 2, 3, 4),
+                i(-8, -8, -8, -8, -8, -8, -8, -8)
+            )
+        );
 
-        assert_eq!(b( 0,  1,  0,  1,  1,  0,  1,  0),
-               le8(i( 8,  3, 46,  0,  0,  0, -6, -1),
-                   i( 7,  3, 24,  1,  0, -9,  5, -2)));
+        assert_eq!(
+            b(0, 1, 0, 1, 1, 0, 1, 0),
+            le8(i(8, 3, 46, 0, 0, 0, -6, -1), i(7, 3, 24, 1, 0, -9, 5, -2))
+        );
     }
 
     #[test]
     fn u_le8_works() {
-        assert_eq!(b( 1,  1,  1,  1,  1,  1,  1,  1),
-             u_le8(u( 0,  0,  0,  0,  0,  0,  0,  0),
-                   u( 7,  6,  5,  4,  3,  2,  1,  0)));
+        assert_eq!(
+            b(1, 1, 1, 1, 1, 1, 1, 1),
+            u_le8(u(0, 0, 0, 0, 0, 0, 0, 0), u(7, 6, 5, 4, 3, 2, 1, 0))
+        );
 
-        assert_eq!(b( 1,  0,  0,  0,  0,  0,  0,  0),
-             u_le8(u( 0,  1,  2,  3,  4,  5,  6,  7),
-                   u( 0,  0,  0,  0,  0,  0,  0,  0)));
+        assert_eq!(
+            b(1, 0, 0, 0, 0, 0, 0, 0),
+            u_le8(u(0, 1, 2, 3, 4, 5, 6, 7), u(0, 0, 0, 0, 0, 0, 0, 0))
+        );
 
-        assert_eq!(b( 0,  0,  1,  1,  1,  1,  1,  1),
-             u_le8(u(19, 18, 17, 16, 15, 14, 13, 12),
-                   u(17, 17, 17, 17, 17, 17, 17, 17)));
+        assert_eq!(
+            b(0, 0, 1, 1, 1, 1, 1, 1),
+            u_le8(
+                u(19, 18, 17, 16, 15, 14, 13, 12),
+                u(17, 17, 17, 17, 17, 17, 17, 17)
+            )
+        );
 
-        assert_eq!(b( 0,  1,  0,  1,  1,  0,  1,  0),
-             u_le8(u( 8,  3, 46,  0,  0,  9,  3,  2),
-                   u( 7,  3, 24,  1,  0,  0,  5,  1)));
+        assert_eq!(
+            b(0, 1, 0, 1, 1, 0, 1, 0),
+            u_le8(u(8, 3, 46, 0, 0, 9, 3, 2), u(7, 3, 24, 1, 0, 0, 5, 1))
+        );
     }
 
     /// Helpers for creating u64s.
 
-    fn b(a: u64, b: u64, c: u64, d: u64,
-         e: u64, f: u64, g: u64, h: u64) -> u64 {
-        (a << 63) | (b << 55) | (c << 47) | (d << 39) |
-                (e << 31) | (f << 23) | (g << 15) | (h << 7)
+    fn b(a: u64, b: u64, c: u64, d: u64, e: u64, f: u64, g: u64, h: u64) -> u64 {
+        (a << 63) | (b << 55) | (c << 47) | (d << 39) | (e << 31) | (f << 23) | (g << 15) | (h << 7)
     }
 
-    fn u(a: u8, b: u8, c: u8, d: u8,
-         e: u8, f: u8, g: u8, h: u8) -> u64 {
+    fn u(a: u8, b: u8, c: u8, d: u8, e: u8, f: u8, g: u8, h: u8) -> u64 {
         ((a as u64) << 56)
-                | ((b as u64) << 48)
-                | ((c as u64) << 40)
-                | ((d as u64) << 32)
-                | ((e as u64) << 24)
-                | ((f as u64) << 16)
-                | ((g as u64) << 8)
-                | (h as u64)
+            | ((b as u64) << 48)
+            | ((c as u64) << 40)
+            | ((d as u64) << 32)
+            | ((e as u64) << 24)
+            | ((f as u64) << 16)
+            | ((g as u64) << 8)
+            | (h as u64)
     }
 
-    fn i(a: i8, b: i8, c: i8, d: i8,
-         e: i8, f: i8, g: i8, h: i8) -> u64 {
-        u(a as u8, b as u8, c as u8, d as u8,
-          e as u8, f as u8, g as u8, h as u8)
+    fn i(a: i8, b: i8, c: i8, d: i8, e: i8, f: i8, g: i8, h: i8) -> u64 {
+        u(
+            a as u8, b as u8, c as u8, d as u8, e as u8, f as u8, g as u8, h as u8,
+        )
     }
 
     fn hash<T: Hash>(t: &T) -> u64 {
@@ -402,4 +425,3 @@ mod test {
         s.finish()
     }
 }
-

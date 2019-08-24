@@ -34,7 +34,9 @@ impl UniversalCode for Comma {
 
         loop {
             if let Some(digit) = try!(source.read_int::<u64>(self.0 as usize)) {
-                if digit == base { return Ok(Some(result)) }
+                if digit == base {
+                    return Ok(Some(result));
+                }
 
                 consumed = true;
                 result = result * base + digit;
@@ -49,10 +51,10 @@ impl UniversalCode for Comma {
 
 #[cfg(test)]
 mod test {
-    use std::collections::VecDeque;
-    use quickcheck::quickcheck;
-    use coding::*;
     use coding::properties;
+    use coding::*;
+    use quickcheck::quickcheck;
+    use std::collections::VecDeque;
 
     #[test]
     fn enc234() {

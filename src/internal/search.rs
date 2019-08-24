@@ -13,14 +13,18 @@ pub fn average<P: PrimInt>(x: P, y: P) -> P {
 /// non-decreasing.
 ///
 /// Does not call `f` on `D`s outside the specified interval.
-pub fn binary_search_function<D, R, F>(
-    mut start: D, mut limit: D, value: R, f: F) -> Option<D>
-        where D: PrimInt,
-              R: Ord,
-              F: Fn(D) -> R {
-
-    if start >= limit { return None; }
-    if f(start) >= value { return Some(start); }
+pub fn binary_search_function<D, R, F>(mut start: D, mut limit: D, value: R, f: F) -> Option<D>
+where
+    D: PrimInt,
+    R: Ord,
+    F: Fn(D) -> R,
+{
+    if start >= limit {
+        return None;
+    }
+    if f(start) >= value {
+        return Some(start);
+    }
 
     // Now we know the answer isn't `start`, which means for every
     // candidate `mid`, `mid - 1` will still be in the domain of `f`.
@@ -42,7 +46,6 @@ pub fn binary_search_function<D, R, F>(
 
     None
 }
-
 
 #[cfg(test)]
 mod test {
@@ -79,8 +82,7 @@ mod test {
         assert_eq!(big - 2, average(big - 1, big - 3));
     }
 
-    fn search_slice(value: usize, slice: &[usize])
-                    -> Option<usize> {
+    fn search_slice(value: usize, slice: &[usize]) -> Option<usize> {
         binary_search_function(0, slice.len(), value, |index| slice[index])
     }
 
@@ -90,16 +92,22 @@ mod test {
     fn binary_search_01() {
         let mut vec = Vec::<usize>::with_capacity(MAX_LEN);
 
-        for len in 0 .. MAX_LEN + 1 {
-            for result in 0 .. len {
+        for len in 0..MAX_LEN + 1 {
+            for result in 0..len {
                 vec.clear();
-                for _ in 0 .. result { vec.push(0); }
-                for _ in result .. len { vec.push(1); }
+                for _ in 0..result {
+                    vec.push(0);
+                }
+                for _ in result..len {
+                    vec.push(1);
+                }
                 assert_eq!(Some(result), search_slice(1, &vec));
             }
 
             vec.clear();
-            for _ in 0 .. len { vec.push(0) }
+            for _ in 0..len {
+                vec.push(0)
+            }
             assert_eq!(None, search_slice(1, &vec));
         }
     }
@@ -108,16 +116,22 @@ mod test {
     fn binary_search_02() {
         let mut vec = Vec::<usize>::with_capacity(MAX_LEN);
 
-        for len in 0 .. MAX_LEN + 1 {
-            for result in 0 .. len {
+        for len in 0..MAX_LEN + 1 {
+            for result in 0..len {
                 vec.clear();
-                for _ in 0 .. result { vec.push(0); }
-                for _ in result .. len { vec.push(2); }
+                for _ in 0..result {
+                    vec.push(0);
+                }
+                for _ in result..len {
+                    vec.push(2);
+                }
                 assert_eq!(Some(result), search_slice(1, &vec));
             }
 
             vec.clear();
-            for _ in 0 .. len { vec.push(0) }
+            for _ in 0..len {
+                vec.push(0)
+            }
             assert_eq!(None, search_slice(1, &vec));
         }
     }
@@ -126,11 +140,13 @@ mod test {
     fn binary_search_iota() {
         let mut vec = Vec::<usize>::with_capacity(MAX_LEN);
 
-        for len in 0 .. MAX_LEN + 1 {
+        for len in 0..MAX_LEN + 1 {
             vec.clear();
-            for i in 0 .. len { vec.push(i); }
+            for i in 0..len {
+                vec.push(i);
+            }
 
-            for i in 0 .. len {
+            for i in 0..len {
                 assert_eq!(Some(i), search_slice(i, &vec));
             }
 
