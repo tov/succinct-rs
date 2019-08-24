@@ -8,6 +8,14 @@ matrix:
   allow_failures:
     - rust: nightly
 
+install:
+  - rustup component add rustfmt
+
+script: |
+  cargo fmt -- --check && \
+  cargo build --verbose && \
+  cargo test
+
 notifications:
   email:
     on_success: never
