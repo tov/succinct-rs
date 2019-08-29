@@ -28,10 +28,8 @@
 //!
 //! to your crate root.
 
+#![doc(html_root_url = "https://docs.rs/succinct/0.4.4")]
 #![warn(missing_docs)]
-
-#![cfg_attr(feature = "clippy", feature(plugin))]
-#![cfg_attr(feature = "clippy", plugin(clippy))]
 
 extern crate byteorder;
 extern crate num_traits;
