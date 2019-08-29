@@ -1,6 +1,6 @@
 [package]
 name = "succinct"
-version = "0.4.4"
+version = "0.5.0"
 authors = ["Jesse A. Tov <jesse.tov@gmail.com>"]
 description = "Succinct data structures for Rust"
 repository = "https://github.com/tov/succinct-rs"
