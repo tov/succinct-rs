@@ -17,12 +17,12 @@
 //!
 //! ```toml
 //! [dependencies]
-//! succinct = "0.5.1"
+//! succinct = "0.5.2"
 //! ```
 //!
 //! to your `Cargo.toml`.
 
-#![doc(html_root_url = "https://docs.rs/succinct/0.5.1")]
+#![doc(html_root_url = "https://docs.rs/succinct/0.5.2")]
 #![warn(missing_docs)]
 
 extern crate byteorder;
