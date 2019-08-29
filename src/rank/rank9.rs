@@ -26,6 +26,7 @@ struct Level2(u64);
 impl Level2 {
     fn new() -> Self { Level2(0) }
 
+    #[cfg(target_pointer_width = "64")]
     fn get(&self, t: usize) -> u64 {
         debug_assert!(t < 8);
 
@@ -34,11 +35,34 @@ impl Level2 {
         self.0 >> shift & 0x1FF
     }
 
+    #[cfg(target_pointer_width = "64")]
     fn set(&mut self, t: usize, value: u64) {
         debug_assert!(t < 8);
 
         let t = t.wrapping_sub(1);
         let shift = t.wrapping_add(t >> 60 & 8) * 9;
+
+        let old_part = self.0 & !(0x1FF << shift);
+        let new_part = (value & 0x1FF) << shift;
+
+        self.0 = old_part | new_part;
+    }
+
+    #[cfg(target_pointer_width = "32")]
+    fn get(&self, t: usize) -> u64 {
+        debug_assert!(t < 8);
+
+        let t = t.wrapping_sub(1);
+        let shift = t.wrapping_add(t >> 28 & 8) * 9;
+        self.0 >> shift & 0x1FF
+    }
+
+    #[cfg(target_pointer_width = "32")]
+    fn set(&mut self, t: usize, value: u64) {
+        debug_assert!(t < 8);
+
+        let t = t.wrapping_sub(1);
+        let shift = t.wrapping_add(t >> 28 & 8) * 9;
 
         let old_part = self.0 & !(0x1FF << shift);
         let new_part = (value & 0x1FF) << shift;

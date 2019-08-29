@@ -1,7 +1,7 @@
 use std::fmt;
 
 #[cfg(target_pointer_width = "32")]
-use num::ToPrimitive;
+use num_traits::ToPrimitive;
 
 use internal::vector_base::{VectorBase, self};
 use space_usage::SpaceUsage;
