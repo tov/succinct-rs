@@ -20,13 +20,7 @@
 //! succinct = "0.5.0"
 //! ```
 //!
-//! to your `Cargo.toml` and
-//!
-//! ```rust
-//! extern crate succinct;
-//! ```
-//!
-//! to your crate root.
+//! to your `Cargo.toml`.
 
 #![doc(html_root_url = "https://docs.rs/succinct/0.5.0")]
 #![warn(missing_docs)]
