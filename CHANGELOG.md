@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog] and this project adheres to
 [Keep a Changelog]: http://keepachangelog.com/en/1.0.0/
 [Semantic Versioning]: http://semver.org/spec/v2.0.0.html
 
+## [Unreleased]
+- Moved documentation hosting to docs.rs.
+
 ## [0.5.1] - 2019-08-29
 
 ### Removed
