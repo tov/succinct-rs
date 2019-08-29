@@ -1,0 +1,6 @@
+pre-release-replacements = [
+  { file="README.md", search="succinct = \"[0-9.]*\"", replace="succinct = \"{{version}}\"" },
+  { file="src/lib.rs", search="succinct = \"[0-9.]*\"", replace="succinct = \"{{version}}\"" },
+  { file="src/lib.rs", search="https://docs[.]rs/succinct/[0-9.]*", replace="https://docs.rs/succinct/{{version}}" },
+  { file="CHANGELOG.md", search="\\[Unreleased\\]", replace="[{{version}}] - {{date}}" }
+]
