@@ -25,21 +25,29 @@ pub struct RsDict {
 	num_ones: u64,
 	num_zeros: u64,
 
+    code_len: u64,
     bits: Vec<u64>,
-    pointer_blocks: Vec<u64>,
-	rank_blocks: Vec<u64>,
 
+    // Select acceleration metadata:
     // `select_{one,zero}_inds` store the (index / LARGE_BLOCK_SIZE) of each
     // SELECT_BLOCK_SIZE'th bit.
 	select_one_inds: Vec<u64>,
 	select_zero_inds: Vec<u64>,
 
-    // Number of set bits in each SMALL_BLOCK_SIZE group of bits
-    // We say a small block has "class" k if k of its bits are set.
-	small_block_classes: Vec<u8>,
+    // Small block metadata (stored every SMALL_BLOCK_SIZE bits):
+    // * number of set bits (the "class") for the small block
+    // * index within a class for each small block; note that the indexes are
+    //   variable length (see `ENUM_CODE_LENGTH`), so there isn't direct access
+    //   for a particular small block.
+	sb_classes: Vec<u8>,
 
-	code_len: u64,
+    // Large block metadata (stored every LARGE_BLOCK_SIZE bits):
+    // * pointer into variable-length `bits` for the current index
+    // * cached rank at the current index
+    lb_pointers: Vec<u64>,
+	lb_ranks: Vec<u64>,
 
+    // Current in-progress small block we're appending to
     last_block: LastBlock,
 }
 
@@ -120,18 +128,18 @@ impl RankSupport for RsDict {
             return bit_num(self.num_ones - trailing_ones, pos, bit);
         }
         let lblock = pos / LARGE_BLOCK_SIZE;
-        let mut pointer = self.pointer_blocks[lblock as usize];
+        let mut pointer = self.lb_pointers[lblock as usize];
         let sblock = pos / SMALL_BLOCK_SIZE;
-        let mut rank = self.rank_blocks[lblock as usize];
+        let mut rank = self.lb_ranks[lblock as usize];
         for i in (lblock * SMALL_BLOCK_PER_LARGE_BLOCK)..sblock {
-            let sb_class = self.small_block_classes[i as usize];
+            let sb_class = self.sb_classes[i as usize];
             pointer += ENUM_CODE_LENGTH[sb_class as usize] as u64;
             rank += sb_class as u64;
         }
         if pos % SMALL_BLOCK_SIZE == 0 {
             return bit_num(rank, pos, bit);
         }
-        let sb_class = self.small_block_classes[sblock as usize];
+        let sb_class = self.sb_classes[sblock as usize];
         let code = get_slice(&self.bits, pointer, ENUM_CODE_LENGTH[sb_class as usize]);
         rank += enum_rank(code, sb_class, (pos % SMALL_BLOCK_SIZE) as u8) as u64;
         bit_num(rank, pos, bit)
@@ -176,8 +184,8 @@ impl Select0Support for RsDict {
 
         let select_ind = rank / SELECT_BLOCK_SIZE;
         let mut lblock = self.select_zero_inds[select_ind as usize];
-        while lblock < self.rank_blocks.len() as u64 {
-            if rank < lblock * LARGE_BLOCK_SIZE - self.rank_blocks[lblock as usize] {
+        while lblock < self.lb_ranks.len() as u64 {
+            if rank < lblock * LARGE_BLOCK_SIZE - self.lb_ranks[lblock as usize] {
                 break;
             }
             lblock += 1;
@@ -185,11 +193,11 @@ impl Select0Support for RsDict {
         lblock -= 1;
 
         let mut sblock = lblock * SMALL_BLOCK_PER_LARGE_BLOCK;
-        let mut pointer = self.pointer_blocks[lblock as usize];
-        let mut remain = rank - lblock * LARGE_BLOCK_SIZE + self.rank_blocks[lblock as usize] + 1;
+        let mut pointer = self.lb_pointers[lblock as usize];
+        let mut remain = rank - lblock * LARGE_BLOCK_SIZE + self.lb_ranks[lblock as usize] + 1;
 
-        while sblock < self.small_block_classes.len() as u64 {
-            let sb_class = self.small_block_classes[sblock as usize];
+        while sblock < self.sb_classes.len() as u64 {
+            let sb_class = self.sb_classes[sblock as usize];
             let sb_zeros = SMALL_BLOCK_SIZE as u8 - sb_class;
             if remain <= sb_zeros as u64 {
                 break;
@@ -198,7 +206,7 @@ impl Select0Support for RsDict {
             pointer += ENUM_CODE_LENGTH[sb_zeros as usize] as u64;
             sblock += 1;
         }
-        let sb_class = self.small_block_classes[sblock as usize];
+        let sb_class = self.sb_classes[sblock as usize];
         let code = get_slice(&self.bits, pointer, ENUM_CODE_LENGTH[sb_class as usize]);
         Some(sblock * SMALL_BLOCK_SIZE + enum_select0(code, sb_class, remain as u8) as u64)
     }
@@ -221,8 +229,8 @@ impl Select1Support for RsDict {
         let select_ind = rank / SELECT_BLOCK_SIZE;
         let mut lblock = self.select_one_inds[select_ind as usize];
 
-        while lblock < self.rank_blocks.len() as u64 {
-            if rank < self.rank_blocks[lblock as usize] {
+        while lblock < self.lb_ranks.len() as u64 {
+            if rank < self.lb_ranks[lblock as usize] {
                 break;
             }
             lblock += 1;
@@ -230,11 +238,11 @@ impl Select1Support for RsDict {
         lblock -= 1;
 
         let mut sblock = lblock * SMALL_BLOCK_PER_LARGE_BLOCK;
-        let mut pointer = self.pointer_blocks[lblock as usize];
-        let mut remain = rank - self.rank_blocks[lblock as usize] + 1;
+        let mut pointer = self.lb_pointers[lblock as usize];
+        let mut remain = rank - self.lb_ranks[lblock as usize] + 1;
 
-        while sblock < self.small_block_classes.len() as u64 {
-            let sb_class = self.small_block_classes[sblock as usize];
+        while sblock < self.sb_classes.len() as u64 {
+            let sb_class = self.sb_classes[sblock as usize];
             if remain <= sb_class as u64 {
                 break;
             }
@@ -243,7 +251,7 @@ impl Select1Support for RsDict {
 
             sblock += 1;
         }
-        let sb_class = self.small_block_classes[sblock as usize];
+        let sb_class = self.sb_classes[sblock as usize];
         let code = get_slice(&self.bits, pointer, ENUM_CODE_LENGTH[sb_class as usize]);
         Some(sblock * SMALL_BLOCK_SIZE + enum_select1(code, sb_class, remain as u8) as u64)
     }
@@ -257,11 +265,11 @@ impl RsDict {
     fn with_capacity(n: usize) -> Self {
         Self {
             bits: Vec::with_capacity(n / SMALL_BLOCK_SIZE as usize),
-            pointer_blocks: Vec::with_capacity(n / LARGE_BLOCK_SIZE as usize),
-            rank_blocks: Vec::with_capacity(n / LARGE_BLOCK_SIZE as usize),
+            lb_pointers: Vec::with_capacity(n / LARGE_BLOCK_SIZE as usize),
+            lb_ranks: Vec::with_capacity(n / LARGE_BLOCK_SIZE as usize),
             select_one_inds: Vec::with_capacity(n / SELECT_BLOCK_SIZE as usize),
             select_zero_inds: Vec::with_capacity(n / SELECT_BLOCK_SIZE as usize),
-            small_block_classes: Vec::with_capacity(n / SMALL_BLOCK_SIZE as usize),
+            sb_classes: Vec::with_capacity(n / SMALL_BLOCK_SIZE as usize),
 
             len: 0,
             num_ones: 0,
@@ -315,14 +323,14 @@ impl RsDict {
             return self.last_block.get_bit(pos % SMALL_BLOCK_SIZE);
         }
         let lblock = pos / LARGE_BLOCK_SIZE;
-        let mut pointer = self.pointer_blocks[lblock as usize]; // FIXME: get unchecked?
+        let mut pointer = self.lb_pointers[lblock as usize]; // FIXME: get unchecked?
         let sblock = pos / SMALL_BLOCK_SIZE;
 
         for i in (lblock * SMALL_BLOCK_PER_LARGE_BLOCK)..sblock {
-            let sb_class = self.small_block_classes[i as usize];
+            let sb_class = self.sb_classes[i as usize];
             pointer += ENUM_CODE_LENGTH[sb_class as usize] as u64;
         }
-        let sb_class = self.small_block_classes[sblock as usize];
+        let sb_class = self.sb_classes[sblock as usize];
         let code = get_slice(&self.bits, pointer, ENUM_CODE_LENGTH[sb_class as usize]);
         enum_bit(code, sb_class, (pos % SMALL_BLOCK_SIZE) as u8)
     }
@@ -335,15 +343,15 @@ impl RsDict {
             return (bit, bit_num(self.num_ones - after_rank, pos, bit));
         }
         let lblock = pos / LARGE_BLOCK_SIZE;
-        let mut pointer = self.pointer_blocks[lblock as usize];
+        let mut pointer = self.lb_pointers[lblock as usize];
         let sblock = pos / SMALL_BLOCK_SIZE;
-        let mut rank = self.rank_blocks[lblock as usize];
+        let mut rank = self.lb_ranks[lblock as usize];
         for i in (lblock * SMALL_BLOCK_PER_LARGE_BLOCK)..sblock {
-            let sb_class = self.small_block_classes[i as usize];
+            let sb_class = self.sb_classes[i as usize];
             pointer += ENUM_CODE_LENGTH[sb_class as usize] as u64;
             rank += sb_class as u64;
         }
-        let sb_class = self.small_block_classes[sblock as usize];
+        let sb_class = self.sb_classes[sblock as usize];
         let code = get_slice(&self.bits, pointer, ENUM_CODE_LENGTH[sb_class as usize]);
         rank += enum_rank(code, sb_class, (pos % SMALL_BLOCK_SIZE) as u8) as u64;
         let bit = enum_bit(code, sb_class, (pos % SMALL_BLOCK_SIZE) as u8);
@@ -357,7 +365,7 @@ impl RsDict {
             let block = mem::replace(&mut self.last_block, LastBlock::new());
 
             let sb_class = block.num_ones as u8;
-            self.small_block_classes.push(sb_class);
+            self.sb_classes.push(sb_class);
             let code_len = ENUM_CODE_LENGTH[sb_class as usize];
             let code = enum_encode(block.bits, sb_class);
             let new_size = floor(self.code_len + code_len as u64, SMALL_BLOCK_SIZE);
@@ -368,8 +376,8 @@ impl RsDict {
             self.code_len += code_len as u64;
         }
         if self.len % LARGE_BLOCK_SIZE == 0 {
-            self.rank_blocks.push(self.num_ones);
-            self.pointer_blocks.push(self.code_len);
+            self.lb_ranks.push(self.num_ones);
+            self.lb_pointers.push(self.code_len);
         }
     }
 
@@ -389,11 +397,11 @@ impl SpaceUsage for RsDict {
 
     fn heap_bytes(&self) -> usize {
         self.bits.heap_bytes() +
-            self.pointer_blocks.heap_bytes() +
-            self.rank_blocks.heap_bytes() +
+            self.lb_pointers.heap_bytes() +
+            self.lb_ranks.heap_bytes() +
             self.select_one_inds.heap_bytes() +
             self.select_zero_inds.heap_bytes() +
-            self.small_block_classes.heap_bytes()
+            self.sb_classes.heap_bytes()
     }
 }
 
