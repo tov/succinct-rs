@@ -25,7 +25,8 @@ pub struct RsDict {
 	select_one_inds: Vec<u64>,
 	select_zero_inds: Vec<u64>,
 	rank_small_blocks: Vec<u8>,
-	num: u64,
+
+	len: u64,
 	one_num: u64,
 	zero_num: u64,
 	last_block: u64,
@@ -34,12 +35,76 @@ pub struct RsDict {
 	code_len: u64,
 }
 
+struct LastBlock {
+    bits: u64,
+    num_ones: usize,
+    num_zeros: usize,
+}
+
+impl LastBlock {
+    fn new() -> Self {
+        LastBlock {
+            bits: 0,
+            num_ones: 0,
+            num_zeros: 0,
+        }
+    }
+
+    // FIXME: Use broadword algorithm here?
+    fn select0(&self, mut rank: u8) -> u8 {
+        debug_assert!(rank < self.num_zeros as u8);
+        for i in 0..SMALL_BLOCK_SIZE {
+            if !self.get_bit(i) {
+                if rank == 0 {
+                    return i as u8;
+                }
+                rank -= 1;
+            }
+        }
+        debug_assert!(false, "Developer error: select0'd outside of last block");
+        0
+    }
+
+    // FIXME: Use broadword algorithm here?
+    fn select1(&self, mut rank: u8) -> u8 {
+        debug_assert!(rank < self.num_ones as u8);
+        for i in 0..SMALL_BLOCK_SIZE {
+            if self.get_bit(i) {
+                if rank == 0 {
+                    return i as u8;
+                }
+                rank -= 1;
+            }
+        }
+        debug_assert!(false, "Developer error: select1'd outside of last block");
+        0
+    }
+
+    // Count the number of bits set at indices i >= pos
+    fn count_trailing_ones(&self, pos: u64) -> u32 {
+        (self.bits >> pos).count_ones()
+    }
+
+    fn get_bit(&self, pos: u64) -> bool {
+        (self.bits >> pos) & 1 == 1
+    }
+
+    // Only call one of `set_one` or `set_zeros` for any `pos`.
+    fn set_one(&mut self, pos: u64) {
+        self.bits |= 1 << pos;
+        self.num_ones += 1;
+    }
+    fn set_zero(&mut self, _pos: u64) {
+        self.num_zeros += 1;
+    }
+}
+
 impl RankSupport for RsDict {
     type Over = bool;
 
     fn rank(&self, pos: u64, bit: bool) -> u64 {
-        if pos >= self.num {
-            return bit_num(self.one_num, self.num, bit);
+        if pos >= self.len {
+            return bit_num(self.one_num, self.len, bit);
         }
         if self.is_last_block(pos) {
             let after_rank = pop_count(self.last_block >> (pos % SMALL_BLOCK_SIZE));
@@ -64,7 +129,7 @@ impl RankSupport for RsDict {
     }
 
     fn limit(&self) -> u64 {
-        self.num
+        self.len
     }
 }
 
@@ -93,7 +158,9 @@ impl Select0Support for RsDict {
         }
         if rank >= self.zero_num - self.last_zero_num {
             let last_block_rank = (rank - (self.zero_num - self.last_zero_num)) as u8;
-            return Some(self.last_block_ind() + select_raw(!self.last_block, last_block_rank + 1) as u64);
+            let block_rank = select_raw(!self.last_block, last_block_rank + 1);
+
+            return Some(self.last_block_ind() + block_rank as u64);
         }
 
         let select_ind = rank / SELECT_BLOCK_SIZE;
@@ -132,7 +199,8 @@ impl Select1Support for RsDict {
         }
         if rank >= self.one_num - self.last_one_num {
             let last_block_rank = (rank - (self.one_num - self.last_one_num)) as u8;
-            return Some(self.last_block_ind() + select_raw(self.last_block, last_block_rank+ 1) as u64);
+            let block_rank = select_raw(self.last_block, last_block_rank + 1);
+            return Some(self.last_block_ind() + block_rank as u64);
         }
 
         let select_ind = rank / SELECT_BLOCK_SIZE;
@@ -180,7 +248,7 @@ impl RsDict {
             select_zero_inds: Vec::with_capacity(n / SELECT_BLOCK_SIZE as usize),
             rank_small_blocks: Vec::with_capacity(n / SMALL_BLOCK_SIZE as usize),
 
-            num: 0,
+            len: 0,
             one_num: 0,
             zero_num: 0,
             last_block: 0,
@@ -191,7 +259,11 @@ impl RsDict {
     }
 
     pub fn len(&self) -> usize {
-        self.num as usize
+        self.len as usize
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
     }
 
     pub fn count_ones(&self) -> usize {
@@ -203,24 +275,24 @@ impl RsDict {
     }
 
     pub fn push(&mut self, bit: bool) {
-        if self.num % SMALL_BLOCK_SIZE == 0 {
+        if self.len % SMALL_BLOCK_SIZE == 0 {
             self.write_block();
         }
         if bit {
-            self.last_block |= 1 << (self.num % SMALL_BLOCK_SIZE);
+            self.last_block |= 1 << (self.len % SMALL_BLOCK_SIZE);
             if self.one_num % SELECT_BLOCK_SIZE == 0 {
-                self.select_one_inds.push(self.num / LARGE_BLOCK_SIZE);
+                self.select_one_inds.push(self.len / LARGE_BLOCK_SIZE);
             }
             self.one_num += 1;
             self.last_one_num += 1;
         } else {
             if self.zero_num % SELECT_BLOCK_SIZE == 0 {
-                self.select_zero_inds.push(self.num / LARGE_BLOCK_SIZE);
+                self.select_zero_inds.push(self.len / LARGE_BLOCK_SIZE);
             }
             self.zero_num += 1;
             self.last_zero_num += 1;
         }
-        self.num += 1;
+        self.len += 1;
     }
 
     pub fn get_bit(&self, pos: u64) -> bool {
@@ -266,7 +338,7 @@ impl RsDict {
 
 impl RsDict {
     fn write_block(&mut self) {
-        if self.num > 0 {
+        if self.len > 0 {
             let rank_sb = self.last_one_num as u8;
             self.rank_small_blocks.push(rank_sb);
             let code_len = ENUM_CODE_LENGTH[rank_sb as usize];
@@ -281,17 +353,17 @@ impl RsDict {
             self.last_one_num = 0;
             self.code_len += code_len as u64;
         }
-        if self.num % LARGE_BLOCK_SIZE == 0 {
+        if self.len % LARGE_BLOCK_SIZE == 0 {
             self.rank_blocks.push(self.one_num);
             self.pointer_blocks.push(self.code_len);
         }
     }
 
     fn last_block_ind(&self) -> u64 {
-        if self.num == 0 {
+        if self.len == 0 {
             return 0;
         }
-        ((self.num - 1) / SMALL_BLOCK_SIZE) * SMALL_BLOCK_SIZE
+        ((self.len - 1) / SMALL_BLOCK_SIZE) * SMALL_BLOCK_SIZE
     }
 
     fn is_last_block(&self, pos: u64) -> bool {
