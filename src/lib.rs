@@ -31,6 +31,9 @@ extern crate num_traits;
 #[cfg(test)]
 extern crate quickcheck;
 
+#[cfg(test)]
+extern crate rand;
+
 #[macro_use]
 mod macros;
 
