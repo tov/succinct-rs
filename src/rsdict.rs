@@ -1,11 +1,16 @@
-use std::ops::Index;
-
+#![allow(missing_docs)]
+use super::rank::{
+    RankSupport,
+    BitRankSupport,
+};
+use super::select::{
+    SelectSupport,
+    Select1Support,
+    Select0Support,
+};
 use super::space_usage::SpaceUsage;
-use super::rank::{RankSupport, BitRankSupport};
-use super::select::{SelectSupport, Select1Support, Select0Support};
-use super::bit_vec::BitVec;
-use super::storage::BlockType;
 
+#[derive(Debug)]
 pub struct RsDict {
     bits: Vec<u64>,
     pointer_blocks: Vec<u64>,
@@ -154,33 +159,19 @@ impl Select1Support for RsDict {
     }
 }
 
-impl<I: BitVec> From<I> for RsDict {
-    fn from(input: I) -> Self {
-        let mut output = Self::with_capacity(input.bit_len() as usize);
-        for i in 0..input.block_len() {
-            let block = input.get_block(i);
-            for j in 0..I::Block::nbits() {
-                output.push(block.get_bit(j));
-            }
-        }
-        output
-    }
-}
-
 impl RsDict {
     pub fn new() -> Self {
         Self::with_capacity(0)
     }
 
     fn with_capacity(n: usize) -> Self {
-        // FIXME: preallocate
         Self {
-            bits: vec![],
-            pointer_blocks: vec![],
-            rank_blocks: vec![],
-            select_one_inds: vec![],
-            select_zero_inds: vec![],
-            rank_small_blocks: vec![],
+            bits: Vec::with_capacity(n / SMALL_BLOCK_SIZE as usize),
+            pointer_blocks: Vec::with_capacity(n / LARGE_BLOCK_SIZE as usize),
+            rank_blocks: Vec::with_capacity(n / LARGE_BLOCK_SIZE as usize),
+            select_one_inds: Vec::with_capacity(n / SELECT_BLOCK_SIZE as usize),
+            select_zero_inds: Vec::with_capacity(n / SELECT_BLOCK_SIZE as usize),
+            rank_small_blocks: Vec::with_capacity(n / SMALL_BLOCK_SIZE as usize),
 
             num: 0,
             one_num: 0,
@@ -236,9 +227,9 @@ impl RsDict {
         for i in (lblock * SMALL_BLOCK_PER_LARGE_BLOCK)..sblock {
             pointer += ENUM_CODE_LENGTH[self.rank_small_blocks[i as usize] as usize] as u64;
         }
-        let rankSB = self.rank_small_blocks[sblock as usize];
-        let code = get_slice(&self.bits, pointer, ENUM_CODE_LENGTH[rankSB as usize]);
-        enum_bit(code, rankSB, (pos % SMALL_BLOCK_SIZE) as u8)
+        let rank_sb = self.rank_small_blocks[sblock as usize];
+        let code = get_slice(&self.bits, pointer, ENUM_CODE_LENGTH[rank_sb as usize]);
+        enum_bit(code, rank_sb, (pos % SMALL_BLOCK_SIZE) as u8)
     }
 
 
@@ -373,57 +364,59 @@ fn pop_count(x: u64) -> u8 {
 const SMALL_BLOCK_SIZE: u64  = 64;
 const LARGE_BLOCK_SIZE: u64  = 1024;
 const SELECT_BLOCK_SIZE: u64 = 4096;
-const USE_RAW_LEN: u64       = 48;
 const SMALL_BLOCK_PER_LARGE_BLOCK: u64 = LARGE_BLOCK_SIZE / SMALL_BLOCK_SIZE;
 
 ////////////////////////////////////////////////////////////////////////////////
 // enumCode.go
 
-fn enum_encode(val: u64, mut rankSB: u8) -> u64 {
-    if ENUM_CODE_LENGTH[rankSB as usize] as u64 == SMALL_BLOCK_SIZE {
+fn enum_encode(val: u64, mut rank_sb: u8) -> u64 {
+    if ENUM_CODE_LENGTH[rank_sb as usize] as u64 == SMALL_BLOCK_SIZE {
         return val;
     }
     let mut code = 0u64;
     for i in 0..(SMALL_BLOCK_SIZE as u8) {
         if get_bit(val, i) {
-            code += COMBINATION_TABLE_64[(SMALL_BLOCK_SIZE - i as u64) as usize - 1][rankSB as usize];
-            rankSB -= 1;
+            code += COMBINATION_TABLE_64[(SMALL_BLOCK_SIZE - i as u64) as usize - 1][rank_sb as usize];
+            rank_sb -= 1;
         }
     }
     code
 }
 
-fn enum_decode(mut code: u64, mut rankSB: u8) -> u64 {
-    if ENUM_CODE_LENGTH[rankSB as usize] as u64 == SMALL_BLOCK_SIZE {
+// FIXME: write enum tests
+#[cfg(test)]
+fn enum_decode(mut code: u64, mut rank_sb: u8) -> u64 {
+    if ENUM_CODE_LENGTH[rank_sb as usize] as u64 == SMALL_BLOCK_SIZE {
         return code;
     }
     let mut val = 0u64;
     for i in 0..(SMALL_BLOCK_SIZE as u8) {
-        let zero_case_num = COMBINATION_TABLE_64[(SMALL_BLOCK_SIZE - i as u64) as usize - 1][rankSB as usize];
+        let zero_case_num = COMBINATION_TABLE_64[(SMALL_BLOCK_SIZE - i as u64) as usize - 1][rank_sb as usize];
         if code >= zero_case_num {
             val |= 1 << i;
             code -= zero_case_num;
-            rankSB -= 1;
+            rank_sb -= 1;
         }
     }
     val
 }
 
-fn enum_bit(mut code: u64, mut rankSB: u8, pos: u8) -> bool {
-    if ENUM_CODE_LENGTH[rankSB as usize] as u64 == SMALL_BLOCK_SIZE {
+fn enum_bit(mut code: u64, mut rank_sb: u8, pos: u8) -> bool {
+    if ENUM_CODE_LENGTH[rank_sb as usize] as u64 == SMALL_BLOCK_SIZE {
         return get_bit(code, pos);
     }
     for i in 0..pos {
-        let zero_case_num = COMBINATION_TABLE_64[(SMALL_BLOCK_SIZE - i as u64) as usize - 1][rankSB as usize];
+        let zero_case_num = COMBINATION_TABLE_64[(SMALL_BLOCK_SIZE - i as u64) as usize - 1][rank_sb as usize];
         if code >= zero_case_num {
             code -= zero_case_num;
-            rankSB -= 1;
+            rank_sb -= 1;
         }
     }
-    // XXX okay?
-    code >= COMBINATION_TABLE_64[(SMALL_BLOCK_SIZE - pos as u64) as usize - 1][rankSB as usize]
+    // FIXME okay?
+    code >= COMBINATION_TABLE_64[(SMALL_BLOCK_SIZE - pos as u64) as usize - 1][rank_sb as usize]
 }
 
+#[cfg(test)]
 fn run_zeros_raw(code: u64, pos: u8) -> u8 {
     let mut i = pos;
     while (i as u64) < SMALL_BLOCK_SIZE && !get_bit(code, i) {
@@ -432,19 +425,20 @@ fn run_zeros_raw(code: u64, pos: u8) -> u8 {
     i - pos
 }
 
-fn enum_run_zeros(mut code: u64, mut rankSB: u8, pos: u8) -> u8 {
-    if ENUM_CODE_LENGTH[rankSB as usize] as u64 == SMALL_BLOCK_SIZE {
+#[cfg(test)]
+fn enum_run_zeros(mut code: u64, mut rank_sb: u8, pos: u8) -> u8 {
+    if ENUM_CODE_LENGTH[rank_sb as usize] as u64 == SMALL_BLOCK_SIZE {
         return run_zeros_raw(code, pos);
     }
     for i in 0..pos {
-        let zero_case_num = COMBINATION_TABLE_64[(SMALL_BLOCK_SIZE - i as u64) as usize - 1][rankSB as usize];
+        let zero_case_num = COMBINATION_TABLE_64[(SMALL_BLOCK_SIZE - i as u64) as usize - 1][rank_sb as usize];
         if code >= zero_case_num {
             code -= zero_case_num;
-            rankSB -= 1;
+            rank_sb -= 1;
         }
     }
     for i in pos..(SMALL_BLOCK_SIZE as u8) {
-        let zero_case_num = COMBINATION_TABLE_64[(SMALL_BLOCK_SIZE - i as u64) as usize - 1][rankSB as usize];
+        let zero_case_num = COMBINATION_TABLE_64[(SMALL_BLOCK_SIZE - i as u64) as usize - 1][rank_sb as usize];
         if code >= zero_case_num {
             return i - pos;
         }
@@ -452,11 +446,11 @@ fn enum_run_zeros(mut code: u64, mut rankSB: u8, pos: u8) -> u8 {
     (SMALL_BLOCK_SIZE as u8) - pos
 }
 
-fn enum_rank(mut code: u64, rankSB: u8, pos: u8) -> u8 {
-    if ENUM_CODE_LENGTH[rankSB as usize] as u64 == SMALL_BLOCK_SIZE {
+fn enum_rank(mut code: u64, rank_sb: u8, pos: u8) -> u8 {
+    if ENUM_CODE_LENGTH[rank_sb as usize] as u64 == SMALL_BLOCK_SIZE {
         return pop_count(code & ((1 << pos) - 1));
     }
-    let mut cur_rank = rankSB;
+    let mut cur_rank = rank_sb;
     for i in 0..pos {
         let zero_case_num = COMBINATION_TABLE_64[(SMALL_BLOCK_SIZE - i as u64) as usize - 1][cur_rank as usize];
         if code >= zero_case_num {
@@ -464,41 +458,42 @@ fn enum_rank(mut code: u64, rankSB: u8, pos: u8) -> u8 {
             cur_rank -= 1;
         }
     }
-    rankSB - cur_rank
+    rank_sb - cur_rank
 }
 
-fn enum_select(code: u64, rankSB: u8, rank: u8, bit: bool) -> u8 {
-    if bit { enum_select1(code, rankSB, rank) } else { enum_select0(code, rankSB, rank) }
+#[cfg(test)]
+fn enum_select(code: u64, rank_sb: u8, rank: u8, bit: bool) -> u8 {
+    if bit { enum_select1(code, rank_sb, rank) } else { enum_select0(code, rank_sb, rank) }
 }
 
-fn enum_select1(mut code: u64, mut rankSB: u8, mut rank: u8) -> u8 {
-    if ENUM_CODE_LENGTH[rankSB as usize] as u64 == SMALL_BLOCK_SIZE {
+fn enum_select1(mut code: u64, mut rank_sb: u8, mut rank: u8) -> u8 {
+    if ENUM_CODE_LENGTH[rank_sb as usize] as u64 == SMALL_BLOCK_SIZE {
         return select_raw(code, rank);
     }
     for i in 0..SMALL_BLOCK_SIZE {
-        let zero_case_num = COMBINATION_TABLE_64[(SMALL_BLOCK_SIZE - i as u64) as usize - 1][rankSB as usize];
+        let zero_case_num = COMBINATION_TABLE_64[(SMALL_BLOCK_SIZE - i as u64) as usize - 1][rank_sb as usize];
         if code >= zero_case_num {
             rank -= 1;
             if rank == 0 {
                 return i as u8;
             }
             code -= zero_case_num;
-            rankSB -= 1;
+            rank_sb -= 1;
         }
     }
     0
 }
 
-fn enum_select0(mut code: u64, mut rankSB: u8, mut rank: u8) -> u8 {
-    if ENUM_CODE_LENGTH[rankSB as usize] as u64 == SMALL_BLOCK_SIZE {
+fn enum_select0(mut code: u64, mut rank_sb: u8, mut rank: u8) -> u8 {
+    if ENUM_CODE_LENGTH[rank_sb as usize] as u64 == SMALL_BLOCK_SIZE {
         return select_raw(!code, rank);
     }
 
     for i in 0..SMALL_BLOCK_SIZE {
-        let zero_case_num = COMBINATION_TABLE_64[(SMALL_BLOCK_SIZE - i as u64) as usize - 1][rankSB as usize];
+        let zero_case_num = COMBINATION_TABLE_64[(SMALL_BLOCK_SIZE - i as u64) as usize - 1][rank_sb as usize];
         if code >= zero_case_num {
             code -= zero_case_num;
-            rankSB -= 1;
+            rank_sb -= 1;
         } else {
             rank -= 1;
             if rank == 0 {
@@ -599,72 +594,73 @@ const ENUM_CODE_LENGTH: &[u8] = &[
 #[cfg(test)]
 mod tests {
     use super::RsDict;
-    use crate::rank::{RankSupport, BitRankSupport};
+    use crate::rank::RankSupport;
     use crate::select::SelectSupport;
-    use rand::{self, Rng};
 
-    // FIXME: use quickcheck
-    #[test]
-    fn test_rank_randomized() {
-        let bv_sizes = vec![5usize, 17, 65, 767, 8197];
-        let num_trials = 1000usize;
-        let mut rng = rand::thread_rng();
-
-        fn vec_rank(v: &[bool], i: u64, bit: bool) -> u64 {
-            v[0..i as usize]
-                .iter()
-                .filter(|&&e| e == bit)
-                .count() as u64
+    #[quickcheck]
+    fn rank_matches_simple(bits: Vec<bool>) -> bool {
+        let mut rs_dict = RsDict::with_capacity(bits.len());
+        for &bit in &bits {
+            rs_dict.push(bit);
         }
 
-        for size in bv_sizes {
-            for _ in 0..num_trials {
-                let mut v = Vec::with_capacity(size);
-                let mut rs_dict = RsDict::new();
-                for _ in 0..size {
-                    let bit = rng.gen();
-                    v.push(bit);
-                    rs_dict.push(bit);
-                }
-                for &bit in &[true, false] {
-                    for i in 0..size as u64 {
-                        assert_eq!(vec_rank(&v, i, bit), rs_dict.rank(i, bit));
-                    }
-                }
+        let mut one_rank = 0;
+        let mut zero_rank = 0;
+
+        // Check that rank(i) matches our naively computed ranks for all indices
+        for (i, &inp_bit) in bits.iter().enumerate() {
+            if rs_dict.rank(i as u64, false) != zero_rank {
+                return false;
+            }
+            if rs_dict.rank(i as u64, true) != one_rank {
+                return false;
+            }
+            if inp_bit {
+                one_rank += 1;
+            } else {
+                zero_rank += 1;
             }
         }
+
+        true
     }
 
-    #[test]
-    fn test_select_randomized() {
-        let bv_sizes = vec![5usize, 17, 65, 767, 8197];
-        let num_trials = 100usize;
-        let mut rng = rand::thread_rng();
-
-        fn vec_select(v: &[bool], rank: u64, bit: bool) -> Option<u64> {
-            v.iter()
-                .enumerate()
-                .filter(|(i, &v)| v == bit)
-                .nth(rank as usize)
-                .map(|(i, _)| i as u64)
+    #[quickcheck]
+    fn select_matches_simple(bits: Vec<bool>) -> bool {
+        let mut rs_dict = RsDict::with_capacity(bits.len());
+        for &bit in &bits {
+            rs_dict.push(bit);
         }
 
-        for size in bv_sizes {
-            for _ in 0..num_trials {
-                let mut v = Vec::with_capacity(size);
-                let mut rs_dict = RsDict::new();
-                for _ in 0..size {
-                    let bit = rng.gen();
-                    v.push(bit);
-                    rs_dict.push(bit);
+        let mut one_rank = 0usize;
+        let mut zero_rank = 0usize;
+
+        // Check `select(r)` for ranks "in bounds" within the bitvector against
+        // our naively computed ranks.
+        for (i, &inp_bit) in bits.iter().enumerate() {
+            if inp_bit {
+                if rs_dict.select(one_rank as u64, true) != Some(i as u64) {
+                    return false;
                 }
-                for &bit in &[true, false] {
-                    for r in 0..size as u64 {
-                        assert_eq!(vec_select(&v, r, bit), rs_dict.select(r, bit));
-                    }
+                one_rank += 1;
+            } else {
+                if rs_dict.select(zero_rank as u64, false) != Some(i as u64) {
+                    return false;
                 }
+                zero_rank += 1;
             }
         }
-
+        // Check all of the "out of bounds" ranks up until `bits.len()`
+        for r in (one_rank + 1)..bits.len() {
+            if rs_dict.select(r as u64, true).is_some() {
+                return false;
+            }
+        }
+        for r in (zero_rank + 1)..bits.len() {
+            if rs_dict.select(r as u64, false).is_some() {
+                return false;
+            }
+        }
+        true
     }
 }
