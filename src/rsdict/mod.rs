@@ -22,6 +22,7 @@ use super::bit_vec::{
     BitVec,
     BitVector,
 };
+use super::broadword;
 
 use self::constants::*;
 use self::enum_code::*;
@@ -73,34 +74,18 @@ impl LastBlock {
         }
     }
 
-    // FIXME: Use broadword algorithm here?
-    fn select0(&self, mut rank: u8) -> u64 {
+    fn select0(&self, rank: u8) -> u64 {
         debug_assert!(rank < self.num_zeros as u8);
-        for i in 0..SMALL_BLOCK_SIZE {
-            if !self.get_bit(i) {
-                if rank == 0 {
-                    return i;
-                }
-                rank -= 1;
-            }
-        }
-        debug_assert!(false, "Developer error: select0'd outside of last block");
-        0
+        let result = broadword::select1_raw(rank as usize, !self.bits);
+        debug_assert_ne!(result, 72);
+        result as u64
     }
 
-    // FIXME: Use broadword algorithm here?
-    fn select1(&self, mut rank: u8) -> u64 {
+    fn select1(&self, rank: u8) -> u64 {
         debug_assert!(rank < self.num_ones as u8);
-        for i in 0..SMALL_BLOCK_SIZE {
-            if self.get_bit(i) {
-                if rank == 0 {
-                    return i;
-                }
-                rank -= 1;
-            }
-        }
-        debug_assert!(false, "Developer error: select1'd outside of last block");
-        0
+        let result = broadword::select1_raw(rank as usize, self.bits);
+        debug_assert_ne!(result, 72);
+        result as u64
     }
 
     // Count the number of bits set at indices i >= pos
