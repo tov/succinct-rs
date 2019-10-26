@@ -14,6 +14,14 @@ use super::select::{
     Select0Support,
 };
 use super::space_usage::SpaceUsage;
+use super::stream::{
+    BitBuffer,
+    BitWrite,
+};
+use super::bit_vec::{
+    BitVec,
+    BitVector,
+};
 
 use self::constants::*;
 use self::enum_code::*;
@@ -31,8 +39,7 @@ pub struct RsDict {
     //   variable length (see `ENUM_CODE_LENGTH`), so there isn't direct access
     //   for a particular small block.
 	sb_classes: Vec<u8>,
-    code_len: u64,
-    bits: Vec<u64>,
+    sb_indices: BitBuffer<BitVector<u64>>,
 
     // Large block metadata (stored every LARGE_BLOCK_SIZE bits):
     // * pointer into variable-length `bits` for the current index
@@ -139,7 +146,7 @@ impl RankSupport for RsDict {
             return bit_num(rank, pos, bit);
         }
         let sb_class = self.sb_classes[sblock as usize];
-        let code = get_slice(&self.bits, pointer, ENUM_CODE_LENGTH[sb_class as usize]);
+        let code = self.read_sb_index(pointer, ENUM_CODE_LENGTH[sb_class as usize]);
         rank += enum_rank(code, sb_class, (pos % SMALL_BLOCK_SIZE) as u8) as u64;
         bit_num(rank, pos, bit)
     }
@@ -206,7 +213,7 @@ impl Select0Support for RsDict {
             sblock += 1;
         }
         let sb_class = self.sb_classes[sblock as usize];
-        let code = get_slice(&self.bits, pointer, ENUM_CODE_LENGTH[sb_class as usize]);
+        let code = self.read_sb_index(pointer, ENUM_CODE_LENGTH[sb_class as usize]);
         Some(sblock * SMALL_BLOCK_SIZE + enum_select0(code, sb_class, remain as u8) as u64)
     }
 }
@@ -251,7 +258,7 @@ impl Select1Support for RsDict {
             sblock += 1;
         }
         let sb_class = self.sb_classes[sblock as usize];
-        let code = get_slice(&self.bits, pointer, ENUM_CODE_LENGTH[sb_class as usize]);
+        let code = self.read_sb_index(pointer, ENUM_CODE_LENGTH[sb_class as usize]);
         Some(sblock * SMALL_BLOCK_SIZE + enum_select1(code, sb_class, remain as u8) as u64)
     }
 }
@@ -263,17 +270,16 @@ impl RsDict {
 
     fn with_capacity(n: usize) -> Self {
         Self {
-            bits: Vec::with_capacity(n / SMALL_BLOCK_SIZE as usize),
             lb_pointers: Vec::with_capacity(n / LARGE_BLOCK_SIZE as usize),
             lb_ranks: Vec::with_capacity(n / LARGE_BLOCK_SIZE as usize),
             select_one_inds: Vec::with_capacity(n / SELECT_BLOCK_SIZE as usize),
             select_zero_inds: Vec::with_capacity(n / SELECT_BLOCK_SIZE as usize),
             sb_classes: Vec::with_capacity(n / SMALL_BLOCK_SIZE as usize),
+            sb_indices: BitBuffer::with_capacity(n as u64 / SMALL_BLOCK_SIZE),
 
             len: 0,
             num_ones: 0,
             num_zeros: 0,
-            code_len: 0,
 
             last_block: LastBlock::new(),
         }
@@ -330,7 +336,7 @@ impl RsDict {
             pointer += ENUM_CODE_LENGTH[sb_class as usize] as u64;
         }
         let sb_class = self.sb_classes[sblock as usize];
-        let code = get_slice(&self.bits, pointer, ENUM_CODE_LENGTH[sb_class as usize]);
+        let code = self.read_sb_index(pointer, ENUM_CODE_LENGTH[sb_class as usize]);
         enum_bit(code, sb_class, (pos % SMALL_BLOCK_SIZE) as u8)
     }
 
@@ -351,7 +357,7 @@ impl RsDict {
             rank += sb_class as u64;
         }
         let sb_class = self.sb_classes[sblock as usize];
-        let code = get_slice(&self.bits, pointer, ENUM_CODE_LENGTH[sb_class as usize]);
+        let code = self.read_sb_index(pointer, ENUM_CODE_LENGTH[sb_class as usize]);
         rank += enum_rank(code, sb_class, (pos % SMALL_BLOCK_SIZE) as u8) as u64;
         let bit = enum_bit(code, sb_class, (pos % SMALL_BLOCK_SIZE) as u8);
         (bit, bit_num(rank, pos, bit))
@@ -365,18 +371,17 @@ impl RsDict {
 
             let sb_class = block.num_ones as u8;
             self.sb_classes.push(sb_class);
+
             let code_len = ENUM_CODE_LENGTH[sb_class as usize];
             let code = enum_encode(block.bits, sb_class);
-            let new_size = floor(self.code_len + code_len as u64, SMALL_BLOCK_SIZE);
-            if new_size > self.bits.len() as u64 {
-                self.bits.push(0);
-            }
-            set_slice(&mut self.bits, self.code_len, code_len, code);
-            self.code_len += code_len as u64;
+
+            // FIXME: This isn't specialized to write the integer all at once.
+            self.sb_indices.write_int(code_len as usize, code)
+                .expect("Developer error: write_int failed");
         }
         if self.len % LARGE_BLOCK_SIZE == 0 {
             self.lb_ranks.push(self.num_ones);
-            self.lb_pointers.push(self.code_len);
+            self.lb_pointers.push(self.sb_bit_len());
         }
     }
 
@@ -390,6 +395,14 @@ impl RsDict {
     fn is_last_block(&self, pos: u64) -> bool {
         pos >= self.last_block_ind()
     }
+
+    fn read_sb_index(&self, ptr: u64, code_len: u8) -> u64 {
+        self.sb_indices.inner().get_bits(ptr, code_len as usize)
+    }
+
+    fn sb_bit_len(&self) -> u64 {
+        self.sb_indices.inner().bit_len()
+    }
 }
 
 impl SpaceUsage for RsDict {
@@ -398,12 +411,12 @@ impl SpaceUsage for RsDict {
     }
 
     fn heap_bytes(&self) -> usize {
-        self.bits.heap_bytes() +
+        self.sb_indices.inner().heap_bytes() +
+            self.sb_classes.heap_bytes() +
             self.lb_pointers.heap_bytes() +
             self.lb_ranks.heap_bytes() +
             self.select_one_inds.heap_bytes() +
-            self.select_zero_inds.heap_bytes() +
-            self.sb_classes.heap_bytes()
+            self.select_zero_inds.heap_bytes()
     }
 }
 
