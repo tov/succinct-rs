@@ -25,27 +25,26 @@ pub struct RsDict {
 	num_ones: u64,
 	num_zeros: u64,
 
-    code_len: u64,
-    bits: Vec<u64>,
-
-    // Select acceleration metadata:
-    // `select_{one,zero}_inds` store the (index / LARGE_BLOCK_SIZE) of each
-    // SELECT_BLOCK_SIZE'th bit.
-	select_one_inds: Vec<u64>,
-	select_zero_inds: Vec<u64>,
-
     // Small block metadata (stored every SMALL_BLOCK_SIZE bits):
     // * number of set bits (the "class") for the small block
     // * index within a class for each small block; note that the indexes are
     //   variable length (see `ENUM_CODE_LENGTH`), so there isn't direct access
     //   for a particular small block.
 	sb_classes: Vec<u8>,
+    code_len: u64,
+    bits: Vec<u64>,
 
     // Large block metadata (stored every LARGE_BLOCK_SIZE bits):
     // * pointer into variable-length `bits` for the current index
     // * cached rank at the current index
     lb_pointers: Vec<u64>,
 	lb_ranks: Vec<u64>,
+
+    // Select acceleration metadata:
+    // `select_{one,zero}_inds` store the (index / LARGE_BLOCK_SIZE) of each
+    // SELECT_BLOCK_SIZE'th bit.
+	select_one_inds: Vec<u64>,
+	select_zero_inds: Vec<u64>,
 
     // Current in-progress small block we're appending to
     last_block: LastBlock,
@@ -382,7 +381,10 @@ impl RsDict {
     }
 
     fn last_block_ind(&self) -> u64 {
-        (floor(self.len, SMALL_BLOCK_SIZE) + 1) * SMALL_BLOCK_SIZE
+        if self.len == 0 {
+            return 0;
+        }
+        ((self.len - 1) / SMALL_BLOCK_SIZE) * SMALL_BLOCK_SIZE
     }
 
     fn is_last_block(&self, pos: u64) -> bool {
