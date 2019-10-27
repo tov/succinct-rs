@@ -204,7 +204,7 @@ impl RsDict {
         Self::with_capacity(0)
     }
 
-    fn with_capacity(n: usize) -> Self {
+    pub fn with_capacity(n: usize) -> Self {
         Self {
             lb_pointers: Vec::with_capacity(n / LARGE_BLOCK_SIZE as usize),
             lb_ranks: Vec::with_capacity(n / LARGE_BLOCK_SIZE as usize),
