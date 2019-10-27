@@ -2,7 +2,6 @@ use std::mem;
 
 mod constants;
 mod enum_code;
-mod helpers;
 
 use super::rank::{
     RankSupport,
@@ -26,7 +25,6 @@ use super::broadword;
 
 use self::constants::*;
 use self::enum_code::*;
-use self::helpers::*;
 
 #[derive(Debug)]
 pub struct RsDict {
@@ -48,7 +46,7 @@ pub struct RsDict {
     lb_pointers: Vec<u64>,
 	lb_ranks: Vec<u64>,
 
-    // Select acceleration metadata:
+    // Select acceleration:
     // `select_{one,zero}_inds` store the (index / LARGE_BLOCK_SIZE) of each
     // SELECT_BLOCK_SIZE'th bit.
 	select_one_inds: Vec<u64>,
@@ -58,65 +56,16 @@ pub struct RsDict {
     last_block: LastBlock,
 }
 
-#[derive(Debug)]
-struct LastBlock {
-    bits: u64,
-    num_ones: u64,
-    num_zeros: u64,
-}
-
-impl LastBlock {
-    fn new() -> Self {
-        LastBlock {
-            bits: 0,
-            num_ones: 0,
-            num_zeros: 0,
-        }
-    }
-
-    fn select0(&self, rank: u8) -> u64 {
-        debug_assert!(rank < self.num_zeros as u8);
-        let result = broadword::select1_raw(rank as usize, !self.bits);
-        debug_assert_ne!(result, 72);
-        result as u64
-    }
-
-    fn select1(&self, rank: u8) -> u64 {
-        debug_assert!(rank < self.num_ones as u8);
-        let result = broadword::select1_raw(rank as usize, self.bits);
-        debug_assert_ne!(result, 72);
-        result as u64
-    }
-
-    // Count the number of bits set at indices i >= pos
-    fn count_suffix(&self, pos: u64) -> u64 {
-        (self.bits >> pos).count_ones() as u64
-    }
-
-    fn get_bit(&self, pos: u64) -> bool {
-        (self.bits >> pos) & 1 == 1
-    }
-
-    // Only call one of `set_one` or `set_zeros` for any `pos`.
-    fn set_one(&mut self, pos: u64) {
-        self.bits |= 1 << pos;
-        self.num_ones += 1;
-    }
-    fn set_zero(&mut self, _pos: u64) {
-        self.num_zeros += 1;
-    }
-}
-
 impl RankSupport for RsDict {
     type Over = bool;
 
     fn rank(&self, pos: u64, bit: bool) -> u64 {
         if pos >= self.len {
-            return bit_num(self.num_ones, self.len, bit);
+            return rank_by_bit(self.num_ones, self.len, bit);
         }
         if self.is_last_block(pos) {
             let trailing_ones = self.last_block.count_suffix(pos % SMALL_BLOCK_SIZE);
-            return bit_num(self.num_ones - trailing_ones, pos, bit);
+            return rank_by_bit(self.num_ones - trailing_ones, pos, bit);
         }
         let lblock = pos / LARGE_BLOCK_SIZE;
         let mut pointer = self.lb_pointers[lblock as usize];
@@ -128,12 +77,12 @@ impl RankSupport for RsDict {
             rank += sb_class as u64;
         }
         if pos % SMALL_BLOCK_SIZE == 0 {
-            return bit_num(rank, pos, bit);
+            return rank_by_bit(rank, pos, bit);
         }
         let sb_class = self.sb_classes[sblock as usize];
         let code = self.read_sb_index(pointer, ENUM_CODE_LENGTH[sb_class as usize]);
-        rank += enum_rank(code, sb_class, (pos % SMALL_BLOCK_SIZE) as u8) as u64;
-        bit_num(rank, pos, bit)
+        rank += enum_code::rank(code, sb_class, pos);
+        rank_by_bit(rank, pos, bit)
     }
 
     fn limit(&self) -> u64 {
@@ -185,7 +134,7 @@ impl Select0Support for RsDict {
 
         let mut sblock = lblock * SMALL_BLOCK_PER_LARGE_BLOCK;
         let mut pointer = self.lb_pointers[lblock as usize];
-        let mut remain = rank - lblock * LARGE_BLOCK_SIZE + self.lb_ranks[lblock as usize] + 1;
+        let mut remain = rank - lblock * LARGE_BLOCK_SIZE + self.lb_ranks[lblock as usize];
 
         while sblock < self.sb_classes.len() as u64 {
             let sb_class = self.sb_classes[sblock as usize];
@@ -199,7 +148,7 @@ impl Select0Support for RsDict {
         }
         let sb_class = self.sb_classes[sblock as usize];
         let code = self.read_sb_index(pointer, ENUM_CODE_LENGTH[sb_class as usize]);
-        Some(sblock * SMALL_BLOCK_SIZE + enum_select0(code, sb_class, remain as u8) as u64)
+        Some(sblock * SMALL_BLOCK_SIZE + enum_code::select0(code, sb_class, remain))
     }
 }
 
@@ -230,7 +179,7 @@ impl Select1Support for RsDict {
 
         let mut sblock = lblock * SMALL_BLOCK_PER_LARGE_BLOCK;
         let mut pointer = self.lb_pointers[lblock as usize];
-        let mut remain = rank - self.lb_ranks[lblock as usize] + 1;
+        let mut remain = rank - self.lb_ranks[lblock as usize];
 
         while sblock < self.sb_classes.len() as u64 {
             let sb_class = self.sb_classes[sblock as usize];
@@ -244,7 +193,9 @@ impl Select1Support for RsDict {
         }
         let sb_class = self.sb_classes[sblock as usize];
         let code = self.read_sb_index(pointer, ENUM_CODE_LENGTH[sb_class as usize]);
-        Some(sblock * SMALL_BLOCK_SIZE + enum_select1(code, sb_class, remain as u8) as u64)
+        let block_rank = enum_code::select1(code, sb_class, remain);
+
+        Some(sblock * SMALL_BLOCK_SIZE + block_rank as u64)
     }
 }
 
@@ -322,7 +273,7 @@ impl RsDict {
         }
         let sb_class = self.sb_classes[sblock as usize];
         let code = self.read_sb_index(pointer, ENUM_CODE_LENGTH[sb_class as usize]);
-        enum_bit(code, sb_class, (pos % SMALL_BLOCK_SIZE) as u8)
+        enum_code::decode_bit(code, sb_class, pos % SMALL_BLOCK_SIZE)
     }
 
     pub fn bit_and_rank(&self, pos: u64) -> (bool, u64) {
@@ -330,7 +281,7 @@ impl RsDict {
             let offset = pos % SMALL_BLOCK_SIZE;
             let bit = self.last_block.get_bit(offset);
             let after_rank = self.last_block.count_suffix(offset);
-            return (bit, bit_num(self.num_ones - after_rank, pos, bit));
+            return (bit, rank_by_bit(self.num_ones - after_rank, pos, bit));
         }
         let lblock = pos / LARGE_BLOCK_SIZE;
         let mut pointer = self.lb_pointers[lblock as usize];
@@ -343,9 +294,9 @@ impl RsDict {
         }
         let sb_class = self.sb_classes[sblock as usize];
         let code = self.read_sb_index(pointer, ENUM_CODE_LENGTH[sb_class as usize]);
-        rank += enum_rank(code, sb_class, (pos % SMALL_BLOCK_SIZE) as u8) as u64;
-        let bit = enum_bit(code, sb_class, (pos % SMALL_BLOCK_SIZE) as u8);
-        (bit, bit_num(rank, pos, bit))
+        rank += enum_code::rank(code, sb_class, pos);
+        let bit = enum_code::decode_bit(code, sb_class, pos % SMALL_BLOCK_SIZE);
+        (bit, rank_by_bit(rank, pos, bit))
     }
 }
 
@@ -357,8 +308,7 @@ impl RsDict {
             let sb_class = block.num_ones as u8;
             self.sb_classes.push(sb_class);
 
-            let code_len = ENUM_CODE_LENGTH[sb_class as usize];
-            let code = enum_encode(block.bits, sb_class);
+            let (code_len, code) = enum_code::encode(block.bits, sb_class);
 
             // FIXME: This isn't specialized to write the integer all at once.
             self.sb_indices.write_int(code_len as usize, code)
@@ -403,6 +353,59 @@ impl SpaceUsage for RsDict {
             self.select_one_inds.heap_bytes() +
             self.select_zero_inds.heap_bytes()
     }
+}
+
+#[derive(Debug)]
+struct LastBlock {
+    bits: u64,
+    num_ones: u64,
+    num_zeros: u64,
+}
+
+impl LastBlock {
+    fn new() -> Self {
+        LastBlock {
+            bits: 0,
+            num_ones: 0,
+            num_zeros: 0,
+        }
+    }
+
+    fn select0(&self, rank: u8) -> u64 {
+        debug_assert!(rank < self.num_zeros as u8);
+        let result = broadword::select1_raw(rank as usize, !self.bits);
+        debug_assert_ne!(result, 72);
+        result as u64
+    }
+
+    fn select1(&self, rank: u8) -> u64 {
+        debug_assert!(rank < self.num_ones as u8);
+        let result = broadword::select1_raw(rank as usize, self.bits);
+        debug_assert_ne!(result, 72);
+        result as u64
+    }
+
+    // Count the number of bits set at indices i >= pos
+    fn count_suffix(&self, pos: u64) -> u64 {
+        (self.bits >> pos).count_ones() as u64
+    }
+
+    fn get_bit(&self, pos: u64) -> bool {
+        (self.bits >> pos) & 1 == 1
+    }
+
+    // Only call one of `set_one` or `set_zeros` for any `pos`.
+    fn set_one(&mut self, pos: u64) {
+        self.bits |= 1 << pos;
+        self.num_ones += 1;
+    }
+    fn set_zero(&mut self, _pos: u64) {
+        self.num_zeros += 1;
+    }
+}
+
+fn rank_by_bit(x: u64, n: u64, b: bool) -> u64 {
+    if b { x } else { n - x }
 }
 
 #[cfg(test)]

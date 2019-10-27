@@ -1,140 +1,186 @@
-// FIXME: Remove * imports
-use super::constants::*;
-use super::helpers::*;
+use crate::broadword;
+use super::constants::SMALL_BLOCK_SIZE;
 
-pub fn enum_encode(val: u64, mut rank_sb: u8) -> u64 {
-    if ENUM_CODE_LENGTH[rank_sb as usize] as u64 == SMALL_BLOCK_SIZE {
-        return val;
+pub fn encode(value: u64, class: u8) -> (u8, u64) {
+    debug_assert_eq!(value.count_ones() as u8, class);
+    let code_len = ENUM_CODE_LENGTH[class as usize];
+
+    // Fast path: return the integer unchanged if we're using all of our bits.
+    if code_len == SMALL_BLOCK_SIZE as u8 {
+        return (code_len, value);
     }
+
     let mut code = 0u64;
+    let mut k = class;
     for i in 0..(SMALL_BLOCK_SIZE as u8) {
-        if get_bit(val, i) {
-            code += BINOMIAL_COEFFICIENTS[(SMALL_BLOCK_SIZE - i as u64) as usize - 1][rank_sb as usize];
-            rank_sb -= 1;
+        if (value >> i) & 1 != 0 {
+            let n = (SMALL_BLOCK_SIZE as u8 - i) - 1;
+            code += BINOMIAL_COEFFICIENTS[n as usize][k as usize];
+            k -= 1;
         }
     }
-    code
+    (code_len, code)
 }
 
-// FIXME: write enum tests
 #[cfg(test)]
-pub fn enum_decode(mut code: u64, mut rank_sb: u8) -> u64 {
-    if ENUM_CODE_LENGTH[rank_sb as usize] as u64 == SMALL_BLOCK_SIZE {
+pub fn decode(mut code: u64, class: u8) -> u64 {
+    if ENUM_CODE_LENGTH[class as usize] == SMALL_BLOCK_SIZE as u8 {
         return code;
     }
-    let mut val = 0u64;
+    let mut value = 0u64;
+    let mut k = class;
     for i in 0..(SMALL_BLOCK_SIZE as u8) {
-        let zero_case_num = BINOMIAL_COEFFICIENTS[(SMALL_BLOCK_SIZE - i as u64) as usize - 1][rank_sb as usize];
+        let n = SMALL_BLOCK_SIZE as u8 - i - 1;
+        let zero_case_num = BINOMIAL_COEFFICIENTS[n as usize][k as usize];
         if code >= zero_case_num {
-            val |= 1 << i;
+            value |= 1 << i;
             code -= zero_case_num;
-            rank_sb -= 1;
+            k -= 1;
         }
     }
-    val
+    value
 }
 
-pub fn enum_bit(mut code: u64, mut rank_sb: u8, pos: u8) -> bool {
-    if ENUM_CODE_LENGTH[rank_sb as usize] as u64 == SMALL_BLOCK_SIZE {
-        return get_bit(code, pos);
+pub fn decode_bit(mut code: u64, class: u8, pos: u64) -> bool {
+    if ENUM_CODE_LENGTH[class as usize] == SMALL_BLOCK_SIZE as u8 {
+        return (code >> pos) & 1 != 0
     }
-    for i in 0..pos {
-        let zero_case_num = BINOMIAL_COEFFICIENTS[(SMALL_BLOCK_SIZE - i as u64) as usize - 1][rank_sb as usize];
-        if code >= zero_case_num {
-            code -= zero_case_num;
-            rank_sb -= 1;
-        }
-    }
-    // FIXME okay?
-    code >= BINOMIAL_COEFFICIENTS[(SMALL_BLOCK_SIZE - pos as u64) as usize - 1][rank_sb as usize]
-}
-
-#[cfg(test)]
-pub fn run_zeros_raw(code: u64, pos: u8) -> u8 {
-    let mut i = pos;
-    while (i as u64) < SMALL_BLOCK_SIZE && !get_bit(code, i) {
-        i += 1;
-    }
-    i - pos
-}
-
-#[cfg(test)]
-pub fn enum_run_zeros(mut code: u64, mut rank_sb: u8, pos: u8) -> u8 {
-    if ENUM_CODE_LENGTH[rank_sb as usize] as u64 == SMALL_BLOCK_SIZE {
-        return run_zeros_raw(code, pos);
-    }
-    for i in 0..pos {
-        let zero_case_num = BINOMIAL_COEFFICIENTS[(SMALL_BLOCK_SIZE - i as u64) as usize - 1][rank_sb as usize];
+    let mut k = class;
+    for i in 0..(pos as u8) {
+        let n = SMALL_BLOCK_SIZE as u8 - i - 1;
+        let zero_case_num = BINOMIAL_COEFFICIENTS[n as usize][k as usize];
         if code >= zero_case_num {
             code -= zero_case_num;
-            rank_sb -= 1;
+            k -= 1;
         }
     }
-    for i in pos..(SMALL_BLOCK_SIZE as u8) {
-        let zero_case_num = BINOMIAL_COEFFICIENTS[(SMALL_BLOCK_SIZE - i as u64) as usize - 1][rank_sb as usize];
-        if code >= zero_case_num {
-            return i - pos;
-        }
-    }
-    (SMALL_BLOCK_SIZE as u8) - pos
+    let n = SMALL_BLOCK_SIZE - pos - 1;
+    code >= BINOMIAL_COEFFICIENTS[n as usize][k as usize]
+
 }
 
-pub fn enum_rank(mut code: u64, rank_sb: u8, pos: u8) -> u8 {
-    if ENUM_CODE_LENGTH[rank_sb as usize] as u64 == SMALL_BLOCK_SIZE {
-        return pop_count(code & ((1 << pos) - 1));
+pub fn rank(mut code: u64, class: u8, pos: u64) -> u64 {
+    if ENUM_CODE_LENGTH[class as usize] == SMALL_BLOCK_SIZE as u8 {
+        return (code & ((1 << pos) - 1)).count_ones() as u64
     }
-    let mut cur_rank = rank_sb;
+    let mut cur_rank = class;
     for i in 0..pos {
-        let zero_case_num = BINOMIAL_COEFFICIENTS[(SMALL_BLOCK_SIZE - i as u64) as usize - 1][cur_rank as usize];
+        let n = SMALL_BLOCK_SIZE - i - 1;
+        let zero_case_num = BINOMIAL_COEFFICIENTS[n as usize][cur_rank as usize];
         if code >= zero_case_num {
             code -= zero_case_num;
             cur_rank -= 1;
         }
     }
-    rank_sb - cur_rank
+    (class - cur_rank) as u64
+}
+
+pub fn select1(mut code: u64, class: u8, mut rank: u64) -> u64 {
+    if ENUM_CODE_LENGTH[class as usize] == SMALL_BLOCK_SIZE as u8 {
+        let result = broadword::select1_raw(rank as usize, code);
+        debug_assert_ne!(result, 72);
+        return result as u64;
+    }
+    let mut k = class;
+    for i in 0..SMALL_BLOCK_SIZE {
+        let n = SMALL_BLOCK_SIZE - i - 1;
+        let zero_case_num = BINOMIAL_COEFFICIENTS[n as usize][k as usize];
+        if code >= zero_case_num {
+            if rank == 0 {
+                return i;
+            }
+            rank -= 1;
+            code -= zero_case_num;
+            k -= 1;
+        }
+    }
+    debug_assert!(false, "select1 past end of codeword");
+    0
+}
+
+pub fn select0(mut code: u64, class: u8, mut rank: u64) -> u64 {
+    if ENUM_CODE_LENGTH[class as usize] == SMALL_BLOCK_SIZE as u8 {
+        let result = broadword::select1_raw(rank as usize, !code);
+        debug_assert_ne!(result, 72);
+        return result as u64;
+    }
+    let mut k = class as usize;
+    for i in 0..SMALL_BLOCK_SIZE {
+        let n = SMALL_BLOCK_SIZE - i - 1;
+        let zero_case_num = BINOMIAL_COEFFICIENTS[n as usize][k];
+        if code >= zero_case_num {
+            code -= zero_case_num;
+            k -= 1;
+        } else {
+            if rank == 0 {
+                return i;
+            }
+            rank -= 1;
+        }
+    }
+    debug_assert!(false, "select0 past end of codeword");
+    0
 }
 
 #[cfg(test)]
-pub fn enum_select(code: u64, rank_sb: u8, rank: u8, bit: bool) -> u8 {
-    if bit { enum_select1(code, rank_sb, rank) } else { enum_select0(code, rank_sb, rank) }
-}
+mod tests {
+    use broadword;
+    use super::{decode, decode_bit, encode, rank, select0, select1};
 
-pub fn enum_select1(mut code: u64, mut rank_sb: u8, mut rank: u8) -> u8 {
-    if ENUM_CODE_LENGTH[rank_sb as usize] as u64 == SMALL_BLOCK_SIZE {
-        return select_raw(code, rank);
-    }
-    for i in 0..SMALL_BLOCK_SIZE {
-        let zero_case_num = BINOMIAL_COEFFICIENTS[(SMALL_BLOCK_SIZE - i as u64) as usize - 1][rank_sb as usize];
-        if code >= zero_case_num {
-            rank -= 1;
-            if rank == 0 {
-                return i as u8;
-            }
-            code -= zero_case_num;
-            rank_sb -= 1;
-        }
-    }
-    0
-}
-
-pub fn enum_select0(mut code: u64, mut rank_sb: u8, mut rank: u8) -> u8 {
-    if ENUM_CODE_LENGTH[rank_sb as usize] as u64 == SMALL_BLOCK_SIZE {
-        return select_raw(!code, rank);
+    #[quickcheck]
+    fn qc_decode(value: u64) -> bool {
+        let class = value.count_ones() as u8;
+        let (_, code) = encode(value, class);
+        decode(code, class) == value
     }
 
-    for i in 0..SMALL_BLOCK_SIZE {
-        let zero_case_num = BINOMIAL_COEFFICIENTS[(SMALL_BLOCK_SIZE - i as u64) as usize - 1][rank_sb as usize];
-        if code >= zero_case_num {
-            code -= zero_case_num;
-            rank_sb -= 1;
-        } else {
-            rank -= 1;
-            if rank == 0 {
-                return i as u8;
-            }
-        }
+    #[quickcheck]
+    fn qc_decode_bit(value: u64) -> bool {
+        let class = value.count_ones() as u8;
+        let (_, code) = encode(value, class);
+        (0..64)
+            .all(|i| {
+                let computed = decode_bit(code, class, i);
+                let expected = (value >> i) & 1 != 0;
+                computed == expected
+            })
     }
-    0
+
+    #[quickcheck]
+    fn qc_rank(value: u64) -> bool {
+        let class = value.count_ones() as u8;
+        let (_, code) = encode(value, class);
+        (0..64)
+            .all(|i| {
+                let computed = rank(code, class, i);
+                let expected = (value & ((1 << i) - 1)).count_ones() as u64;
+                computed == expected
+            })
+    }
+
+    #[quickcheck]
+    fn qc_select0(value: u64) -> bool {
+        let class = value.count_ones() as u8;
+        let (_, code) = encode(value, class);
+        (0..class as u64)
+            .all(|i| {
+                let computed = select0(code, class, i) as usize;
+                let expected = broadword::select1_raw(i as usize, !value);
+                computed == expected
+            })
+    }
+
+    #[quickcheck]
+    fn qc_select1(value: u64) -> bool {
+        let class = value.count_ones() as u8;
+        let (_, code) = encode(value, class);
+        (0..class as u64)
+            .all(|i| {
+                let computed = select1(code, class, i) as usize;
+                let expected = broadword::select1_raw(i as usize, value);
+                computed == expected
+            })
+    }
 }
 
 // FIXME: Each row is symmetric, we could store half of it w/a second table.
