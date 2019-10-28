@@ -88,20 +88,22 @@ impl RankSupport for RsDict {
         // Start with the rank from our position's large block.
         let lblock = pos / LARGE_BLOCK_SIZE;
         let LargeBlock { mut pointer, mut rank } = self.large_blocks[lblock as usize];
-        let sblock = pos / SMALL_BLOCK_SIZE;
 
         // Add in the ranks (i.e. the classes) per small block up to our
         // position's small block.
-        for &sb_class in &self.sb_classes[(lblock * SMALL_BLOCK_PER_LARGE_BLOCK) as usize .. sblock as usize] {
+        let sblock_start = (lblock * SMALL_BLOCK_PER_LARGE_BLOCK) as usize;
+        let sblock = (pos / SMALL_BLOCK_SIZE) as usize;
+
+        for &sb_class in &self.sb_classes[sblock_start..sblock] {
             pointer += ENUM_CODE_LENGTH[sb_class as usize] as u64;
             rank += sb_class as u64;
         }
 
         // If we aren't on a small block boundary, add in the rank within the small block.
         if pos % SMALL_BLOCK_SIZE != 0 {
-            let sb_class = self.sb_classes[sblock as usize];
+            let sb_class = self.sb_classes[sblock];
             let code = self.read_sb_index(pointer, ENUM_CODE_LENGTH[sb_class as usize]);
-            rank += enum_code::rank(code, sb_class, pos);
+            rank += enum_code::rank(code, sb_class, pos % SMALL_BLOCK_SIZE);
         }
 
         rank_by_bit(rank, pos, bit)
@@ -158,12 +160,12 @@ impl Select0Support for RsDict {
 
         let large_block = &self.large_blocks[lblock as usize];
         let mut pointer = large_block.pointer;
-        let mut remain = rank - lblock * LARGE_BLOCK_SIZE + large_block.rank;
+        let mut remain = rank - (lblock * LARGE_BLOCK_SIZE - large_block.rank);
 
         while sblock < self.sb_classes.len() as u64 {
             let sb_class = self.sb_classes[sblock as usize];
             let sb_zeros = SMALL_BLOCK_SIZE as u8 - sb_class;
-            if remain <= sb_zeros as u64 {
+            if remain < sb_zeros as u64 {
                 break;
             }
             remain -= sb_zeros as u64;
@@ -208,7 +210,7 @@ impl Select1Support for RsDict {
 
         while sblock < self.sb_classes.len() as u64 {
             let sb_class = self.sb_classes[sblock as usize];
-            if remain <= sb_class as u64 {
+            if remain < sb_class as u64 {
                 break;
             }
             remain -= sb_class as u64;
@@ -355,6 +357,9 @@ impl RsDict {
     }
 
     fn read_sb_index(&self, ptr: u64, code_len: u8) -> u64 {
+        if code_len == 0 {
+            return 0;
+        }
         self.sb_indices.inner().get_bits(ptr, code_len as usize)
     }
 
@@ -436,11 +441,13 @@ mod tests {
     use crate::rank::RankSupport;
     use crate::select::SelectSupport;
 
-    fn test_rsdict(blocks: Vec<u128>) -> (Vec<bool>, RsDict) {
+    // Ask quickcheck to generate blocks of 64 bits so we get test
+    // coverage for ranges spanning multiple small blocks.
+    fn test_rsdict(blocks: Vec<u64>) -> (Vec<bool>, RsDict) {
         let mut rs_dict = RsDict::with_capacity(blocks.len() * 64);
         let mut bits = Vec::with_capacity(blocks.len() * 64);
         for block in blocks {
-            for i in 0..128 {
+            for i in 0..64 {
                 let bit = (block >> i) & 1 != 0;
                 rs_dict.push(bit);
                 bits.push(bit);
@@ -450,7 +457,7 @@ mod tests {
     }
 
     #[quickcheck]
-    fn rank_matches_simple(blocks: Vec<u128>) -> bool {
+    fn rank_matches_simple(blocks: Vec<u64>) {
         let (bits, rs_dict) = test_rsdict(blocks);
 
         let mut one_rank = 0;
@@ -458,24 +465,47 @@ mod tests {
 
         // Check that rank(i) matches our naively computed ranks for all indices
         for (i, &inp_bit) in bits.iter().enumerate() {
-            if rs_dict.rank(i as u64, false) != zero_rank {
-                return false;
-            }
-            if rs_dict.rank(i as u64, true) != one_rank {
-                return false;
-            }
+            assert_eq!(rs_dict.rank(i as u64, false), zero_rank);
+            assert_eq!(rs_dict.rank(i as u64, true), one_rank);
             if inp_bit {
                 one_rank += 1;
             } else {
                 zero_rank += 1;
             }
         }
+    }
 
-        true
+   #[test]
+    fn select_failure() {
+        let blocks = vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0];
+        let (bits, rs_dict) = test_rsdict(blocks);
+        let mut one_rank = 0usize;
+        let mut zero_rank = 0usize;
+
+        rs_dict.select(1023, false);
+
+        // // Check `select(r)` for ranks "in bounds" within the bitvector against
+        // // our naively computed ranks.
+        // for (i, &inp_bit) in bits.iter().enumerate() {
+        //     if inp_bit {
+        //         assert_eq!(rs_dict.select(one_rank as u64, true), Some(i as u64));
+        //         one_rank += 1;
+        //     } else {
+        //         assert_eq!(rs_dict.select(zero_rank as u64, false), Some(i as u64));
+        //         zero_rank += 1;
+        //     }
+        // }
+        // // Check all of the "out of bounds" ranks up until `bits.len()`
+        // for r in (one_rank + 1)..bits.len() {
+        //     assert_eq!(rs_dict.select(r as u64, true), None);
+        // }
+        // for r in (zero_rank + 1)..bits.len() {
+        //     assert_eq!(rs_dict.select(r as u64, false), None);
+        // }
     }
 
     #[quickcheck]
-    fn select_matches_simple(blocks: Vec<u128>) -> bool {
+    fn select_matches_simple(blocks: Vec<u64>) {
         let (bits, rs_dict) = test_rsdict(blocks);
 
         let mut one_rank = 0usize;
@@ -485,28 +515,19 @@ mod tests {
         // our naively computed ranks.
         for (i, &inp_bit) in bits.iter().enumerate() {
             if inp_bit {
-                if rs_dict.select(one_rank as u64, true) != Some(i as u64) {
-                    return false;
-                }
+                assert_eq!(rs_dict.select(one_rank as u64, true), Some(i as u64));
                 one_rank += 1;
             } else {
-                if rs_dict.select(zero_rank as u64, false) != Some(i as u64) {
-                    return false;
-                }
+                assert_eq!(rs_dict.select(zero_rank as u64, false), Some(i as u64));
                 zero_rank += 1;
             }
         }
         // Check all of the "out of bounds" ranks up until `bits.len()`
         for r in (one_rank + 1)..bits.len() {
-            if rs_dict.select(r as u64, true).is_some() {
-                return false;
-            }
+            assert_eq!(rs_dict.select(r as u64, true), None);
         }
         for r in (zero_rank + 1)..bits.len() {
-            if rs_dict.select(r as u64, false).is_some() {
-                return false;
-            }
+            assert_eq!(rs_dict.select(r as u64, false), None);
         }
-        true
     }
 }
