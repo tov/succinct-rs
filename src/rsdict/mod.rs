@@ -57,12 +57,12 @@ pub struct RsDict {
     sb_indices: BitBuffer<BitVector<u64>>,
 
     // Large block metadata (stored every LARGE_BLOCK_SIZE bits):
-    // * pointer into variable-length `bits` for the current index
-    // * cached rank at the current index
+    // * pointer into variable-length `bits` for the block start
+    // * cached rank at the block start
     large_blocks: Vec<LargeBlock>,
 
     // Select acceleration:
-    // `select_{one,zero}_inds` store the (index / LARGE_BLOCK_SIZE) of each
+    // `select_{one,zero}_inds` store the (offset / LARGE_BLOCK_SIZE) of each
     // SELECT_BLOCK_SIZE'th bit.
 	select_one_inds: Vec<u64>,
 	select_zero_inds: Vec<u64>,
@@ -140,41 +140,50 @@ impl Select0Support for RsDict {
         // How many zeros are there *excluding* the last block?
         let prefix_num_zeros = self.num_zeros - self.last_block.num_zeros;
 
-        // Our index must be in the last block.
+        // Our rank must be in the last block.
         if rank >= prefix_num_zeros {
             let lb_rank = (rank - prefix_num_zeros) as u8;
             return Some(self.last_block_ind() + self.last_block.select0(lb_rank));
         }
 
-        let select_ind = rank / SELECT_BLOCK_SIZE;
-        let mut lblock = self.select_zero_inds[select_ind as usize];
-        while lblock < self.large_blocks.len() as u64 {
-            if rank < lblock * LARGE_BLOCK_SIZE - self.large_blocks[lblock as usize].rank {
+        // First, use the select pointer to jump forward to a large block and
+        // then walk forward over the large blocks until we pass our rank.
+        let select_ind = (rank / SELECT_BLOCK_SIZE) as usize;
+        let lb_start = self.select_zero_inds[select_ind] as usize;
+        let mut lblock = None;
+        for (i, large_block) in self.large_blocks[lb_start..].iter().enumerate() {
+            let lb_ix = (lb_start + i) as u64;
+            let lb_rank = lb_ix * LARGE_BLOCK_SIZE - large_block.rank;
+            if rank < lb_rank {
+                lblock = Some(lb_ix - 1);
                 break;
             }
-            lblock += 1;
         }
-        lblock -= 1;
-
-        let mut sblock = lblock * SMALL_BLOCK_PER_LARGE_BLOCK;
-
+        let lblock = lblock.unwrap_or(self.large_blocks.len() as u64 - 1);
         let large_block = &self.large_blocks[lblock as usize];
-        let mut pointer = large_block.pointer;
-        let mut remain = rank - (lblock * LARGE_BLOCK_SIZE - large_block.rank);
 
-        while sblock < self.sb_classes.len() as u64 {
-            let sb_class = self.sb_classes[sblock as usize];
-            let sb_zeros = SMALL_BLOCK_SIZE as u8 - sb_class;
-            if remain < sb_zeros as u64 {
-                break;
+        // Next, iterate over the small blocks, using their cached class to
+        // subtract out our rank.
+        let sb_start = (lblock * SMALL_BLOCK_PER_LARGE_BLOCK) as usize;
+        let mut pointer = large_block.pointer;
+        let mut remaining = rank - (lblock * LARGE_BLOCK_SIZE - large_block.rank);
+        for (i, &sb_class) in self.sb_classes[sb_start..].iter().enumerate() {
+            let sb_zeros = (SMALL_BLOCK_SIZE as u8 - sb_class) as u64;
+            let code_length = ENUM_CODE_LENGTH[sb_class as usize];
+
+            // Our desired rank is within this block.
+            if remaining < sb_zeros {
+                let code = self.read_sb_index(pointer, code_length);
+                let sb_rank = (sb_start + i) as u64 * SMALL_BLOCK_SIZE;
+                let block_rank = enum_code::select0(code, sb_class, remaining);
+                return Some(sb_rank + block_rank);
             }
-            remain -= sb_zeros as u64;
-            pointer += ENUM_CODE_LENGTH[sb_zeros as usize] as u64;
-            sblock += 1;
+
+            // Otherwise, subtract out this block and continue.
+            remaining -= sb_zeros;
+            pointer += code_length as u64;
         }
-        let sb_class = self.sb_classes[sblock as usize];
-        let code = self.read_sb_index(pointer, ENUM_CODE_LENGTH[sb_class as usize]);
-        Some(sblock * SMALL_BLOCK_SIZE + enum_code::select0(code, sb_class, remain))
+        panic!("Ran out of small blocks when iterating over rank");
     }
 }
 
@@ -183,46 +192,43 @@ impl Select1Support for RsDict {
         if rank >= self.num_ones {
             return None;
         }
-        // How many ones are there *excluding* the last block?
-        let prefix_num_ones = self.num_ones - self.last_block.num_ones;
 
-        // Our index must be in the last block.
+        let prefix_num_ones = self.num_ones - self.last_block.num_ones;
         if rank >= prefix_num_ones {
             let lb_rank = (rank - prefix_num_ones) as u8;
             return Some(self.last_block_ind() + self.last_block.select1(lb_rank));
         }
 
-        let select_ind = rank / SELECT_BLOCK_SIZE;
-        let mut lblock = self.select_one_inds[select_ind as usize];
-
-        while lblock < self.large_blocks.len() as u64 {
-            if rank < self.large_blocks[lblock as usize].rank {
+        let select_ind = (rank / SELECT_BLOCK_SIZE) as usize;
+        let lb_start = self.select_one_inds[select_ind] as usize;
+        let mut lblock = None;
+        for (i, large_block) in self.large_blocks[lb_start..].iter().enumerate() {
+            if rank < large_block.rank {
+                lblock = Some((lb_start + i - 1) as u64);
                 break;
             }
-            lblock += 1;
         }
-        lblock -= 1;
-
-        let mut sblock = lblock * SMALL_BLOCK_PER_LARGE_BLOCK;
+        let lblock = lblock.unwrap_or(self.large_blocks.len() as u64 - 1);
         let large_block = &self.large_blocks[lblock as usize];
+
+        let sb_start = (lblock * SMALL_BLOCK_PER_LARGE_BLOCK) as usize;
         let mut pointer = large_block.pointer;
-        let mut remain = rank - large_block.rank;
+        let mut remaining = rank - large_block.rank;
+        for (i, &sb_class) in self.sb_classes[sb_start..].iter().enumerate() {
+            let sb_ones = sb_class as u64;
+            let code_length = ENUM_CODE_LENGTH[sb_class as usize];
 
-        while sblock < self.sb_classes.len() as u64 {
-            let sb_class = self.sb_classes[sblock as usize];
-            if remain < sb_class as u64 {
-                break;
+            if remaining < sb_ones {
+                let code = self.read_sb_index(pointer, code_length);
+                let sb_rank = (sb_start + i) as u64 * SMALL_BLOCK_SIZE;
+                let block_rank = enum_code::select1(code, sb_class, remaining);
+                return Some(sb_rank + block_rank);
             }
-            remain -= sb_class as u64;
-            pointer += ENUM_CODE_LENGTH[sb_class as usize] as u64;
 
-            sblock += 1;
+            remaining -= sb_ones;
+            pointer += code_length as u64;
         }
-        let sb_class = self.sb_classes[sblock as usize];
-        let code = self.read_sb_index(pointer, ENUM_CODE_LENGTH[sb_class as usize]);
-        let block_rank = enum_code::select1(code, sb_class, remain);
-
-        Some(sblock * SMALL_BLOCK_SIZE + block_rank as u64)
+        panic!("Ran out of small blocks when iterating over rank");
     }
 }
 
@@ -270,14 +276,12 @@ impl RsDict {
         if bit {
             self.last_block.set_one(self.len % SMALL_BLOCK_SIZE);
             if self.num_ones % SELECT_BLOCK_SIZE == 0 {
-                // FIXME: This should be a vec of 54 bit indices.
                 self.select_one_inds.push(self.len / LARGE_BLOCK_SIZE);
             }
             self.num_ones += 1;
         } else {
             self.last_block.set_zero(self.len % SMALL_BLOCK_SIZE);
             if self.num_zeros % SELECT_BLOCK_SIZE == 0 {
-                // FIXME: This should be a vec of 54 bit indices.
                 self.select_zero_inds.push(self.len / LARGE_BLOCK_SIZE);
             }
             self.num_zeros += 1;
@@ -285,6 +289,7 @@ impl RsDict {
         self.len += 1;
     }
 
+    // FIXME: clean this up
     pub fn get_bit(&self, pos: u64) -> bool {
         if self.is_last_block(pos) {
             return self.last_block.get_bit(pos % SMALL_BLOCK_SIZE);
@@ -302,6 +307,7 @@ impl RsDict {
         enum_code::decode_bit(code, sb_class, pos % SMALL_BLOCK_SIZE)
     }
 
+    // FIXME: clean this up.
     pub fn bit_and_rank(&self, pos: u64) -> (bool, u64) {
         if self.is_last_block(pos) {
             let offset = pos % SMALL_BLOCK_SIZE;
