@@ -27,6 +27,22 @@ use self::constants::*;
 use self::enum_code::*;
 
 #[derive(Debug)]
+struct LargeBlock {
+    pointer: u64,
+    rank: u64,
+}
+
+impl SpaceUsage for LargeBlock {
+    fn is_stack_only() -> bool {
+        true
+    }
+
+    fn heap_bytes(&self) -> usize {
+        0
+    }
+}
+
+#[derive(Debug)]
 pub struct RsDict {
 	len: u64,
 	num_ones: u64,
@@ -43,8 +59,7 @@ pub struct RsDict {
     // Large block metadata (stored every LARGE_BLOCK_SIZE bits):
     // * pointer into variable-length `bits` for the current index
     // * cached rank at the current index
-    lb_pointers: Vec<u64>,
-	lb_ranks: Vec<u64>,
+    large_blocks: Vec<LargeBlock>,
 
     // Select acceleration:
     // `select_{one,zero}_inds` store the (index / LARGE_BLOCK_SIZE) of each
@@ -63,25 +78,32 @@ impl RankSupport for RsDict {
         if pos >= self.len {
             return rank_by_bit(self.num_ones, self.len, bit);
         }
+        // If we're in the last block, count the number of ones set after our
+        // bit in the last block and remove that from the global count.
         if self.is_last_block(pos) {
             let trailing_ones = self.last_block.count_suffix(pos % SMALL_BLOCK_SIZE);
             return rank_by_bit(self.num_ones - trailing_ones, pos, bit);
         }
+
+        // Start with the rank from our position's large block.
         let lblock = pos / LARGE_BLOCK_SIZE;
-        let mut pointer = self.lb_pointers[lblock as usize];
+        let LargeBlock { mut pointer, mut rank } = self.large_blocks[lblock as usize];
         let sblock = pos / SMALL_BLOCK_SIZE;
-        let mut rank = self.lb_ranks[lblock as usize];
-        for i in (lblock * SMALL_BLOCK_PER_LARGE_BLOCK)..sblock {
-            let sb_class = self.sb_classes[i as usize];
+
+        // Add in the ranks (i.e. the classes) per small block up to our
+        // position's small block.
+        for &sb_class in &self.sb_classes[(lblock * SMALL_BLOCK_PER_LARGE_BLOCK) as usize .. sblock as usize] {
             pointer += ENUM_CODE_LENGTH[sb_class as usize] as u64;
             rank += sb_class as u64;
         }
-        if pos % SMALL_BLOCK_SIZE == 0 {
-            return rank_by_bit(rank, pos, bit);
+
+        // If we aren't on a small block boundary, add in the rank within the small block.
+        if pos % SMALL_BLOCK_SIZE != 0 {
+            let sb_class = self.sb_classes[sblock as usize];
+            let code = self.read_sb_index(pointer, ENUM_CODE_LENGTH[sb_class as usize]);
+            rank += enum_code::rank(code, sb_class, pos);
         }
-        let sb_class = self.sb_classes[sblock as usize];
-        let code = self.read_sb_index(pointer, ENUM_CODE_LENGTH[sb_class as usize]);
-        rank += enum_code::rank(code, sb_class, pos);
+
         rank_by_bit(rank, pos, bit)
     }
 
@@ -124,8 +146,8 @@ impl Select0Support for RsDict {
 
         let select_ind = rank / SELECT_BLOCK_SIZE;
         let mut lblock = self.select_zero_inds[select_ind as usize];
-        while lblock < self.lb_ranks.len() as u64 {
-            if rank < lblock * LARGE_BLOCK_SIZE - self.lb_ranks[lblock as usize] {
+        while lblock < self.large_blocks.len() as u64 {
+            if rank < lblock * LARGE_BLOCK_SIZE - self.large_blocks[lblock as usize].rank {
                 break;
             }
             lblock += 1;
@@ -133,8 +155,10 @@ impl Select0Support for RsDict {
         lblock -= 1;
 
         let mut sblock = lblock * SMALL_BLOCK_PER_LARGE_BLOCK;
-        let mut pointer = self.lb_pointers[lblock as usize];
-        let mut remain = rank - lblock * LARGE_BLOCK_SIZE + self.lb_ranks[lblock as usize];
+
+        let large_block = &self.large_blocks[lblock as usize];
+        let mut pointer = large_block.pointer;
+        let mut remain = rank - lblock * LARGE_BLOCK_SIZE + large_block.rank;
 
         while sblock < self.sb_classes.len() as u64 {
             let sb_class = self.sb_classes[sblock as usize];
@@ -169,8 +193,8 @@ impl Select1Support for RsDict {
         let select_ind = rank / SELECT_BLOCK_SIZE;
         let mut lblock = self.select_one_inds[select_ind as usize];
 
-        while lblock < self.lb_ranks.len() as u64 {
-            if rank < self.lb_ranks[lblock as usize] {
+        while lblock < self.large_blocks.len() as u64 {
+            if rank < self.large_blocks[lblock as usize].rank {
                 break;
             }
             lblock += 1;
@@ -178,8 +202,9 @@ impl Select1Support for RsDict {
         lblock -= 1;
 
         let mut sblock = lblock * SMALL_BLOCK_PER_LARGE_BLOCK;
-        let mut pointer = self.lb_pointers[lblock as usize];
-        let mut remain = rank - self.lb_ranks[lblock as usize];
+        let large_block = &self.large_blocks[lblock as usize];
+        let mut pointer = large_block.pointer;
+        let mut remain = rank - large_block.rank;
 
         while sblock < self.sb_classes.len() as u64 {
             let sb_class = self.sb_classes[sblock as usize];
@@ -206,8 +231,7 @@ impl RsDict {
 
     pub fn with_capacity(n: usize) -> Self {
         Self {
-            lb_pointers: Vec::with_capacity(n / LARGE_BLOCK_SIZE as usize),
-            lb_ranks: Vec::with_capacity(n / LARGE_BLOCK_SIZE as usize),
+            large_blocks: Vec::with_capacity(n / LARGE_BLOCK_SIZE as usize),
             select_one_inds: Vec::with_capacity(n / SELECT_BLOCK_SIZE as usize),
             select_zero_inds: Vec::with_capacity(n / SELECT_BLOCK_SIZE as usize),
             sb_classes: Vec::with_capacity(n / SMALL_BLOCK_SIZE as usize),
@@ -264,7 +288,7 @@ impl RsDict {
             return self.last_block.get_bit(pos % SMALL_BLOCK_SIZE);
         }
         let lblock = pos / LARGE_BLOCK_SIZE;
-        let mut pointer = self.lb_pointers[lblock as usize]; // FIXME: get unchecked?
+        let mut pointer = self.large_blocks[lblock as usize].pointer;
         let sblock = pos / SMALL_BLOCK_SIZE;
 
         for i in (lblock * SMALL_BLOCK_PER_LARGE_BLOCK)..sblock {
@@ -284,9 +308,8 @@ impl RsDict {
             return (bit, rank_by_bit(self.num_ones - after_rank, pos, bit));
         }
         let lblock = pos / LARGE_BLOCK_SIZE;
-        let mut pointer = self.lb_pointers[lblock as usize];
+        let LargeBlock { mut pointer, mut rank } = self.large_blocks[lblock as usize];
         let sblock = pos / SMALL_BLOCK_SIZE;
-        let mut rank = self.lb_ranks[lblock as usize];
         for i in (lblock * SMALL_BLOCK_PER_LARGE_BLOCK)..sblock {
             let sb_class = self.sb_classes[i as usize];
             pointer += ENUM_CODE_LENGTH[sb_class as usize] as u64;
@@ -315,8 +338,8 @@ impl RsDict {
                 .expect("Developer error: write_int failed");
         }
         if self.len % LARGE_BLOCK_SIZE == 0 {
-            self.lb_ranks.push(self.num_ones);
-            self.lb_pointers.push(self.sb_bit_len());
+            let lblock = LargeBlock { rank: self.num_ones, pointer: self.sb_bit_len() };
+            self.large_blocks.push(lblock);
         }
     }
 
@@ -348,8 +371,7 @@ impl SpaceUsage for RsDict {
     fn heap_bytes(&self) -> usize {
         self.sb_indices.inner().heap_bytes() +
             self.sb_classes.heap_bytes() +
-            self.lb_pointers.heap_bytes() +
-            self.lb_ranks.heap_bytes() +
+            self.large_blocks.heap_bytes() +
             self.select_one_inds.heap_bytes() +
             self.select_zero_inds.heap_bytes()
     }
@@ -414,12 +436,22 @@ mod tests {
     use crate::rank::RankSupport;
     use crate::select::SelectSupport;
 
-    #[quickcheck]
-    fn rank_matches_simple(bits: Vec<bool>) -> bool {
-        let mut rs_dict = RsDict::with_capacity(bits.len());
-        for &bit in &bits {
-            rs_dict.push(bit);
+    fn test_rsdict(blocks: Vec<u128>) -> (Vec<bool>, RsDict) {
+        let mut rs_dict = RsDict::with_capacity(blocks.len() * 64);
+        let mut bits = Vec::with_capacity(blocks.len() * 64);
+        for block in blocks {
+            for i in 0..128 {
+                let bit = (block >> i) & 1 != 0;
+                rs_dict.push(bit);
+                bits.push(bit);
+            }
         }
+        (bits, rs_dict)
+    }
+
+    #[quickcheck]
+    fn rank_matches_simple(blocks: Vec<u128>) -> bool {
+        let (bits, rs_dict) = test_rsdict(blocks);
 
         let mut one_rank = 0;
         let mut zero_rank = 0;
@@ -443,11 +475,8 @@ mod tests {
     }
 
     #[quickcheck]
-    fn select_matches_simple(bits: Vec<bool>) -> bool {
-        let mut rs_dict = RsDict::with_capacity(bits.len());
-        for &bit in &bits {
-            rs_dict.push(bit);
-        }
+    fn select_matches_simple(blocks: Vec<u128>) -> bool {
+        let (bits, rs_dict) = test_rsdict(blocks);
 
         let mut one_rank = 0usize;
         let mut zero_rank = 0usize;
