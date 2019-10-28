@@ -13,34 +13,10 @@ use super::select::{
     Select0Support,
 };
 use super::space_usage::SpaceUsage;
-use super::stream::{
-    BitBuffer,
-    BitWrite,
-};
-use super::bit_vec::{
-    BitVec,
-    BitVector,
-};
 use super::broadword;
 
 use self::constants::*;
 use self::enum_code::*;
-
-#[derive(Debug)]
-struct LargeBlock {
-    pointer: u64,
-    rank: u64,
-}
-
-impl SpaceUsage for LargeBlock {
-    fn is_stack_only() -> bool {
-        true
-    }
-
-    fn heap_bytes(&self) -> usize {
-        0
-    }
-}
 
 #[derive(Debug)]
 pub struct RsDict {
@@ -54,7 +30,7 @@ pub struct RsDict {
     //   variable length (see `ENUM_CODE_LENGTH`), so there isn't direct access
     //   for a particular small block.
 	sb_classes: Vec<u8>,
-    sb_indices: BitBuffer<BitVector<u64>>,
+    sb_indices: VarintBuffer,
 
     // Large block metadata (stored every LARGE_BLOCK_SIZE bits):
     // * pointer into variable-length `bits` for the block start
@@ -243,7 +219,7 @@ impl RsDict {
             select_one_inds: Vec::with_capacity(n / SELECT_BLOCK_SIZE as usize),
             select_zero_inds: Vec::with_capacity(n / SELECT_BLOCK_SIZE as usize),
             sb_classes: Vec::with_capacity(n / SMALL_BLOCK_SIZE as usize),
-            sb_indices: BitBuffer::with_capacity(n as u64 / SMALL_BLOCK_SIZE),
+            sb_indices: VarintBuffer::with_capacity(n),
 
             len: 0,
             num_ones: 0,
@@ -340,13 +316,13 @@ impl RsDict {
             self.sb_classes.push(sb_class);
 
             let (code_len, code) = enum_code::encode(block.bits, sb_class);
-
-            // FIXME: This isn't specialized to write the integer all at once.
-            self.sb_indices.write_int(code_len as usize, code)
-                .expect("Developer error: write_int failed");
+            self.sb_indices.push(code_len as usize, code);
         }
         if self.len % LARGE_BLOCK_SIZE == 0 {
-            let lblock = LargeBlock { rank: self.num_ones, pointer: self.sb_bit_len() };
+            let lblock = LargeBlock {
+                rank: self.num_ones,
+                pointer: self.sb_indices.len() as u64,
+            };
             self.large_blocks.push(lblock);
         }
     }
@@ -363,14 +339,7 @@ impl RsDict {
     }
 
     fn read_sb_index(&self, ptr: u64, code_len: u8) -> u64 {
-        if code_len == 0 {
-            return 0;
-        }
-        self.sb_indices.inner().get_bits(ptr, code_len as usize)
-    }
-
-    fn sb_bit_len(&self) -> u64 {
-        self.sb_indices.inner().bit_len()
+        self.sb_indices.get(ptr as usize, code_len as usize)
     }
 }
 
@@ -380,11 +349,88 @@ impl SpaceUsage for RsDict {
     }
 
     fn heap_bytes(&self) -> usize {
-        self.sb_indices.inner().heap_bytes() +
+        self.sb_indices.heap_bytes() +
             self.sb_classes.heap_bytes() +
             self.large_blocks.heap_bytes() +
             self.select_one_inds.heap_bytes() +
             self.select_zero_inds.heap_bytes()
+    }
+}
+
+#[derive(Debug)]
+struct LargeBlock {
+    pointer: u64,
+    rank: u64,
+}
+
+impl SpaceUsage for LargeBlock {
+    fn is_stack_only() -> bool {
+        true
+    }
+
+    fn heap_bytes(&self) -> usize {
+        0
+    }
+}
+
+#[derive(Debug)]
+struct VarintBuffer {
+    buf: Vec<u64>,
+    len: usize,
+}
+
+impl VarintBuffer {
+    fn with_capacity(bits: usize) -> Self {
+        Self {
+            buf: Vec::with_capacity(bits / 64),
+            len: 0,
+        }
+    }
+
+    fn push(&mut self, num_bits: usize, value: u64) {
+        debug_assert!(num_bits <= 64);
+        if num_bits == 0 {
+            return;
+        }
+        let (block, offset) = (self.len / 64, self.len % 64);
+        if self.buf.len() == block || offset + num_bits > 64 {
+            self.buf.push(0);
+        }
+        self.buf[block] |= value << offset;
+        if offset + num_bits > 64 {
+            self.buf[block + 1] |= value >> (64 - offset);
+        }
+        self.len += num_bits;
+    }
+
+    fn get(&self, index: usize, num_bits: usize) -> u64 {
+        debug_assert!(num_bits <= 64);
+        if num_bits == 0 {
+            return 0;
+        }
+        let (block, offset) = (index / 64, index % 64);
+        let mut ret = (self.buf[block] >> offset) & ((1 << num_bits) - 1);
+        if offset + num_bits > 64 {
+            ret |= self.buf[block + 1] << (64 - offset);
+        }
+        if num_bits < 64 {
+            ret &= (1 << num_bits) - 1;
+        }
+        ret
+    }
+
+    fn len(&self) -> usize {
+        self.len
+    }
+}
+
+impl SpaceUsage for VarintBuffer {
+    fn is_stack_only() -> bool {
+        false
+    }
+
+    fn heap_bytes(&self) -> usize {
+        self.buf.heap_bytes()
     }
 }
 
