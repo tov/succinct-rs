@@ -475,35 +475,6 @@ mod tests {
         }
     }
 
-   #[test]
-    fn select_failure() {
-        let blocks = vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0];
-        let (bits, rs_dict) = test_rsdict(blocks);
-        let mut one_rank = 0usize;
-        let mut zero_rank = 0usize;
-
-        rs_dict.select(1023, false);
-
-        // // Check `select(r)` for ranks "in bounds" within the bitvector against
-        // // our naively computed ranks.
-        // for (i, &inp_bit) in bits.iter().enumerate() {
-        //     if inp_bit {
-        //         assert_eq!(rs_dict.select(one_rank as u64, true), Some(i as u64));
-        //         one_rank += 1;
-        //     } else {
-        //         assert_eq!(rs_dict.select(zero_rank as u64, false), Some(i as u64));
-        //         zero_rank += 1;
-        //     }
-        // }
-        // // Check all of the "out of bounds" ranks up until `bits.len()`
-        // for r in (one_rank + 1)..bits.len() {
-        //     assert_eq!(rs_dict.select(r as u64, true), None);
-        // }
-        // for r in (zero_rank + 1)..bits.len() {
-        //     assert_eq!(rs_dict.select(r as u64, false), None);
-        // }
-    }
-
     #[quickcheck]
     fn select_matches_simple(blocks: Vec<u64>) {
         let (bits, rs_dict) = test_rsdict(blocks);
