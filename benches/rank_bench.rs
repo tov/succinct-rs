@@ -6,7 +6,7 @@ use succinct::bit_vec::{
     BitVector,
     BitVecPush,
 };
-use succinct::rsdict::RsDict;
+use succinct::rsdic::RsDic;
 use succinct::rank::{
     RankSupport,
     JacobsonRank,
@@ -52,8 +52,8 @@ fn bench_one_rank<R, F>(c: &mut Criterion, name: &str, f: F)
 }
 
 fn bench_rank(c: &mut Criterion) {
-    bench_one_rank(c, "rsdict::rank", |bits| {
-        let mut rs_dict = RsDict::with_capacity(NUM_BITS);
+    bench_one_rank(c, "rsdic::rank", |bits| {
+        let mut rs_dict = RsDic::with_capacity(NUM_BITS);
         for b in bits.iter() {
             rs_dict.push(b);
         }
@@ -84,8 +84,8 @@ fn bench_one_select<R, F>(c: &mut Criterion, name: &str, f: F)
 }
 
 fn bench_select(c: &mut Criterion) {
-    bench_one_select(c, "rsdict", |bits| {
-        let mut rs_dict = RsDict::with_capacity(NUM_BITS);
+    bench_one_select(c, "rsdic", |bits| {
+        let mut rs_dict = RsDic::with_capacity(NUM_BITS);
         for b in bits.iter() {
             rs_dict.push(b);
         }

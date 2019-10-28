@@ -1,3 +1,33 @@
+//! 'RsDic' data structure that supports both rank and select over a bitmap.
+//!
+//! From [Navarro and Providel, "Fast, Small, Simple Rank/Select On
+//! Bitmaps,"](https://users.dcc.uchile.cl/~gnavarro/ps/sea12.1.pdf), with
+//! heavy inspiration from a [Go implementation](https://github.com/hillbig/rsdic).
+//!
+//! First, we store the bitmap in compressed form, where each block of 64 bits
+//! is stored with a variable length code, where the length is determined by the
+//! number of bits set in the block (its "class").  Then, we store the classes
+//! in a parallel array, allowing us to iterate forward from a pointer into the
+//! variable length buffer.
+//!
+//! To allow efficient indexing, we then break up the input into
+//! `LARGE_BLOCK_SIZE` blocks and store a pointer into the variable length
+//! buffer per block.  As with other rank structures, we also store a
+//! precomputed rank from the beginning of the large block.
+//!
+//! Finally, we store precomputed indices for selection in separate arrays.  For
+//! every `SELECT_BLOCK_SIZE`th bit, we maintain a pointer to the large block
+//! this bit falls in.  We also do the same for zeros.
+//!
+//! Then, we can compute ranks by consulting the large block rank and then
+//! iterating over the small block classes before our desired position.  Once
+//! we've found the boundary small block, we can then decode it and compute the
+//! rank within the block.  The choice of variable length code allows computing
+//! its internal rank without decoding the entire block.
+//!
+//! Select works similarly where we start with the large block indices, skip
+//! over as many small blocks as possible, and then select within a small
+//! block. As with rank, we're able to select within a small block directly.
 use std::mem;
 
 mod constants;
@@ -18,8 +48,9 @@ use super::broadword;
 use self::constants::*;
 use self::enum_code::*;
 
+/// Data structure for efficiently computing both rank and select queries.
 #[derive(Debug)]
-pub struct RsDict {
+pub struct RsDic {
 	len: u64,
 	num_ones: u64,
 	num_zeros: u64,
@@ -47,7 +78,7 @@ pub struct RsDict {
     last_block: LastBlock,
 }
 
-impl RankSupport for RsDict {
+impl RankSupport for RsDic {
     type Over = bool;
 
     fn rank(&self, pos: u64, bit: bool) -> u64 {
@@ -90,7 +121,7 @@ impl RankSupport for RsDict {
     }
 }
 
-impl BitRankSupport for RsDict {
+impl BitRankSupport for RsDic {
     fn rank1(&self, pos: u64) -> u64 {
         self.rank(pos, true)
     }
@@ -100,7 +131,7 @@ impl BitRankSupport for RsDict {
     }
 }
 
-impl SelectSupport for RsDict {
+impl SelectSupport for RsDic {
     type Over = bool;
 
     fn select(&self, rank: u64, bit: bool) -> Option<u64> {
@@ -108,7 +139,7 @@ impl SelectSupport for RsDict {
     }
 }
 
-impl Select0Support for RsDict {
+impl Select0Support for RsDic {
     fn select0(&self, rank: u64) -> Option<u64> {
         if rank >= self.num_zeros {
             return None;
@@ -163,7 +194,7 @@ impl Select0Support for RsDict {
     }
 }
 
-impl Select1Support for RsDict {
+impl Select1Support for RsDic {
     fn select1(&self, rank: u64) -> Option<u64> {
         if rank >= self.num_ones {
             return None;
@@ -208,11 +239,13 @@ impl Select1Support for RsDict {
     }
 }
 
-impl RsDict {
+impl RsDic {
+    /// Create a new `RsDic` with zero capacity.
     pub fn new() -> Self {
         Self::with_capacity(0)
     }
 
+    /// Create a new `RsDic` with the given capacity preallocated.
     pub fn with_capacity(n: usize) -> Self {
         Self {
             large_blocks: Vec::with_capacity(n / LARGE_BLOCK_SIZE as usize),
@@ -229,22 +262,27 @@ impl RsDict {
         }
     }
 
+    /// Return the length of the underlying bitmap.
     pub fn len(&self) -> usize {
         self.len as usize
     }
 
+    /// Return whether the underlying bitmap is empty.
     pub fn is_empty(&self) -> bool {
         self.len == 0
     }
 
+    /// Count the number of set bits in the underlying bitmap.
     pub fn count_ones(&self) -> usize {
         self.num_ones as usize
     }
 
+    /// Count the number of unset bits in the underlying bitmap.
     pub fn count_zeros(&self) -> usize {
         self.num_zeros as usize
     }
 
+    /// Push a bit at the end of the underlying bitmap.
     pub fn push(&mut self, bit: bool) {
         if self.len % SMALL_BLOCK_SIZE == 0 {
             self.write_block();
@@ -265,6 +303,7 @@ impl RsDict {
         self.len += 1;
     }
 
+    /// Query the `pos`th bit (zero-indexed) of the underlying bitmap.
     pub fn get_bit(&self, pos: u64) -> bool {
         if self.is_last_block(pos) {
             return self.last_block.get_bit(pos % SMALL_BLOCK_SIZE);
@@ -282,6 +321,10 @@ impl RsDict {
         enum_code::decode_bit(code, sb_class, pos % SMALL_BLOCK_SIZE)
     }
 
+    /// Query the `pos`th bit (zero-indexed) of the underlying bit and the
+    /// number of set bits to the left of `pos` in a single operation.  This
+    /// method is faster than calling `get_bit(pos)` and `rank(pos, true)`
+    /// separately.
     pub fn bit_and_one_rank(&self, pos: u64) -> (bool, u64) {
         if self.is_last_block(pos) {
             let sb_pos = pos % SMALL_BLOCK_SIZE;
@@ -307,7 +350,7 @@ impl RsDict {
     }
 }
 
-impl RsDict {
+impl RsDic {
     fn write_block(&mut self) {
         if self.len > 0 {
             let block = mem::replace(&mut self.last_block, LastBlock::new());
@@ -343,7 +386,7 @@ impl RsDict {
     }
 }
 
-impl SpaceUsage for RsDict {
+impl SpaceUsage for RsDic {
     fn is_stack_only() -> bool {
         false
     }
@@ -489,14 +532,14 @@ fn rank_by_bit(x: u64, n: u64, b: bool) -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use super::RsDict;
+    use super::RsDic;
     use crate::rank::RankSupport;
     use crate::select::SelectSupport;
 
     // Ask quickcheck to generate blocks of 64 bits so we get test
     // coverage for ranges spanning multiple small blocks.
-    fn test_rsdict(blocks: Vec<u64>) -> (Vec<bool>, RsDict) {
-        let mut rs_dict = RsDict::with_capacity(blocks.len() * 64);
+    fn test_rsdic(blocks: Vec<u64>) -> (Vec<bool>, RsDic) {
+        let mut rs_dict = RsDic::with_capacity(blocks.len() * 64);
         let mut bits = Vec::with_capacity(blocks.len() * 64);
         for block in blocks {
             for i in 0..64 {
@@ -510,7 +553,7 @@ mod tests {
 
     #[quickcheck]
     fn qc_rank(blocks: Vec<u64>) {
-        let (bits, rs_dict) = test_rsdict(blocks);
+        let (bits, rs_dict) = test_rsdic(blocks);
 
         let mut one_rank = 0;
         let mut zero_rank = 0;
@@ -529,7 +572,7 @@ mod tests {
 
     #[quickcheck]
     fn qc_select(blocks: Vec<u64>) {
-        let (bits, rs_dict) = test_rsdict(blocks);
+        let (bits, rs_dict) = test_rsdic(blocks);
 
         let mut one_rank = 0usize;
         let mut zero_rank = 0usize;
@@ -556,7 +599,7 @@ mod tests {
 
     #[quickcheck]
     fn qc_get_bit(blocks: Vec<u64>) {
-        let (bits, rs_dict) = test_rsdict(blocks);
+        let (bits, rs_dict) = test_rsdic(blocks);
         for (i, &bit) in bits.iter().enumerate() {
             assert_eq!(rs_dict.get_bit(i as u64), bit);
         }
@@ -565,7 +608,7 @@ mod tests {
     #[quickcheck]
     fn qc_bit_and_one_rank(blocks: Vec<u64>) {
         let mut one_rank = 0;
-        let (bits, rs_dict) = test_rsdict(blocks);
+        let (bits, rs_dict) = test_rsdic(blocks);
         for (i, &bit) in bits.iter().enumerate() {
             let (rs_bit, rs_rank) = rs_dict.bit_and_one_rank(i as u64);
             assert_eq!((rs_bit, rs_rank), (bit, one_rank));

@@ -59,4 +59,4 @@ pub use rank::{BitRankSupport, JacobsonRank, Rank9};
 pub mod select;
 pub use select::{Select1Support, BinSearchSelect};
 
-pub mod rsdict;
+pub mod rsdic;
