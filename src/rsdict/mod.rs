@@ -289,45 +289,45 @@ impl RsDict {
         self.len += 1;
     }
 
-    // FIXME: clean this up
     pub fn get_bit(&self, pos: u64) -> bool {
         if self.is_last_block(pos) {
             return self.last_block.get_bit(pos % SMALL_BLOCK_SIZE);
         }
         let lblock = pos / LARGE_BLOCK_SIZE;
+        let sblock = (pos / SMALL_BLOCK_SIZE) as usize;
+        let sblock_start = (lblock * SMALL_BLOCK_PER_LARGE_BLOCK) as usize;
         let mut pointer = self.large_blocks[lblock as usize].pointer;
-        let sblock = pos / SMALL_BLOCK_SIZE;
-
-        for i in (lblock * SMALL_BLOCK_PER_LARGE_BLOCK)..sblock {
-            let sb_class = self.sb_classes[i as usize];
+        for &sb_class in &self.sb_classes[sblock_start..sblock] {
             pointer += ENUM_CODE_LENGTH[sb_class as usize] as u64;
         }
-        let sb_class = self.sb_classes[sblock as usize];
-        let code = self.read_sb_index(pointer, ENUM_CODE_LENGTH[sb_class as usize]);
+        let sb_class = self.sb_classes[sblock];
+        let code_length = ENUM_CODE_LENGTH[sb_class as usize];
+        let code = self.read_sb_index(pointer, code_length);
         enum_code::decode_bit(code, sb_class, pos % SMALL_BLOCK_SIZE)
     }
 
-    // FIXME: clean this up.
-    pub fn bit_and_rank(&self, pos: u64) -> (bool, u64) {
+    pub fn bit_and_one_rank(&self, pos: u64) -> (bool, u64) {
         if self.is_last_block(pos) {
-            let offset = pos % SMALL_BLOCK_SIZE;
-            let bit = self.last_block.get_bit(offset);
-            let after_rank = self.last_block.count_suffix(offset);
-            return (bit, rank_by_bit(self.num_ones - after_rank, pos, bit));
+            let sb_pos = pos % SMALL_BLOCK_SIZE;
+            let bit = self.last_block.get_bit(sb_pos);
+            let after_rank = self.last_block.count_suffix(sb_pos);
+            return (bit, self.num_ones - after_rank);
         }
         let lblock = pos / LARGE_BLOCK_SIZE;
+        let sblock = (pos / SMALL_BLOCK_SIZE) as usize;
+        let sblock_start = (lblock * SMALL_BLOCK_PER_LARGE_BLOCK) as usize;
         let LargeBlock { mut pointer, mut rank } = self.large_blocks[lblock as usize];
-        let sblock = pos / SMALL_BLOCK_SIZE;
-        for i in (lblock * SMALL_BLOCK_PER_LARGE_BLOCK)..sblock {
-            let sb_class = self.sb_classes[i as usize];
+        for &sb_class in &self.sb_classes[sblock_start..sblock] {
             pointer += ENUM_CODE_LENGTH[sb_class as usize] as u64;
             rank += sb_class as u64;
         }
-        let sb_class = self.sb_classes[sblock as usize];
-        let code = self.read_sb_index(pointer, ENUM_CODE_LENGTH[sb_class as usize]);
-        rank += enum_code::rank(code, sb_class, pos);
+        let sb_class = self.sb_classes[sblock];
+        let code_length = ENUM_CODE_LENGTH[sb_class as usize];
+        let code = self.read_sb_index(pointer, code_length);
+
+        rank += enum_code::rank(code, sb_class, pos % SMALL_BLOCK_SIZE);
         let bit = enum_code::decode_bit(code, sb_class, pos % SMALL_BLOCK_SIZE);
-        (bit, rank_by_bit(rank, pos, bit))
+        (bit, rank)
     }
 }
 
@@ -463,7 +463,7 @@ mod tests {
     }
 
     #[quickcheck]
-    fn rank_matches_simple(blocks: Vec<u64>) {
+    fn qc_rank(blocks: Vec<u64>) {
         let (bits, rs_dict) = test_rsdict(blocks);
 
         let mut one_rank = 0;
@@ -482,7 +482,7 @@ mod tests {
     }
 
     #[quickcheck]
-    fn select_matches_simple(blocks: Vec<u64>) {
+    fn qc_select(blocks: Vec<u64>) {
         let (bits, rs_dict) = test_rsdict(blocks);
 
         let mut one_rank = 0usize;
@@ -505,6 +505,27 @@ mod tests {
         }
         for r in (zero_rank + 1)..bits.len() {
             assert_eq!(rs_dict.select(r as u64, false), None);
+        }
+    }
+
+    #[quickcheck]
+    fn qc_get_bit(blocks: Vec<u64>) {
+        let (bits, rs_dict) = test_rsdict(blocks);
+        for (i, &bit) in bits.iter().enumerate() {
+            assert_eq!(rs_dict.get_bit(i as u64), bit);
+        }
+    }
+
+    #[quickcheck]
+    fn qc_bit_and_one_rank(blocks: Vec<u64>) {
+        let mut one_rank = 0;
+        let (bits, rs_dict) = test_rsdict(blocks);
+        for (i, &bit) in bits.iter().enumerate() {
+            let (rs_bit, rs_rank) = rs_dict.bit_and_one_rank(i as u64);
+            assert_eq!((rs_bit, rs_rank), (bit, one_rank));
+            if bit {
+                one_rank += 1;
+            }
         }
     }
 }
