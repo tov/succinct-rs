@@ -36,3 +36,6 @@ to your `Cargo.toml`.
     [SDSL](https://github.com/simongog/sdsl-lite), a C++ succinct data
     structures library. It’s much more complete than `succinct`, and
     probably more correct and faster too.
+
+  - `RsDic` borrows most of its implementation from the Go
+    [rsdic library](https://github.com/hillbig/rsdic).
