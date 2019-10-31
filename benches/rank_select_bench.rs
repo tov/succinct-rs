@@ -42,7 +42,7 @@ fn bench_one_rank<R, F>(c: &mut Criterion, name: &str, f: F)
     where R: RankSupport<Over=bool>, F: FnOnce(BitVector<u64>) -> R
 {
     let r = f(random_bits(NUM_BITS));
-    let indices = random_indices(1000, NUM_BITS);
+    let indices = random_indices(1, NUM_BITS);
 
     c.bench_function(name, |b| b.iter(|| {
         for &ix in &indices {
@@ -69,7 +69,7 @@ fn bench_one_select<R, F>(c: &mut Criterion, name: &str, f: F)
     let bits = random_bits(NUM_BITS);
     let num_set = bits.iter().filter(|&b| b).count();
     let r = f(bits);
-    let indices = random_indices(1000, num_set);
+    let indices = random_indices(1, num_set);
 
     c.bench_function(&format!("{}::select0", name), |b| b.iter(|| {
         for &ix in &indices {

@@ -4,3 +4,4 @@ Cargo.lock
 .idea
 *.iml
 cmake-build-*/
+perf.data*

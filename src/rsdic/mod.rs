@@ -33,6 +33,8 @@ use std::mem;
 mod constants;
 mod enum_code;
 
+mod rank_acceleration;
+
 use super::rank::{
     RankSupport,
     BitRankSupport,
@@ -100,11 +102,13 @@ impl RankSupport for RsDic {
         // position's small block.
         let sblock_start = (lblock * SMALL_BLOCK_PER_LARGE_BLOCK) as usize;
         let sblock = (pos / SMALL_BLOCK_SIZE) as usize;
-
-        for &sb_class in &self.sb_classes[sblock_start..sblock] {
-            pointer += ENUM_CODE_LENGTH[sb_class as usize] as u64;
-            rank += sb_class as u64;
-        }
+        let (class_sum, length_sum) = rank_acceleration::scan_block(
+            &self.sb_classes,
+            sblock_start,
+            sblock,
+        );
+        rank += class_sum;
+        pointer += length_sum;
 
         // If we aren't on a small block boundary, add in the rank within the small block.
         if pos % SMALL_BLOCK_SIZE != 0 {

@@ -9,9 +9,8 @@ So far we have:
 
   - bit vectors and bit buffer;
   - integer vectors with arbitrary-sized (1- to 64-bit) elements;
-  - a variety of universal codes;
-  - constant-time rank queries; and
-  - *O*(lg lg *n*)-time select queries based on binary search over ranks.
+  - a variety of universal codes; and
+  - constant-time rank and select queries.
 
 ## Usage
 
@@ -23,6 +22,11 @@ succinct = "0.5.2"
 ```
 
 to your `Cargo.toml`.
+
+There's also experimental SIMD acceleration via the "simd_acceleration" feature.
+You will need to have a nightly compiler and set the "target-cpu" compiler flag
+to `rustc` to codegen the appropriate instructions.  See [this article](https://rust-lang.github.io/packed_simd/perf-guide/target-feature/rustflags.html)
+for more details.
 
 ## Credits
 
