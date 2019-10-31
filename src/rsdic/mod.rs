@@ -51,16 +51,16 @@ use self::enum_code::*;
 /// Data structure for efficiently computing both rank and select queries.
 #[derive(Debug)]
 pub struct RsDic {
-	len: u64,
-	num_ones: u64,
-	num_zeros: u64,
+    len: u64,
+    num_ones: u64,
+    num_zeros: u64,
 
     // Small block metadata (stored every SMALL_BLOCK_SIZE bits):
     // * number of set bits (the "class") for the small block
     // * index within a class for each small block; note that the indexes are
     //   variable length (see `ENUM_CODE_LENGTH`), so there isn't direct access
     //   for a particular small block.
-	sb_classes: Vec<u8>,
+    sb_classes: Vec<u8>,
     sb_indices: VarintBuffer,
 
     // Large block metadata (stored every LARGE_BLOCK_SIZE bits):
@@ -71,8 +71,8 @@ pub struct RsDic {
     // Select acceleration:
     // `select_{one,zero}_inds` store the (offset / LARGE_BLOCK_SIZE) of each
     // SELECT_BLOCK_SIZE'th bit.
-	select_one_inds: Vec<u64>,
-	select_zero_inds: Vec<u64>,
+    select_one_inds: Vec<u64>,
+    select_zero_inds: Vec<u64>,
 
     // Current in-progress small block we're appending to
     last_block: LastBlock,
