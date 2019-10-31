@@ -13,7 +13,6 @@ use super::enum_code::ENUM_CODE_LENGTH;
 #[cfg(feature = "simd_acceleration")]
 pub fn scan_block(classes: &[u8], start: usize, end: usize) -> (u64, u64) {
     use std::u64;
-    use std::mem;
     use std::slice;
     use packed_simd::{
         FromBits,
@@ -50,10 +49,7 @@ pub fn scan_block(classes: &[u8], start: usize, end: usize) -> (u64, u64) {
     // Step 1b: Do the same for the remaining 8 bytes.
     let hi_shift = len.saturating_sub(8) as u32 * 8;
     let hi_mask = !u64::MAX.checked_shl(hi_shift).unwrap_or(0);
-
-    // Sadly, we can't cast between u64x2 and u8x16 directly.
-    let ix_mask64 = u64x2::new(lo_mask, hi_mask);
-    let ix_mask = unsafe { mem::transmute::<_, u8x16>(ix_mask64) };
+    let ix_mask = u8x16::from_bits(u64x2::new(lo_mask, hi_mask));
 
     let classes = unsafe {
         let start = classes.as_ptr().offset(start as isize);
