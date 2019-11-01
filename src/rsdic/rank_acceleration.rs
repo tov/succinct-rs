@@ -34,7 +34,6 @@ pub fn scan_block(classes: &[u8], start: usize, end: usize) -> (u64, u64) {
         u64x2::from_bits(sum_m128).wrapping_sum()
     }
 
-    // FIXME: Add a block of padding to the vec to avoid reading bogus data.
     // Step 1: Load the classes into a u8x16.  Our approach here is to do a
     // single load and then mask off the elements past `len`.  This is unsafe
     // since we're potentially reading past the end of the slice, but we're

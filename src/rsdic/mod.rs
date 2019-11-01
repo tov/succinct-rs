@@ -365,6 +365,17 @@ impl RsDic {
             let sb_class = block.num_ones as u8;
             self.sb_classes.push(sb_class);
 
+            #[cfg(feature = "simd_acceleration")]
+            {
+                // To avoid indexing past the end of our allocation when
+                // scanning through a large block, reserve some extra space to
+                // ensure that we always have a full large block in
+                // `sb_classes`.
+                let num_sb = self.sb_classes.len();
+                let align = SMALL_BLOCK_PER_LARGE_BLOCK as usize;
+                self.sb_classes.reserve((num_sb + align - 1) / align * align)
+            }
+
             let (code_len, code) = enum_code::encode(block.bits, sb_class);
             self.sb_indices.push(code_len as usize, code);
         }
