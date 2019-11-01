@@ -35,6 +35,9 @@ mod enum_code;
 
 mod rank_acceleration;
 
+#[cfg(test)]
+mod test_helpers;
+
 use super::rank::{
     RankSupport,
     BitRankSupport,
@@ -452,18 +455,13 @@ impl VarintBuffer {
 
     fn get(&self, index: usize, num_bits: usize) -> u64 {
         debug_assert!(num_bits <= 64);
-        if num_bits == 0 {
-            return 0;
-        }
         let (block, offset) = (index / 64, index % 64);
-        let mut ret = (self.buf[block] >> offset) & ((1 << num_bits) - 1);
+        let mask = 1u64.checked_shl(num_bits as u32).unwrap_or(0).wrapping_sub(1);
+        let mut ret = (self.buf[block] >> offset) & mask;
         if offset + num_bits > 64 {
             ret |= self.buf[block + 1] << (64 - offset);
         }
-        if num_bits < 64 {
-            ret &= (1 << num_bits) - 1;
-        }
-        ret
+        ret & mask
     }
 
     fn len(&self) -> usize {
@@ -539,18 +537,26 @@ mod tests {
     use super::RsDic;
     use crate::rank::RankSupport;
     use crate::select::SelectSupport;
+    use crate::rsdic::test_helpers::hash_u64;
 
     // Ask quickcheck to generate blocks of 64 bits so we get test
     // coverage for ranges spanning multiple small blocks.
     fn test_rsdic(blocks: Vec<u64>) -> (Vec<bool>, RsDic) {
-        let mut rs_dict = RsDic::with_capacity(blocks.len() * 64);
         let mut bits = Vec::with_capacity(blocks.len() * 64);
+        let to_pop = blocks.get(0).unwrap_or(&0) % 64;
         for block in blocks {
+            let block = hash_u64(block);
             for i in 0..64 {
                 let bit = (block >> i) & 1 != 0;
-                rs_dict.push(bit);
                 bits.push(bit);
             }
+        }
+        for _ in 0..to_pop {
+            bits.pop();
+        }
+        let mut rs_dict = RsDic::with_capacity(bits.len());
+        for &bit in &bits {
+            rs_dict.push(bit);
         }
         (bits, rs_dict)
     }

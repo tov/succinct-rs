@@ -1,4 +1,3 @@
-use crate::broadword;
 use super::constants::SMALL_BLOCK_SIZE;
 
 pub fn encode(value: u64, class: u8) -> (u8, u64) {
@@ -75,11 +74,23 @@ pub fn rank(mut code: u64, class: u8, pos: u64) -> u64 {
     (class - cur_rank) as u64
 }
 
+fn select1_raw(mut code: u64, mut rank: u64) -> u64 {
+    let orig_code = code;
+    let orig_rank = rank;
+    while code != 0 {
+        let i = code.trailing_zeros();
+        if rank == 0 {
+            return i as u64;
+        }
+        rank -= 1;
+        code ^= 1 << i;
+    }
+    panic!("selected past end of codeword {} {}", orig_code, orig_rank);
+}
+
 pub fn select1(mut code: u64, class: u8, mut rank: u64) -> u64 {
     if ENUM_CODE_LENGTH[class as usize] == SMALL_BLOCK_SIZE as u8 {
-        let result = broadword::select1_raw(rank as usize, code);
-        debug_assert_ne!(result, 72);
-        return result as u64;
+        return select1_raw(code, rank);
     }
     let mut k = class;
     for i in 0..SMALL_BLOCK_SIZE {
@@ -100,9 +111,7 @@ pub fn select1(mut code: u64, class: u8, mut rank: u64) -> u64 {
 
 pub fn select0(mut code: u64, class: u8, mut rank: u64) -> u64 {
     if ENUM_CODE_LENGTH[class as usize] == SMALL_BLOCK_SIZE as u8 {
-        let result = broadword::select1_raw(rank as usize, !code);
-        debug_assert_ne!(result, 72);
-        return result as u64;
+        return select1_raw(!code, rank);
     }
     let mut k = class as usize;
     for i in 0..SMALL_BLOCK_SIZE {
@@ -124,11 +133,20 @@ pub fn select0(mut code: u64, class: u8, mut rank: u64) -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use broadword;
-    use super::{decode, decode_bit, encode, rank, select0, select1};
+    use crate::broadword;
+    use crate::rsdic::test_helpers::hash_u64;
+    use super::{
+        decode,
+        decode_bit,
+        encode,
+        rank,
+        select0,
+        select1,
+    };
 
     #[quickcheck]
     fn qc_decode(value: u64) -> bool {
+        let value = hash_u64(value);
         let class = value.count_ones() as u8;
         let (_, code) = encode(value, class);
         decode(code, class) == value
@@ -136,6 +154,7 @@ mod tests {
 
     #[quickcheck]
     fn qc_decode_bit(value: u64) -> bool {
+        let value = hash_u64(value);
         let class = value.count_ones() as u8;
         let (_, code) = encode(value, class);
         (0..64)
@@ -148,6 +167,7 @@ mod tests {
 
     #[quickcheck]
     fn qc_rank(value: u64) -> bool {
+        let value = hash_u64(value);
         let class = value.count_ones() as u8;
         let (_, code) = encode(value, class);
         (0..64)
@@ -160,9 +180,10 @@ mod tests {
 
     #[quickcheck]
     fn qc_select0(value: u64) -> bool {
+        let value = hash_u64(value);
         let class = value.count_ones() as u8;
         let (_, code) = encode(value, class);
-        (0..class as u64)
+        (0..(64 - class) as u64)
             .all(|i| {
                 let computed = select0(code, class, i) as usize;
                 let expected = broadword::select1_raw(i as usize, !value);
@@ -172,6 +193,7 @@ mod tests {
 
     #[quickcheck]
     fn qc_select1(value: u64) -> bool {
+        let value = hash_u64(value);
         let class = value.count_ones() as u8;
         let (_, code) = encode(value, class);
         (0..class as u64)
