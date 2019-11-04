@@ -9,8 +9,9 @@ So far we have:
 
   - bit vectors and bit buffer;
   - integer vectors with arbitrary-sized (1- to 64-bit) elements;
-  - a variety of universal codes; and
-  - constant-time rank and select queries.
+  - a variety of universal codes;
+  - constant-time rank queries; and
+  - *O*(lg lg *n*)-time select queries based on binary search over ranks.
 
 ## Usage
 
