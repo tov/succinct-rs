@@ -24,6 +24,9 @@ succinct = "0.5.4"
 
 to your `Cargo.toml`.
 
+There's nightly-only SIMD support for `RsDict`'s `rank` algorithm that can be
+enabled with the "simd" feature.
+
 ## Credits
 
   - `IntVec` borrows some implementation techniques from

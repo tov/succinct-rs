@@ -26,6 +26,8 @@
 
 extern crate byteorder;
 extern crate num_traits;
+
+#[cfg(feature = "simd")]
 extern crate packed_simd;
 
 #[cfg(test)]
