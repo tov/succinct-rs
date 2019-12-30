@@ -1,6 +1,6 @@
 [package]
 name = "succinct"
-version = "0.5.3-alpha.0"
+version = "0.5.4"
 authors = ["Jesse A. Tov <jesse.tov@gmail.com>"]
 description = "Succinct data structures for Rust"
 repository = "https://github.com/tov/succinct-rs"
@@ -12,23 +12,31 @@ keywords = ["succinct", "rank", "select"]
 
 [features]
 default = []
-simd_acceleration = ["packed_simd"]
+fuzz = ["afl"]
 
 [dependencies]
 num-traits = "0.2"
 byteorder = "1.2"
-rand = "0.7"
+
+[dependencies.afl]
+version = "0.5.2"
+optional = true
 
 [dependencies.packed_simd]
 version = "0.3"
 features = ["into_bits"]
-optional = true
 
 [dev-dependencies]
 quickcheck = "0.9.0"
 quickcheck_macros = "0.8.0"
 criterion = "0.3"
+rand = "0.7"
 
 [[bench]]
-name = "rank_select_bench"
+name = "rank_select"
 harness = false
+
+[[bin]]
+name = "rsdict_fuzz"
+path = "src/rsdict/fuzz.rs"
+required-features = ["fuzz"]

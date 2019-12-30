@@ -19,15 +19,10 @@ It’s [on crates.io](https://crates.io/crates/succinct), so you can add
 
 ```toml
 [dependencies]
-succinct = "0.5.2"
+succinct = "0.5.4"
 ```
 
 to your `Cargo.toml`.
-
-There's also experimental SIMD acceleration via the "simd_acceleration" feature.
-You will need to have a nightly compiler and set the "target-cpu" compiler flag
-to `rustc` to codegen the appropriate instructions.  See [this article](https://rust-lang.github.io/packed_simd/perf-guide/target-feature/rustflags.html)
-for more details.
 
 ## Credits
 
@@ -42,5 +37,5 @@ for more details.
     structures library. It’s much more complete than `succinct`, and
     probably more correct and faster too.
 
-  - `RsDic` borrows most of its implementation from the Go
+  - `RsDict` borrows most of its implementation from the Go
     [rsdic library](https://github.com/hillbig/rsdic).

@@ -17,19 +17,15 @@
 //!
 //! ```toml
 //! [dependencies]
-//! succinct = "0.5.2"
+//! succinct = "0.5.4"
 //! ```
 //!
 //! to your `Cargo.toml`.
-#![cfg_attr(simd_acceleration, feature(stdsimd))]
-
-#![doc(html_root_url = "https://docs.rs/succinct/0.5.2")]
+#![doc(html_root_url = "https://docs.rs/succinct/0.5.4")]
 #![warn(missing_docs)]
 
 extern crate byteorder;
 extern crate num_traits;
-
-#[cfg(feature = "simd_acceleration")]
 extern crate packed_simd;
 
 #[cfg(test)]
@@ -63,4 +59,5 @@ pub use rank::{BitRankSupport, JacobsonRank, Rank9};
 pub mod select;
 pub use select::{Select1Support, BinSearchSelect};
 
-pub mod rsdic;
+pub mod rsdict;
+pub use rsdict::RsDict;

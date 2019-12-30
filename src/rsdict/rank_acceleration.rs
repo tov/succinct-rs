@@ -1,39 +1,30 @@
 use super::enum_code::ENUM_CODE_LENGTH;
 
-/// Scan a prefix of a large block of small block classes, returning the
-/// sum of the classes and their total encoded length.
-///
-/// Preconditions:
-/// * start <= end <= start + 16
-/// * classes[start] must be 128-bit aligned
-///
-/// Returns:
-/// * class_sum: classes[start..end].sum()
-/// * length_sum: classes[start.end].map(|i| ENUM_CODE_LENGTH[i]).sum()
-#[cfg(feature = "simd_acceleration")]
+use packed_simd::{u64x2, u8x16, FromBits, IntoBits};
+use std::arch::x86_64::{__m128i, _mm_sad_epu8};
+use std::slice;
+use std::u64;
+
+// Scan a prefix of a large block of small block classes, returning the
+// sum of the classes and their total encoded length.
+//
+// Preconditions:
+// * start <= end <= start + 16
+// * classes[start] must be 128-bit aligned
+//
+// Returns:
+// * class_sum: classes[start..end].sum()
+// * length_sum: classes[start.end].map(|i| ENUM_CODE_LENGTH[i]).sum()
 pub fn scan_block(classes: &[u8], start: usize, end: usize) -> (u64, u64) {
-    use std::u64;
-    use std::slice;
-    use packed_simd::{
-        FromBits,
-        IntoBits,
-        u8x16,
-        u64x2,
-    };
-
-    // Unfortunately, `packed_simd` doesn't support `psadbw` yet, which is a
-    // great way to sum a u8x16 into a u64x2 in a single SSE2 instruction.
-    fn sum_u8x16(xs: u8x16) -> u64 {
-        use std::arch::x86_64::{
-            __m128i,
-            _mm_sad_epu8,
-        };
-        let zero_m128: __m128i = u8x16::splat(0).into_bits();
-        let xs_m128: __m128i = xs.into_bits();
-        let sum_m128 = unsafe { _mm_sad_epu8(zero_m128, xs_m128) };
-        u64x2::from_bits(sum_m128).wrapping_sum()
+    if is_x86_feature_detected!("ssse3") {
+        unsafe { scan_block_ssse3(classes, start, end) }
+    } else {
+        scan_block_naive(classes, start, end)
     }
+}
 
+#[target_feature(enable = "ssse3")]
+unsafe fn scan_block_ssse3(classes: &[u8], start: usize, end: usize) -> (u64, u64) {
     // Step 1: Load the classes into a u8x16.  Our approach here is to do a
     // single load and then mask off the elements past `len`.  This is unsafe
     // since we're potentially reading past the end of the slice, but we're
@@ -50,7 +41,7 @@ pub fn scan_block(classes: &[u8], start: usize, end: usize) -> (u64, u64) {
     let hi_mask = !u64::MAX.checked_shl(hi_shift).unwrap_or(0);
     let ix_mask = u8x16::from_bits(u64x2::new(lo_mask, hi_mask));
 
-    let classes = unsafe {
+    let classes = {
         let start = classes.as_ptr().offset(start as isize);
         let block = slice::from_raw_parts(start, 16);
 
@@ -72,7 +63,9 @@ pub fn scan_block(classes: &[u8], start: usize, end: usize) -> (u64, u64) {
     //
     //    ENUM_CODE_LENGTH[i] == ENUM_CODE_LENGTH[f(i)] for i in [0, 64].
     //
-    let indices = classes.min(u8x16::splat(64) - classes).min(u8x16::splat(15));
+    let indices = classes
+        .min(u8x16::splat(64) - classes)
+        .min(u8x16::splat(15));
     const ENUM_CODE_VECTOR: u8x16 = u8x16::new(
         ENUM_CODE_LENGTH[0],
         ENUM_CODE_LENGTH[1],
@@ -104,11 +97,6 @@ pub fn scan_block(classes: &[u8], start: usize, end: usize) -> (u64, u64) {
     (class_sum, length_sum)
 }
 
-#[cfg(not(feature = "simd_acceleration"))]
-pub fn scan_block(classes: &[u8], start: usize, end: usize) -> (u64, u64) {
-    scan_block_naive(classes, start, end)
-}
-
 #[allow(unused)]
 fn scan_block_naive(classes: &[u8], start: usize, end: usize) -> (u64, u64) {
     let mut class_sum = 0;
@@ -118,4 +106,13 @@ fn scan_block_naive(classes: &[u8], start: usize, end: usize) -> (u64, u64) {
         length_sum += ENUM_CODE_LENGTH[class as usize] as u64;
     }
     (class_sum, length_sum)
+}
+
+// Unfortunately, `packed_simd` doesn't support `psadbw` yet, which is a
+// great way to sum a u8x16 into a u64x2 in a single SSE2 instruction.
+unsafe fn sum_u8x16(xs: u8x16) -> u64 {
+    let zero_m128: __m128i = u8x16::splat(0).into_bits();
+    let xs_m128: __m128i = xs.into_bits();
+    let sum_m128 = _mm_sad_epu8(zero_m128, xs_m128);
+    u64x2::from_bits(sum_m128).wrapping_sum()
 }
