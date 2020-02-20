@@ -63,7 +63,7 @@ to find interesting test cases using program coverage.  Install [cargo-afl](http
 and run the `rsdict_fuzz` binary with the `fuzz` feature set.
 ```
 $ cargo install afl
-$ cargo afl build --release --bin rsdict_fuzz --features fuzz
+$ cargo afl build --release --test rsdict_fuzz --features fuzz
 
 # Create some starting bitsets within target/fuzz/in and create an empty directory target/fuzz/out.
 $ cargo afl fuzz -i target/fuzz/in -o target/fuzz/out target/release/rsdict_fuzz

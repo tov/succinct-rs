@@ -69,7 +69,6 @@ use std::path::Path;
 //
 // row_start(n) = (n / 2 + n % 2) * (n / 2 + 1)
 //
-//
 fn row_start(n: usize) -> usize {
     let (q, r) = (n / 2, n % 2);
     (q + r) * (q + 1)

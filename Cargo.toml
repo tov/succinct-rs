@@ -38,7 +38,8 @@ rand = "0.7"
 name = "rank_select"
 harness = false
 
-[[bin]]
+[[test]]
 name = "rsdict_fuzz"
 path = "src/rsdict/fuzz.rs"
 required-features = ["fuzz"]
+harness = false
