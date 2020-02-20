@@ -57,9 +57,6 @@ use std::path::Path;
 //               = m * (m + 1)
 //
 // Then, if `n` is odd, we need to add `row_len(n - 1)`
-
-// Note that if `n` is even, `2 * (1 + 2 + ... + n / 2)`, and if `n` is odd,
-// we just need to add in its own row length to account for row `n - 1`.
 //
 // row_start(2m + 1) = m * (m + 1) + row_len(2m)
 //                   = m * (m + 1) + (m + 1)
