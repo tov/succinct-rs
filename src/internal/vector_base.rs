@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 #[cfg(target_pointer_width = "32")]
-use num::ToPrimitive;
+use num_traits::ToPrimitive;
 
 use bit_vec::{BitVec, BitVecMut};
 use space_usage::SpaceUsage;
@@ -396,6 +396,14 @@ impl<'a, Block: BlockType> Iterator for Iter<'a, Block> {
 }
 
 #[cfg(target_pointer_width = "64")]
+impl<'a, Block: BlockType> ExactSizeIterator for Iter<'a, Block> {
+    #[inline]
+    fn len(&self) -> usize {
+        (self.limit - self.start) as usize
+    }
+}
+
+#[cfg(target_pointer_width = "32")]
 impl<'a, Block: BlockType> ExactSizeIterator for Iter<'a, Block> {
     #[inline]
     fn len(&self) -> usize {
