@@ -165,7 +165,8 @@ pub fn select0(mut code: u64, class: u8, mut rank: u64) -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use super::{decode, decode_bit, encode, rank, select0, select1};
+    use std::collections::HashMap;
+    use super::{binomial_coefficient, decode, decode_bit, encode, rank, select0, select1};
     use crate::broadword;
     use crate::rsdict::test_helpers::hash_u64;
 
@@ -223,6 +224,27 @@ mod tests {
             let expected = broadword::select1_raw(i as usize, value);
             computed == expected
         })
+    }
+
+    #[test]
+    fn test_binomial_coefficient_table() {
+        fn lookup(table: &mut HashMap<(u8, u8), u64>, n: u8, k: u8) -> u64 {
+            if k == 0 || k == n {
+                return 1;
+            }
+            if let Some(&v) = table.get(&(n, k)) {
+                return v;
+            }
+            let v = lookup(table, n - 1, k - 1) + lookup(table, n - 1, k);
+            table.insert((n, k), v);
+            v
+        }
+        let mut table = HashMap::new();
+        for n in 0..=64 {
+            for k in 0..=n {
+                assert_eq!(binomial_coefficient(n, k), lookup(&mut table, n, k));
+            }
+        }
     }
 }
 
