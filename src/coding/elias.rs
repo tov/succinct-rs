@@ -1,6 +1,5 @@
 use super::*;
-use crate::internal::errors::*;
-use crate::stream::*;
+use crate::{internal::errors::*, stream::*};
 
 /// An Elias code.
 ///
@@ -14,13 +13,13 @@ pub struct Elias<Header: UniversalCode>(pub Header);
 pub type Gamma = Elias<Unary>;
 
 /// An instance of `Gamma`.
-pub const GAMMA : Gamma = Elias(Unary);
+pub const GAMMA: Gamma = Elias(Unary);
 
 /// An Elias delta code encodes the header using the Elias gamma code.
 pub type Delta = Elias<Lift0<Gamma>>;
 
 /// An instance of `Delta`.
-pub const DELTA : Delta = Elias(Lift0(GAMMA));
+pub const DELTA: Delta = Elias(Lift0(GAMMA));
 
 /// An Elias omega code iterates the Elias encoding.
 pub struct Omega;
@@ -42,8 +41,7 @@ impl<Header: UniversalCode> UniversalCode for Elias<Header> {
                 return too_many_bits("Elias::decode");
             }
 
-            if let Some(low_bits) = source.read_int::<u64>(nbits as usize)?
-            {
+            if let Some(low_bits) = source.read_int::<u64>(nbits as usize)? {
                 Ok(Some(low_bits | (1 << nbits)))
             } else {
                 out_of_bits("Elias::decode")
@@ -77,10 +75,11 @@ impl UniversalCode for Omega {
 
         loop {
             if let Some(bit) = source.read_bit()? {
-                if !bit { return Ok(Some(result)); }
+                if !bit {
+                    return Ok(Some(result));
+                }
 
-                if let Some(next) =
-                       source.read_int_be::<u64>(result as usize)? {
+                if let Some(next) = source.read_int_be::<u64>(result as usize)? {
                     result = next | (1 << result as u32)
                 } else {
                     return out_of_bits("Omega::decode");
@@ -96,10 +95,10 @@ impl UniversalCode for Omega {
 
 #[cfg(test)]
 mod test {
-    use std::collections::VecDeque;
-    use quickcheck::quickcheck;
-    use crate::coding::*;
     use crate::coding::properties;
+    use crate::coding::*;
+    use quickcheck::quickcheck;
+    use std::collections::VecDeque;
 
     #[test]
     fn gamma() {

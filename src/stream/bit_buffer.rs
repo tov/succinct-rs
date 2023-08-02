@@ -1,8 +1,10 @@
-use std::io::{Error, ErrorKind, Result};
+use crate::{
+    bit_vec::*,
+    storage::BlockType,
+    stream::{BitRead, BitWrite},
+};
 
-use crate::storage::{BlockType};
-use crate::stream::{BitRead, BitWrite};
-use crate::bit_vec::*;
+use std::io::{Error, ErrorKind, Result};
 
 /// A bit buffer can be used to read bits from or write bits to an
 /// underlying bit vector.
@@ -14,7 +16,7 @@ pub struct BitBuffer<Inner = BitVector> {
 
 impl<Block: BlockType> Default for BitBuffer<BitVector<Block>> {
     fn default() -> Self {
-         Self::new()
+        Self::new()
     }
 }
 
@@ -59,8 +61,7 @@ impl<Inner: BitVec> BitBuffer<Inner> {
             self.pos = position;
             Ok(())
         } else {
-            Err(Error::new(ErrorKind::NotFound,
-                           "position out of bounds"))
+            Err(Error::new(ErrorKind::NotFound, "position out of bounds"))
         }
     }
 }

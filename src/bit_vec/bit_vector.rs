@@ -1,12 +1,13 @@
-use std::fmt;
+use super::traits::*;
+use crate::{
+    internal::vector_base::{self, VectorBase},
+    space_usage::SpaceUsage,
+    storage::BlockType,
+};
 
 #[cfg(target_pointer_width = "32")]
 use num_traits::ToPrimitive;
-
-use crate::internal::vector_base::{VectorBase, self};
-use crate::space_usage::SpaceUsage;
-use crate::storage::BlockType;
-use super::traits::*;
+use std::fmt;
 
 /// Uncompressed vector of bits.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -44,9 +45,9 @@ impl<Block: BlockType> BitVector<Block> {
     /// blocks required by the capacity (`len / Block::nbits()`)
     /// must fit in a `usize`.
     pub fn with_fill(len: u64, value: bool) -> Self {
-        let block_size = Block::checked_ceil_div_nbits(len)
-                             .expect("BitVector::with_fill: overflow");
-        let block_value = if value {!Block::zero()} else {Block::zero()};
+        let block_size =
+            Block::checked_ceil_div_nbits(len).expect("BitVector::with_fill: overflow");
+        let block_value = if value { !Block::zero() } else { Block::zero() };
         let mut result = Self::block_with_fill(block_size, block_value);
         result.0.truncate(1, len);
         result
@@ -76,15 +77,15 @@ impl<Block: BlockType> BitVector<Block> {
     /// blocks required by the capacity (`new_len / Block::nbits()`)
     /// must fit in a `usize`.
     pub fn resize(&mut self, new_len: u64, value: bool) {
-        let new_block_len = Block::checked_ceil_div_nbits(new_len)
-                                .expect("BitVector::resize: overflow");
+        let new_block_len =
+            Block::checked_ceil_div_nbits(new_len).expect("BitVector::resize: overflow");
 
         if new_len < self.bit_len() || !value {
             self.block_resize(new_block_len, Block::zero());
         } else {
             let trailing = Block::last_block_bits(self.bit_len());
             let remaining = Block::nbits() - trailing;
-            for _ in 0 .. remaining {
+            for _ in 0..remaining {
                 self.0.push_bit(true);
             }
             self.block_resize(new_block_len, !Block::zero());
@@ -227,7 +228,7 @@ impl<Block: BlockType> BitVecPush for BitVector<Block> {
 impl<Block: BlockType> fmt::Binary for BitVector<Block> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         for bit in self {
-            let bit = if bit {"1"} else {"0"};
+            let bit = if bit { "1" } else { "0" };
             formatter.write_str(bit)?;
         }
 
@@ -236,7 +237,9 @@ impl<Block: BlockType> fmt::Binary for BitVector<Block> {
 }
 
 impl<Block: BlockType> SpaceUsage for BitVector<Block> {
-    fn is_stack_only() -> bool { false }
+    fn is_stack_only() -> bool {
+        false
+    }
 
     fn heap_bytes(&self) -> usize {
         self.0.heap_bytes()
@@ -251,8 +254,7 @@ impl<Block: BlockType> Default for BitVector<Block> {
 
 /// Iterator over `BitVector`.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct Iter<'a, Block: BlockType + 'a = usize>
-    (vector_base::Iter<'a, Block>);
+pub struct Iter<'a, Block: BlockType + 'a = usize>(vector_base::Iter<'a, Block>);
 
 impl<'a, Block: BlockType> Iterator for Iter<'a, Block> {
     type Item = bool;
@@ -307,7 +309,7 @@ mod test {
     macro_rules! assert_bv {
         ($expected:expr, $actual:expr) => {
             assert_eq!($expected, format!("{:b}", $actual))
-        }
+        };
     }
 
     #[test]
@@ -397,11 +399,11 @@ mod test {
     #[test]
     fn push_bits_get_block() {
         let mut bit_vector: BitVector = BitVector::new();
-        bit_vector.push_bit(true);  // 1
-        bit_vector.push_bit(true);  // 2
+        bit_vector.push_bit(true); // 1
+        bit_vector.push_bit(true); // 2
         bit_vector.push_bit(false); // (4)
         bit_vector.push_bit(false); // (8)
-        bit_vector.push_bit(true);  // 16
+        bit_vector.push_bit(true); // 16
 
         assert_eq!(19, bit_vector.get_block(0));
     }

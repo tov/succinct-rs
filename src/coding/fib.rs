@@ -1,8 +1,7 @@
-use std::mem;
-
 use super::*;
-use crate::internal::errors::*;
-use crate::stream::*;
+use crate::{internal::errors::*, stream::*};
+
+use std::mem;
 
 /// A Fibonacci code.
 pub struct Fibonacci;
@@ -14,10 +13,7 @@ struct Fib {
 
 impl Fib {
     fn new() -> Self {
-        Fib {
-            i_1: 1,
-            i: 1,
-        }
+        Fib { i_1: 1, i: 1 }
     }
 
     fn next(&mut self) -> Result<()> {
@@ -69,7 +65,7 @@ impl UniversalCode for Fibonacci {
     }
 
     fn decode<R: BitRead>(&self, source: &mut R) -> Result<Option<u64>> {
-        let mut result  = 0;
+        let mut result = 0;
         let mut fib = Fib::new();
         let mut previous = false;
 
@@ -96,10 +92,10 @@ impl UniversalCode for Fibonacci {
 
 #[cfg(test)]
 mod test {
-    use std::collections::VecDeque;
-    use quickcheck::quickcheck;
-    use crate::coding::*;
     use crate::coding::properties;
+    use crate::coding::*;
+    use quickcheck::quickcheck;
+    use std::collections::VecDeque;
 
     #[test]
     fn enc234() {

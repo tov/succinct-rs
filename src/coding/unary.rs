@@ -1,6 +1,5 @@
 use super::*;
-use crate::internal::errors::*;
-use crate::stream::*;
+use crate::{internal::errors::*, stream::*};
 
 /// Encodes _n_ as _n_ zeroes followed by a one.
 pub struct Unary;
@@ -22,7 +21,9 @@ impl UniversalCode for Unary {
         let mut consumed = false;
 
         while let Some(bit) = source.read_bit()? {
-            if bit { return Ok(Some(result)); }
+            if bit {
+                return Ok(Some(result));
+            }
             // This can't overflow because it would require too many
             // unary digits to get there:
             result += 1;
@@ -39,8 +40,8 @@ impl UniversalCode for Unary {
 
 #[cfg(test)]
 mod test {
-    use std::collections::VecDeque;
     use crate::coding::*;
+    use std::collections::VecDeque;
 
     #[test]
     fn test234() {
