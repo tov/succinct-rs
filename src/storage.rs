@@ -1,15 +1,14 @@
 //! Traits describing how bits and arrays of bits are stored.
 
-use std::fmt;
-use std::io;
-use std::mem;
+use crate::{
+    bit_vec::{BitVec, BitVecMut},
+    rank::{BitRankSupport, RankSupport},
+    space_usage::SpaceUsage,
+};
 
 use byteorder::{ByteOrder, ReadBytesExt, WriteBytesExt};
 use num_traits::{One, PrimInt, ToPrimitive};
-
-use bit_vec::{BitVec, BitVecMut};
-use rank::{BitRankSupport, RankSupport};
-use space_usage::SpaceUsage;
+use std::{fmt, io, mem};
 
 /// Types that can be used for `IntVector` and `BitVector` storage.
 ///
@@ -20,8 +19,9 @@ use space_usage::SpaceUsage;
 ///   - a method for computing rank,
 ///   - three arithmetic methods that probably belong elsewhere, and
 ///   - block-based, endian-specified I/O.
-pub trait BlockType: PrimInt + BitVec + BitVecMut + BitRankSupport +
-                     RankSupport<Over = bool> + SpaceUsage + fmt::Debug {
+pub trait BlockType:
+    PrimInt + BitVec + BitVecMut + BitRankSupport + RankSupport<Over = bool> + SpaceUsage + fmt::Debug
+{
     // Methods for computing sizes and offsets relative to the block size.
 
     /// The number of bits in a block.
@@ -99,7 +99,11 @@ pub trait BlockType: PrimInt + BitVec + BitVecMut + BitRankSupport +
     #[inline]
     fn last_block_bits(len: u64) -> usize {
         let masked = Self::mod_nbits(len);
-        if masked == 0 { Self::nbits() } else { masked }
+        if masked == 0 {
+            Self::nbits()
+        } else {
+            masked
+        }
     }
 
     /// Log-base-2 of the number of bits in a block.
@@ -178,10 +182,14 @@ pub trait BlockType: PrimInt + BitVec + BitVecMut + BitRankSupport +
     /// Panics of the bit span is out of bounds.
     #[inline]
     fn get_bits(self, start: usize, len: usize) -> Self {
-        assert!(start + len <= Self::nbits(),
-                "Block::get_bits: out of bounds");;
+        assert!(
+            start + len <= Self::nbits(),
+            "Block::get_bits: out of bounds"
+        );
 
-        if len == 0 { return Self::zero(); }
+        if len == 0 {
+            return Self::zero();
+        }
 
         (self >> start) & Self::low_mask(len)
     }
@@ -193,10 +201,14 @@ pub trait BlockType: PrimInt + BitVec + BitVecMut + BitRankSupport +
     /// Panics of the bit span is out of bounds.
     #[inline]
     fn with_bits(self, start: usize, len: usize, value: Self) -> Self {
-        assert!(start + len <= Self::nbits(),
-                "Block::with_bits: out of bounds");
+        assert!(
+            start + len <= Self::nbits(),
+            "Block::with_bits: out of bounds"
+        );
 
-        if len == 0 { return self; }
+        if len == 0 {
+            return self;
+        }
 
         let mask = Self::low_mask(len) << start;
         let shifted_value = value << start;
@@ -209,14 +221,18 @@ pub trait BlockType: PrimInt + BitVec + BitVecMut + BitRankSupport +
     /// Returns the smallest number `n` such that `2.pow(n) >= self`.
     #[inline]
     fn ceil_lg(self) -> usize {
-        if self <= Self::one() { return 0; }
+        if self <= Self::one() {
+            return 0;
+        }
         Self::nbits() - (self - Self::one()).leading_zeros() as usize
     }
 
     /// Returns the largest number `n` such that `2.pow(n) <= self`.
     #[inline]
     fn floor_lg(self) -> usize {
-        if self <= Self::one() { return 0; }
+        if self <= Self::one() {
+            return 0;
+        }
         Self::nbits() - 1 - self.leading_zeros() as usize
     }
 
@@ -230,17 +246,19 @@ pub trait BlockType: PrimInt + BitVec + BitVecMut + BitRankSupport +
 
     /// Reads a block with the specified endianness.
     fn read_block<R, T>(source: &mut R) -> io::Result<Self>
-        where R: io::Read, T: ByteOrder;
+    where
+        R: io::Read,
+        T: ByteOrder;
 
     /// Writes a block with the specified endianness.
     fn write_block<W, T>(&self, sink: &mut W) -> io::Result<()>
-        where W: io::Write, T: ByteOrder;
+    where
+        W: io::Write,
+        T: ByteOrder;
 }
 
 macro_rules! fn_low_mask {
-    ( $ty:ident )
-        =>
-    {
+    ( $ty:ident ) => {
         #[inline]
         fn low_mask(k: usize) -> $ty {
             debug_assert!(k <= Self::nbits());
@@ -253,19 +271,23 @@ macro_rules! fn_low_mask {
 
             a | b
         }
-    }
+    };
 }
 
 impl BlockType for u8 {
     fn read_block<R, T>(source: &mut R) -> io::Result<Self>
-        where R: io::Read,
-              T: ByteOrder {
+    where
+        R: io::Read,
+        T: ByteOrder,
+    {
         source.read_u8()
     }
 
     fn write_block<W, T>(&self, sink: &mut W) -> io::Result<()>
-        where W: io::Write,
-              T: ByteOrder {
+    where
+        W: io::Write,
+        T: ByteOrder,
+    {
         sink.write_u8(*self)
     }
 
@@ -273,25 +295,27 @@ impl BlockType for u8 {
 }
 
 macro_rules! impl_block_type {
-    ($ty:ident, $read:ident, $write:ident)
-        =>
-    {
+    ($ty:ident, $read:ident, $write:ident) => {
         impl BlockType for $ty {
             fn read_block<R, T>(source: &mut R) -> io::Result<Self>
-                where R: io::Read,
-                      T: ByteOrder {
+            where
+                R: io::Read,
+                T: ByteOrder,
+            {
                 source.$read::<T>()
             }
 
             fn write_block<W, T>(&self, sink: &mut W) -> io::Result<()>
-                where W: io::Write,
-                      T: ByteOrder {
+            where
+                W: io::Write,
+                T: ByteOrder,
+            {
                 sink.$write::<T>(*self)
             }
 
             fn_low_mask!($ty);
         }
-    }
+    };
 }
 
 impl_block_type!(u16, read_u16, write_u16);
@@ -301,34 +325,41 @@ impl_block_type!(u64, read_u64, write_u64);
 impl BlockType for usize {
     #[cfg(target_pointer_width = "64")]
     fn read_block<R, T>(source: &mut R) -> io::Result<Self>
-        where R: io::Read,
-              T: ByteOrder {
+    where
+        R: io::Read,
+        T: ByteOrder,
+    {
         source.read_u64::<T>().map(|x| x as usize)
     }
 
     #[cfg(target_pointer_width = "32")]
     fn read_block<R, T>(source: &mut R) -> io::Result<Self>
-        where R: io::Read,
-              T: ByteOrder {
+    where
+        R: io::Read,
+        T: ByteOrder,
+    {
         source.read_u32::<T>().map(|x| x as usize)
     }
 
     #[cfg(target_pointer_width = "64")]
     fn write_block<W, T>(&self, sink: &mut W) -> io::Result<()>
-        where W: io::Write,
-              T: ByteOrder {
+    where
+        W: io::Write,
+        T: ByteOrder,
+    {
         sink.write_u64::<T>(*self as u64)
     }
 
     #[cfg(target_pointer_width = "32")]
     fn write_block<W, T>(&self, sink: &mut W) -> io::Result<()>
-        where W: io::Write,
-              T: ByteOrder {
+    where
+        W: io::Write,
+        T: ByteOrder,
+    {
         sink.write_u32::<T>(*self as u32)
     }
 
     fn_low_mask!(usize);
-
 }
 
 /// Represents the address of a bit, broken into a block component
@@ -352,8 +383,7 @@ impl Address {
     #[inline]
     pub fn new<Block: BlockType>(bit_index: u64) -> Self {
         Address {
-            block_index: Block::checked_div_nbits(bit_index)
-                             .expect("Address::new: index overflow"),
+            block_index: Block::checked_div_nbits(bit_index).expect("Address::new: index overflow"),
             bit_offset: Block::mod_nbits(bit_index),
         }
     }
@@ -390,44 +420,49 @@ mod test {
 
     #[test]
     fn get_bits() {
-        assert_eq!(0b0,
-                   0b0100110001110000u16.get_bits(0, 0));
-        assert_eq!(0b010,
-                   0b0100110001110000u16.get_bits(13, 3));
-        assert_eq!(    0b110001,
-                   0b0100110001110000u16.get_bits(6, 6));
-        assert_eq!(           0b10000,
-                   0b0100110001110000u16.get_bits(0, 5));
-        assert_eq!(0b0100110001110000,
-                   0b0100110001110000u16.get_bits(0, 16));
+        assert_eq!(0b0, 0b0100110001110000u16.get_bits(0, 0));
+        assert_eq!(0b010, 0b0100110001110000u16.get_bits(13, 3));
+        assert_eq!(0b110001, 0b0100110001110000u16.get_bits(6, 6));
+        assert_eq!(0b10000, 0b0100110001110000u16.get_bits(0, 5));
+        assert_eq!(0b0100110001110000, 0b0100110001110000u16.get_bits(0, 16));
     }
 
     #[test]
     fn with_bits() {
-        assert_eq!(0b0111111111000001,
-                   0b0110001111000001u16.with_bits(10, 3, 0b111));
-        assert_eq!(0b0101110111000001,
-                   0b0110001111000001u16.with_bits(9, 5, 0b01110));
-        assert_eq!(0b0110001111000001,
-                   0b0110001111000001u16.with_bits(14, 0, 0b01110));
-        assert_eq!(0b0110001110101010,
-                   0b0110001111000001u16.with_bits(0, 8, 0b10101010));
-        assert_eq!(0b0000000000000010,
-                   0b0110001111000001u16.with_bits(0, 16, 0b10));
+        assert_eq!(
+            0b0111111111000001,
+            0b0110001111000001u16.with_bits(10, 3, 0b111)
+        );
+        assert_eq!(
+            0b0101110111000001,
+            0b0110001111000001u16.with_bits(9, 5, 0b01110)
+        );
+        assert_eq!(
+            0b0110001111000001,
+            0b0110001111000001u16.with_bits(14, 0, 0b01110)
+        );
+        assert_eq!(
+            0b0110001110101010,
+            0b0110001111000001u16.with_bits(0, 8, 0b10101010)
+        );
+        assert_eq!(
+            0b0000000000000010,
+            0b0110001111000001u16.with_bits(0, 16, 0b10)
+        );
     }
 
     #[test]
     fn get_bit() {
-        assert!(! 0b00000000u8.get_bit(0));
-        assert!(! 0b00000000u8.get_bit(1));
-        assert!(! 0b00000000u8.get_bit(2));
-        assert!(! 0b00000000u8.get_bit(3));
-        assert!(! 0b00000000u8.get_bit(7));
-        assert!(! 0b10101010u8.get_bit(0));
-        assert!(  0b10101010u8.get_bit(1));
-        assert!(! 0b10101010u8.get_bit(2));
-        assert!(  0b10101010u8.get_bit(3));
-        assert!(  0b10101010u8.get_bit(7));
+        assert!(!0b00000000u8.get_bit(0));
+        assert!(!0b00000000u8.get_bit(1));
+        assert!(!0b00000000u8.get_bit(2));
+        assert!(!0b00000000u8.get_bit(3));
+        assert!(!0b00000000u8.get_bit(7));
+        assert!(!0b10101010u8.get_bit(0));
+        assert!(0b10101010u8.get_bit(1));
+        assert!(!0b10101010u8.get_bit(2));
+        assert!(0b10101010u8.get_bit(3));
+        assert!(0b10101010u8.get_bit(7));
     }
 
     #[test]
@@ -451,11 +486,13 @@ mod test {
         assert_eq!(3, 8u32.floor_lg());
 
         fn prop(n: u64) -> TestResult {
-            if n == 0 { return TestResult::discard(); }
+            if n == 0 {
+                return TestResult::discard();
+            }
 
             TestResult::from_bool(
-                2u64.pow(n.floor_lg() as u32) <= n
-                    && 2u64.pow(n.floor_lg() as u32 + 1) > n)
+                2u64.pow(n.floor_lg() as u32) <= n && 2u64.pow(n.floor_lg() as u32 + 1) > n,
+            )
         }
 
         quickcheck(prop as fn(u64) -> TestResult);
@@ -473,11 +510,13 @@ mod test {
         assert_eq!(4, 9u32.ceil_lg());
 
         fn prop(n: u64) -> TestResult {
-            if n <= 1 { return TestResult::discard(); }
+            if n <= 1 {
+                return TestResult::discard();
+            }
 
             TestResult::from_bool(
-                2u64.pow(n.ceil_lg() as u32) >= n
-                    && 2u64.pow(n.ceil_lg() as u32 - 1) < n)
+                2u64.pow(n.ceil_lg() as u32) >= n && 2u64.pow(n.ceil_lg() as u32 - 1) < n,
+            )
         }
 
         quickcheck(prop as fn(u64) -> TestResult);
@@ -495,14 +534,13 @@ mod test {
         assert_eq!(1, 12u32.ceil_div(12));
 
         fn prop(n: u64, m: u64) -> TestResult {
-            if n * m == 0 { return TestResult::discard(); }
+            if n * m == 0 {
+                return TestResult::discard();
+            }
 
-            TestResult::from_bool(
-                m * n.ceil_div(m) >= n
-                    && m * (n.ceil_div(m) - 1) < n)
+            TestResult::from_bool(m * n.ceil_div(m) >= n && m * (n.ceil_div(m) - 1) < n)
         }
 
         quickcheck(prop as fn(u64, u64) -> TestResult);
     }
 }
-

@@ -17,19 +17,12 @@
 //!
 //! ```toml
 //! [dependencies]
-//! succinct = "0.5.2"
+//! succinct = "0.5.4"
 //! ```
 //!
 //! to your `Cargo.toml`.
 
-#![doc(html_root_url = "https://docs.rs/succinct/0.5.2")]
 #![warn(missing_docs)]
-
-extern crate byteorder;
-extern crate num_traits;
-
-#[cfg(test)]
-extern crate quickcheck;
 
 #[macro_use]
 mod macros;
@@ -42,17 +35,16 @@ pub mod storage;
 pub mod stream;
 
 mod space_usage;
-pub use space_usage::SpaceUsage;
+pub use crate::space_usage::SpaceUsage;
 
 pub mod bit_vec;
-pub use bit_vec::{BitVec, BitVecMut, BitVecPush, BitVector};
+pub use crate::bit_vec::{BitVec, BitVecMut, BitVecPush, BitVector};
 
 pub mod int_vec;
-pub use int_vec::{IntVec, IntVecMut, IntVector};
+pub use crate::int_vec::{IntVec, IntVecMut, IntVector};
 
 pub mod rank;
-pub use rank::{BitRankSupport, JacobsonRank, Rank9};
+pub use crate::rank::{BitRankSupport, JacobsonRank, Rank9};
 
 pub mod select;
-pub use select::{Select1Support, BinSearchSelect};
-
+pub use crate::select::{BinSearchSelect, Select1Support};

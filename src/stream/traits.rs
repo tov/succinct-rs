@@ -1,8 +1,6 @@
-use std::io::Result;
-
-use internal::errors::*;
-
+use crate::internal::errors::*;
 use num_traits::PrimInt;
+use std::io::Result;
 
 /// Allows reading bits from a source.
 pub trait BitRead {
@@ -17,19 +15,17 @@ pub trait BitRead {
         let mut mask = N::one();
         let mut consumed = false;
 
-        for _ in 0 .. nbits {
-            if let Some(bit) = try!(self.read_bit()) {
+        for _ in 0..nbits {
+            if let Some(bit) = self.read_bit()? {
                 consumed = true;
                 if bit {
                     result = result | mask;
                 }
                 mask = mask << 1;
+            } else if consumed {
+                return out_of_bits("BitRead::read_int");
             } else {
-                if consumed {
-                    return out_of_bits("BitRead::read_int");
-                } else {
-                    return Ok(None);
-                }
+                return Ok(None);
             }
         }
 
@@ -41,19 +37,17 @@ pub trait BitRead {
         let mut result = N::zero();
         let mut consumed = false;
 
-        for _ in 0 .. nbits {
-            if let Some(bit) = try!(self.read_bit()) {
+        for _ in 0..nbits {
+            if let Some(bit) = self.read_bit()? {
                 consumed = true;
                 result = result << 1;
                 if bit {
                     result = result | N::one()
                 }
+            } else if consumed {
+                return out_of_bits("BitRead::read_int");
             } else {
-                if consumed {
-                    return out_of_bits("BitRead::read_int");
-                } else {
-                    return Ok(None)
-                }
+                return Ok(None);
             }
         }
 
@@ -68,8 +62,8 @@ pub trait BitWrite {
 
     /// Writes the lower `nbits` of `value`, least-significant first.
     fn write_int<N: PrimInt>(&mut self, nbits: usize, mut value: N) -> Result<()> {
-        for _ in 0 .. nbits {
-            try!(self.write_bit(value & N::one() != N::zero()));
+        for _ in 0..nbits {
+            self.write_bit(value & N::one() != N::zero())?;
             value = value >> 1;
         }
 
@@ -77,12 +71,11 @@ pub trait BitWrite {
     }
 
     /// Writes the lower `nbits` of `value`, most-significant first.
-    fn write_int_be<N: PrimInt>(&mut self, nbits: usize, value: N)
-                                -> Result<()> {
-        let mut mask = N::one() << nbits - 1;
+    fn write_int_be<N: PrimInt>(&mut self, nbits: usize, value: N) -> Result<()> {
+        let mut mask = N::one() << (nbits - 1);
 
-        for _ in 0 .. nbits {
-            try!(self.write_bit(value & mask != N::zero()));
+        for _ in 0..nbits {
+            self.write_bit(value & mask != N::zero())?;
             mask = mask >> 1;
         }
 

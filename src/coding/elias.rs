@@ -1,6 +1,5 @@
 use super::*;
-use internal::errors::*;
-use stream::*;
+use crate::{internal::errors::*, stream::*};
 
 /// An Elias code.
 ///
@@ -14,13 +13,13 @@ pub struct Elias<Header: UniversalCode>(pub Header);
 pub type Gamma = Elias<Unary>;
 
 /// An instance of `Gamma`.
-pub const GAMMA : Gamma = Elias(Unary);
+pub const GAMMA: Gamma = Elias(Unary);
 
 /// An Elias delta code encodes the header using the Elias gamma code.
 pub type Delta = Elias<Lift0<Gamma>>;
 
 /// An instance of `Delta`.
-pub const DELTA : Delta = Elias(Lift0(GAMMA));
+pub const DELTA: Delta = Elias(Lift0(GAMMA));
 
 /// An Elias omega code iterates the Elias encoding.
 pub struct Omega;
@@ -32,18 +31,17 @@ impl<Header: UniversalCode> UniversalCode for Elias<Header> {
         assert!(value != 0, "Elias codes do not handle 0");
 
         let nbits: u32 = WORD_BITS - 1 - value.leading_zeros();
-        try!(self.0.encode(sink, nbits as u64));
+        self.0.encode(sink, nbits as u64)?;
         sink.write_int(nbits as usize, value)
     }
 
     fn decode<R: BitRead>(&self, source: &mut R) -> Result<Option<u64>> {
-        if let Some(nbits) = try!(self.0.decode(source)) {
+        if let Some(nbits) = self.0.decode(source)? {
             if nbits > WORD_BITS as u64 - 1 {
                 return too_many_bits("Elias::decode");
             }
 
-            if let Some(low_bits) = try!(source.read_int::<u64>(nbits as usize))
-            {
+            if let Some(low_bits) = source.read_int::<u64>(nbits as usize)? {
                 Ok(Some(low_bits | (1 << nbits)))
             } else {
                 out_of_bits("Elias::decode")
@@ -65,9 +63,9 @@ impl UniversalCode for Omega {
         }
 
         while let Some((nbits, value)) = stack.pop() {
-            try!(sink.write_int_be(nbits, value));
+            sink.write_int_be(nbits, value)?;
         }
-        try!(sink.write_bit(false));
+        sink.write_bit(false)?;
 
         Ok(())
     }
@@ -76,11 +74,12 @@ impl UniversalCode for Omega {
         let mut result: u64 = 1;
 
         loop {
-            if let Some(bit) = try!(source.read_bit()) {
-                if !bit { return Ok(Some(result)); }
+            if let Some(bit) = source.read_bit()? {
+                if !bit {
+                    return Ok(Some(result));
+                }
 
-                if let Some(next) =
-                       try!(source.read_int_be::<u64>(result as usize)) {
+                if let Some(next) = source.read_int_be::<u64>(result as usize)? {
                     result = next | (1 << result as u32)
                 } else {
                     return out_of_bits("Omega::decode");
@@ -96,10 +95,10 @@ impl UniversalCode for Omega {
 
 #[cfg(test)]
 mod test {
-    use std::collections::VecDeque;
+    use crate::coding::properties;
+    use crate::coding::*;
     use quickcheck::quickcheck;
-    use coding::*;
-    use coding::properties;
+    use std::collections::VecDeque;
 
     #[test]
     fn gamma() {

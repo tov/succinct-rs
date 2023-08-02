@@ -1,8 +1,6 @@
-use std::ops::{Range, RangeTo, RangeFrom, RangeFull};
+use crate::{bit_vec::traits::*, space_usage::SpaceUsage, storage::BlockType};
 
-use bit_vec::traits::*;
-use space_usage::SpaceUsage;
-use storage::BlockType;
+use std::ops::{Range, RangeFrom, RangeFull, RangeTo};
 
 /// A borrowed slice of a bit vector.
 #[derive(Clone, Copy, Debug)]
@@ -63,8 +61,7 @@ impl<'a, Base: 'a + BitVecMut + ?Sized> BitSliceMut<'a, Base> {
     ///
     /// Unlike `BitSliceMut::new`, does not create an additional layer of
     /// indirection.
-    pub fn slice_mut<R: IntoRange<u64>>(&mut self, range: R)
-                                        -> BitSliceMut<Base> {
+    pub fn slice_mut<R: IntoRange<u64>>(&mut self, range: R) -> BitSliceMut<Base> {
         let range = range.into_range(0, self.len);
         assert!(range.end <= self.len, "BitSlice::slice: out of bounds");
         BitSliceMut {
@@ -101,8 +98,9 @@ impl<'a, Base: 'a + BitVec + ?Sized> BitVec for BitSlice<'a, Base> {
     }
 
     fn get_bits(&self, position: u64, count: usize) -> Self::Block {
-        let end = position.checked_add(count as u64)
-                          .expect("BitSlice::get_bits: index overflow");
+        let end = position
+            .checked_add(count as u64)
+            .expect("BitSlice::get_bits: index overflow");
         assert!(end <= self.len, "BitSlice::get_bits: out of bounds");
         self.data.get_bits(self.start + position, count)
     }
@@ -127,8 +125,9 @@ impl<'a, Base: 'a + BitVecMut + ?Sized> BitVec for BitSliceMut<'a, Base> {
     }
 
     fn get_bits(&self, position: u64, count: usize) -> Self::Block {
-        let end = position.checked_add(count as u64)
-                          .expect("BitSliceMut::get_bits: index overflow");
+        let end = position
+            .checked_add(count as u64)
+            .expect("BitSliceMut::get_bits: index overflow");
         assert!(end <= self.len, "BitSliceMut::get_bits: out of bounds");
         self.data.get_bits(self.start + position, count)
     }
@@ -146,26 +145,38 @@ impl<'a, Base: 'a + BitVecMut + ?Sized> BitVecMut for BitSliceMut<'a, Base> {
     }
 
     fn set_bits(&mut self, position: u64, count: usize, value: Self::Block) {
-        let end = position.checked_add(count as u64)
-                          .expect("BitSliceMut::get_bits: index overflow");
+        let end = position
+            .checked_add(count as u64)
+            .expect("BitSliceMut::get_bits: index overflow");
         assert!(end <= self.len, "BitSliceMut::get_bits: out of bounds");
         self.data.set_bits(self.start + position, count, value);
     }
 
     fn set_block(&mut self, position: usize, value: Self::Block) {
-        self.set_bits(Self::Block::mul_nbits(position),
-                      Self::Block::nbits(), value);
+        self.set_bits(
+            Self::Block::mul_nbits(position),
+            Self::Block::nbits(),
+            value,
+        );
     }
 }
 
 impl<'a, Base: 'a + BitVec + ?Sized> SpaceUsage for BitSlice<'a, Base> {
-    fn is_stack_only() -> bool { true }
-    fn heap_bytes(&self) -> usize { 0 }
+    fn is_stack_only() -> bool {
+        true
+    }
+    fn heap_bytes(&self) -> usize {
+        0
+    }
 }
 
 impl<'a, Base: 'a + BitVecMut + ?Sized> SpaceUsage for BitSliceMut<'a, Base> {
-    fn is_stack_only() -> bool { true }
-    fn heap_bytes(&self) -> usize { 0 }
+    fn is_stack_only() -> bool {
+        true
+    }
+    fn heap_bytes(&self) -> usize {
+        0
+    }
 }
 
 /// Range polymorphism support.
@@ -190,17 +201,25 @@ pub trait IntoRange<T> {
 }
 
 impl<T> IntoRange<T> for Range<T> {
-    fn into_range(self, _: T, _: T) -> Range<T> { self }
+    fn into_range(self, _: T, _: T) -> Range<T> {
+        self
+    }
 }
 
 impl<T> IntoRange<T> for RangeTo<T> {
-    fn into_range(self, start: T, _: T) -> Range<T> { start .. self.end }
+    fn into_range(self, start: T, _: T) -> Range<T> {
+        start..self.end
+    }
 }
 
 impl<T> IntoRange<T> for RangeFrom<T> {
-    fn into_range(self, _: T, end: T) -> Range<T> { self.start .. end }
+    fn into_range(self, _: T, end: T) -> Range<T> {
+        self.start..end
+    }
 }
 
 impl<T> IntoRange<T> for RangeFull {
-    fn into_range(self, start: T, end: T) -> Range<T> { start .. end }
+    fn into_range(self, start: T, end: T) -> Range<T> {
+        start..end
+    }
 }

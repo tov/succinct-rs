@@ -24,11 +24,10 @@ pub use self::trans::*;
 
 #[cfg(test)]
 mod properties {
-    use std::collections::VecDeque;
     use super::*;
+    use std::collections::VecDeque;
 
-    pub fn code_decode<Code: UniversalCode>(code: &Code, vec: Vec<u64>)
-                                            -> bool {
+    pub fn code_decode<Code: UniversalCode>(code: &Code, vec: Vec<u64>) -> bool {
         let mut dv = VecDeque::<bool>::new();
         for &i in &vec {
             code.encode(&mut dv, i + 1).unwrap();

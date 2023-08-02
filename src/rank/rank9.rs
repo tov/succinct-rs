@@ -1,9 +1,11 @@
-use num_traits::ToPrimitive;
+use crate::{
+    bit_vec::BitVec,
+    rank::{BitRankSupport, RankSupport},
+    space_usage::SpaceUsage,
+    storage::BlockType,
+};
 
-use bit_vec::BitVec;
-use rank::{RankSupport, BitRankSupport};
-use space_usage::SpaceUsage;
-use storage::BlockType;
+use num_traits::ToPrimitive;
 
 /// Vigna’s rank structure for fast rank queries over a `BitVec`.
 #[derive(Clone, Debug)]
@@ -24,7 +26,9 @@ struct Rank9Cell {
 struct Level2(u64);
 
 impl Level2 {
-    fn new() -> Self { Level2(0) }
+    fn new() -> Self {
+        Level2(0)
+    }
 
     #[cfg(target_pointer_width = "64")]
     fn get(&self, t: usize) -> u64 {
@@ -82,11 +86,9 @@ impl<Store: BitVec<Block = u64>> Rank9<Store> {
 
         // Scope for store_counts's borrow of result
         {
-            let mut store_counts = |i: usize,
-                                    level1_count: &mut u64,
-                                    level2_count: &mut u64| {
+            let mut store_counts = |i: usize, level1_count: &mut u64, level2_count: &mut u64| {
                 let basic_block_index = i / 8;
-                let word_offset       = i % 8;
+                let word_offset = i % 8;
 
                 if word_offset == 0 {
                     result.push(Rank9Cell {
@@ -95,8 +97,9 @@ impl<Store: BitVec<Block = u64>> Rank9<Store> {
                     });
                     *level2_count = 0;
                 } else {
-                    result[basic_block_index].level2
-                            .set(word_offset, *level2_count);
+                    result[basic_block_index]
+                        .level2
+                        .set(word_offset, *level2_count);
                 }
             };
 
@@ -108,8 +111,7 @@ impl<Store: BitVec<Block = u64>> Rank9<Store> {
                 level2_count += word_count;
             }
 
-            store_counts(bits.block_len(),
-                         &mut level1_count, &mut level2_count);
+            store_counts(bits.block_len(), &mut level1_count, &mut level2_count);
         }
 
         Rank9 {
@@ -131,10 +133,12 @@ impl<Store: BitVec<Block = u64>> Rank9<Store> {
 
 impl<Store: BitVec<Block = u64>> BitRankSupport for Rank9<Store> {
     fn rank1(&self, position: u64) -> u64 {
-        let bb_index = (position / 512).to_usize()
-                                       .expect("Rank9::rank1: index overflow");
-        let word_index = (position / 64).to_usize()
-                                        .expect("Rank9::rank1: index overflow");
+        let bb_index = (position / 512)
+            .to_usize()
+            .expect("Rank9::rank1: index overflow");
+        let word_index = (position / 64)
+            .to_usize()
+            .expect("Rank9::rank1: index overflow");
         let word_offset = word_index % 8;
         let bit_offset = position % 64;
 
@@ -142,8 +146,7 @@ impl<Store: BitVec<Block = u64>> BitRankSupport for Rank9<Store> {
 
         let bb_portion = cell.level1;
         let word_portion = cell.level2.get(word_offset);
-        let bit_portion = self.bit_store.get_block(word_index)
-                                        .rank1(bit_offset);
+        let bit_portion = self.bit_store.get_block(word_index).rank1(bit_offset);
 
         bb_portion + word_portion + bit_portion
     }
@@ -153,7 +156,11 @@ impl<Store: BitVec<Block = u64>> RankSupport for Rank9<Store> {
     type Over = bool;
 
     fn rank(&self, position: u64, value: bool) -> u64 {
-        if value {self.rank1(position)} else {self.rank0(position)}
+        if value {
+            self.rank1(position)
+        } else {
+            self.rank0(position)
+        }
     }
 
     fn limit(&self) -> u64 {
@@ -169,7 +176,9 @@ impl_stack_only_space_usage!(Rank9Cell);
 impl_stack_only_space_usage!(Level2);
 
 impl<Store: SpaceUsage> SpaceUsage for Rank9<Store> {
-    fn is_stack_only() -> bool { false }
+    fn is_stack_only() -> bool {
+        false
+    }
 
     fn heap_bytes(&self) -> usize {
         self.bit_store.heap_bytes() + self.counts.heap_bytes()
@@ -178,8 +187,7 @@ impl<Store: SpaceUsage> SpaceUsage for Rank9<Store> {
 
 #[test]
 fn level2() {
-    let mut l2 =
-        Level2(0b0_110010000_000000000_000000001_000001110_000001000_100000000_000000101);
+    let mut l2 = Level2(0b0_110010000_000000000_000000001_000001110_000001000_100000000_000000101);
 
     assert_eq!(0, l2.get(0));
     assert_eq!(5, l2.get(1));
@@ -216,11 +224,11 @@ fn level2() {
 #[cfg(test)]
 mod test {
     use super::*;
-    use rank::BitRankSupport;
+    use crate::rank::BitRankSupport;
 
     #[test]
     fn rank1() {
-        let vec = vec![ 0b00000000000001110000000000000001u64; 1024 ];
+        let vec = vec![0b00000000000001110000000000000001u64; 1024];
         let rank = Rank9::new(vec);
 
         assert_eq!(1, rank.rank1(0));
@@ -245,10 +253,10 @@ mod test {
     // space with the metadata.
     #[test]
     fn space() {
-        use space_usage::*;
+        use crate::space_usage::*;
 
-        for i in 0 .. 50 {
-            let vec = vec![ 0u64; 1000 + i ];
+        for i in 0..50 {
+            let vec = vec![0u64; 1000 + i];
             let vec_bytes = vec.total_bytes() as f64;
             let rank = Rank9::new(vec);
 
