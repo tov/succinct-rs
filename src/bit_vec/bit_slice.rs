@@ -1,8 +1,8 @@
 use std::ops::{Range, RangeTo, RangeFrom, RangeFull};
 
-use bit_vec::traits::*;
-use space_usage::SpaceUsage;
-use storage::BlockType;
+use crate::bit_vec::traits::*;
+use crate::space_usage::SpaceUsage;
+use crate::storage::BlockType;
 
 /// A borrowed slice of a bit vector.
 #[derive(Clone, Copy, Debug)]

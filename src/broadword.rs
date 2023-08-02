@@ -20,9 +20,9 @@
 //!
 //!     In the paper, the shifted `s` appears as `x`.
 
-use rank::{BitRankSupport, RankSupport};
-use select::Select1Support;
-use storage::BlockType;
+use crate::rank::{BitRankSupport, RankSupport};
+use crate::select::Select1Support;
+use crate::storage::BlockType;
 
 /// Newtype for treating a `u64` as a rank or select structure.
 pub struct Broadword(pub u64);
@@ -112,7 +112,7 @@ mod test {
     use quickcheck::{quickcheck, TestResult};
 
     use super::*;
-    use select::{BinSearchSelect, Select1Support};
+    use crate::select::{BinSearchSelect, Select1Support};
 
     #[test]
     fn count_ones_0() {

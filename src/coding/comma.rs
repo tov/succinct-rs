@@ -1,6 +1,6 @@
 use super::*;
-use internal::errors::*;
-use stream::*;
+use crate::internal::errors::*;
+use crate::stream::*;
 
 /// `Comma(n)` encodes in base 2<sup>n</sup> - 1, using n bits per digit.
 pub struct Comma(pub u8);
@@ -19,10 +19,10 @@ impl UniversalCode for Comma {
         }
 
         while let Some(digit) = stack.pop() {
-            try!(sink.write_int(self.0 as usize, digit));
+            sink.write_int(self.0 as usize, digit)?;
         }
 
-        try!(sink.write_int(self.0 as usize, base));
+        sink.write_int(self.0 as usize, base)?;
 
         Ok(())
     }
@@ -33,7 +33,7 @@ impl UniversalCode for Comma {
         let mut consumed = false;
 
         loop {
-            if let Some(digit) = try!(source.read_int::<u64>(self.0 as usize)) {
+            if let Some(digit) = source.read_int::<u64>(self.0 as usize)? {
                 if digit == base { return Ok(Some(result)) }
 
                 consumed = true;
@@ -51,8 +51,8 @@ impl UniversalCode for Comma {
 mod test {
     use std::collections::VecDeque;
     use quickcheck::quickcheck;
-    use coding::*;
-    use coding::properties;
+    use crate::coding::*;
+    use crate::coding::properties;
 
     #[test]
     fn enc234() {

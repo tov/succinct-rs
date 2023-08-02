@@ -1,6 +1,6 @@
 use super::*;
-use internal::errors::*;
-use stream::*;
+use crate::internal::errors::*;
+use crate::stream::*;
 
 /// Encodes _n_ as _n_ zeroes followed by a one.
 pub struct Unary;
@@ -8,11 +8,11 @@ pub struct Unary;
 impl UniversalCode for Unary {
     fn encode<W: BitWrite>(&self, sink: &mut W, mut value: u64) -> Result<()> {
         while value > 0 {
-            try!(sink.write_bit(false));
-            value = value - 1;
+            sink.write_bit(false)?;
+            value -= 1;
         }
 
-        try!(sink.write_bit(true));
+        sink.write_bit(true)?;
 
         Ok(())
     }
@@ -21,11 +21,11 @@ impl UniversalCode for Unary {
         let mut result = 0;
         let mut consumed = false;
 
-        while let Some(bit) = try!(source.read_bit()) {
+        while let Some(bit) = source.read_bit()? {
             if bit { return Ok(Some(result)); }
             // This can't overflow because it would require too many
             // unary digits to get there:
-            result = result + 1;
+            result += 1;
             consumed = true;
         }
 
@@ -40,7 +40,7 @@ impl UniversalCode for Unary {
 #[cfg(test)]
 mod test {
     use std::collections::VecDeque;
-    use coding::*;
+    use crate::coding::*;
 
     #[test]
     fn test234() {

@@ -1,5 +1,5 @@
-use rank::{BitRankSupport, RankSupport};
-use storage::BlockType;
+use crate::rank::{BitRankSupport, RankSupport};
+use crate::storage::BlockType;
 
 macro_rules! impl_rank_support_prim {
     ( $t:ident )
@@ -36,7 +36,7 @@ impl_rank_support_prim!(usize);
 
 #[cfg(test)]
 mod test {
-    use rank::*;
+    use crate::rank::*;
 
     #[test]
     fn rank1() {

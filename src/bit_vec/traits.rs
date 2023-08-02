@@ -1,6 +1,6 @@
 use num_traits::{One, Zero, ToPrimitive};
 
-use storage::{Address, BlockType};
+use crate::storage::{Address, BlockType};
 
 /// Read-only bit vector operations.
 ///

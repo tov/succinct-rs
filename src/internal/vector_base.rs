@@ -3,9 +3,9 @@
 #[cfg(target_pointer_width = "32")]
 use num_traits::ToPrimitive;
 
-use bit_vec::{BitVec, BitVecMut};
-use space_usage::SpaceUsage;
-use storage::BlockType;
+use crate::bit_vec::{BitVec, BitVecMut};
+use crate::space_usage::SpaceUsage;
+use crate::storage::BlockType;
 
 /// VectorBase provides basic functionality for IntVector and BitVector. It
 /// doesn’t know its element size, but it does know (once provided its
@@ -38,10 +38,10 @@ impl<Block: BlockType> VectorBase<Block> {
     #[inline]
     fn clear_extra_bits(&mut self, element_bits: usize) {
         let bit_len = self.len * element_bits as u64;
-        self.vec.last_mut().map(|block| {
+        if let Some(block) = self.vec.last_mut() {
             let mask = Block::low_mask(Block::last_block_bits(bit_len));
             *block = *block & mask;
-        });
+        }
     }
 
     // Sets the length based on the number of blocks in the underlying Vec.
@@ -88,7 +88,7 @@ impl<Block: BlockType> VectorBase<Block> {
         let block_len = len_to_block_len::<Block>(element_bits, len)
                             .expect("VectorBase::with_fill: overflow");
         let mut result = VectorBase {
-            len: len,
+            len,
             vec: vec![ Block::zero(); block_len ],
         };
 
@@ -167,7 +167,7 @@ impl<Block: BlockType> VectorBase<Block> {
 
         let pos = self.len;
         self.len = pos + 1;
-        self.set_bits(element_bits, pos as u64 * element_bits as u64,
+        self.set_bits(element_bits, pos * element_bits as u64,
                       element_bits, value);
     }
 
@@ -340,8 +340,8 @@ impl<'a, Block: BlockType> Iter<'a, Block> {
         Iter {
             start: 0,
             limit: data.len(),
-            element_bits: element_bits,
-            data: data,
+            element_bits,
+            data,
         }
     }
 }
@@ -478,10 +478,10 @@ mod test {
         assert_eq!(3, v.block_capacity());
         assert_eq!(4, v.capacity(5));
 
-        assert_eq!(true, v.get_bit(0));
-        assert_eq!(false, v.get_bit(1));
-        assert_eq!(true, v.get_bit(2));
-        assert_eq!(false, v.get_bit(3));
+        assert!(v.get_bit(0));
+        assert!(!v.get_bit(1));
+        assert!(v.get_bit(2));
+        assert!(!v.get_bit(3));
 
         assert_eq!(0b01010101, v.get_block(0));
         assert_eq!(0b01010101, v.get_block(1));
@@ -554,23 +554,23 @@ mod test {
         let mut v = VB::block_with_fill(1, 2, 0);
         assert_eq!(16, v.len());
 
-        assert_eq!(false, v.get_bit(0));
-        assert_eq!(false, v.get_bit(1));
-        assert_eq!(false, v.get_bit(2));
-        assert_eq!(false, v.get_bit(3));
-        assert_eq!(false, v.get_bit(4));
-        assert_eq!(false, v.get_bit(5));
+        assert!(!v.get_bit(0));
+        assert!(!v.get_bit(1));
+        assert!(!v.get_bit(2));
+        assert!(!v.get_bit(3));
+        assert!(!v.get_bit(4));
+        assert!(!v.get_bit(5));
 
         v.set_bit(1, true);
         v.set_bit(2, true);
         v.set_bit(5, true);
 
-        assert_eq!(false, v.get_bit(0));
-        assert_eq!(true, v.get_bit(1));
-        assert_eq!(true, v.get_bit(2));
-        assert_eq!(false, v.get_bit(3));
-        assert_eq!(false, v.get_bit(4));
-        assert_eq!(true, v.get_bit(5));
+        assert!(!v.get_bit(0));
+        assert!(v.get_bit(1));
+        assert!(v.get_bit(2));
+        assert!(!v.get_bit(3));
+        assert!(!v.get_bit(4));
+        assert!(v.get_bit(5));
     }
 
     #[test]

@@ -1,7 +1,7 @@
-use internal::search::binary_search_function;
-use rank::{BitRankSupport, RankSupport};
-use space_usage::SpaceUsage;
-use bit_vec::BitVec;
+use crate::internal::search::binary_search_function;
+use crate::rank::{BitRankSupport, RankSupport};
+use crate::space_usage::SpaceUsage;
+use crate::bit_vec::BitVec;
 use super::{SelectSupport, Select1Support, Select0Support};
 
 /// Performs a select query by binary searching rank queries.
@@ -15,7 +15,7 @@ impl<Rank: RankSupport> BinSearchSelect<Rank> {
     /// support.
     pub fn new(rank_support: Rank) -> Self {
         BinSearchSelect {
-            rank_support: rank_support,
+            rank_support,
         }
     }
 
@@ -79,8 +79,8 @@ impl<Rank: SpaceUsage> SpaceUsage for BinSearchSelect<Rank> {
 
 #[cfg(test)]
 mod test {
-    use rank::*;
-    use select::*;
+    use crate::rank::*;
+    use crate::select::*;
 
     #[test]
     fn select1() {

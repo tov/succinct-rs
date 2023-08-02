@@ -1,9 +1,9 @@
 use num_traits::PrimInt;
 
-use bit_vec::BitVec;
-use int_vec::{IntVec, IntVector};
-use space_usage::SpaceUsage;
-use storage::{Address, BlockType};
+use crate::bit_vec::BitVec;
+use crate::int_vec::{IntVec, IntVector};
+use crate::space_usage::SpaceUsage;
+use crate::storage::{Address, BlockType};
 
 use super::{RankSupport, BitRankSupport};
 
@@ -66,9 +66,9 @@ impl<Store: BitVec> JacobsonRank<Store> {
 
         JacobsonRank {
             bit_store: bits,
-            large_block_size: large_block_size,
-            large_block_ranks: large_block_ranks,
-            small_block_ranks: small_block_ranks,
+            large_block_size,
+            large_block_ranks,
+            small_block_ranks,
         }
     }
 
@@ -130,7 +130,7 @@ impl<Store: SpaceUsage> SpaceUsage for JacobsonRank<Store> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use rank::BitRankSupport;
+    use crate::rank::BitRankSupport;
 
     #[test]
     fn rank1() {
@@ -159,7 +159,7 @@ mod test {
     // space with the metadata.
     #[test]
     fn space() {
-        use space_usage::*;
+        use crate::space_usage::*;
 
         for i in 0 .. 50 {
             let vec = vec![ 0b10000000000000001110000000000000u32;

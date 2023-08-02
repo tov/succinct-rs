@@ -3,7 +3,7 @@ use num_traits::PrimInt;
 /// Averages two `PrimInt`s without overflowing.
 pub fn average<P: PrimInt>(x: P, y: P) -> P {
     let almost_average = (x >> 1) + (y >> 1);
-    let extra_bit = (x & P::one()) + (y & P::one()) >> 1;
+    let extra_bit = ((x & P::one()) + (y & P::one())) >> 1;
 
     almost_average + extra_bit
 }

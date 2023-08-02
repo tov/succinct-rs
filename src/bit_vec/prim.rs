@@ -1,5 +1,5 @@
-use storage::BlockType;
-use bit_vec::traits::*;
+use crate::storage::BlockType;
+use crate::bit_vec::traits::*;
 
 macro_rules! impl_bits_prim {
     ( $t:ident )

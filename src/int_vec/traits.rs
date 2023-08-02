@@ -1,4 +1,4 @@
-use storage::BlockType;
+use crate::storage::BlockType;
 
 /// An immutable array of integers of limited width.
 pub trait IntVec {

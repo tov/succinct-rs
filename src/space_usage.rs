@@ -65,7 +65,6 @@ pub trait SpaceUsage: Sized {
     /// including any portion of its size that is
     /// included in `stack_bytes`. This is typically for containers
     /// that heap allocate varying amounts of memory.
-    #[inline]
     fn heap_bytes(&self) -> usize;
 }
 

@@ -1,9 +1,9 @@
 use num_traits::ToPrimitive;
 
-use bit_vec::BitVec;
-use rank::{RankSupport, BitRankSupport};
-use space_usage::SpaceUsage;
-use storage::BlockType;
+use crate::bit_vec::BitVec;
+use crate::rank::{RankSupport, BitRankSupport};
+use crate::space_usage::SpaceUsage;
+use crate::storage::BlockType;
 
 /// Vigna’s rank structure for fast rank queries over a `BitVec`.
 #[derive(Clone, Debug)]
@@ -216,7 +216,7 @@ fn level2() {
 #[cfg(test)]
 mod test {
     use super::*;
-    use rank::BitRankSupport;
+    use crate::rank::BitRankSupport;
 
     #[test]
     fn rank1() {
@@ -245,7 +245,7 @@ mod test {
     // space with the metadata.
     #[test]
     fn space() {
-        use space_usage::*;
+        use crate::space_usage::*;
 
         for i in 0 .. 50 {
             let vec = vec![ 0u64; 1000 + i ];

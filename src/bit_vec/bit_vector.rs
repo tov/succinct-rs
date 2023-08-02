@@ -3,9 +3,9 @@ use std::fmt;
 #[cfg(target_pointer_width = "32")]
 use num_traits::ToPrimitive;
 
-use internal::vector_base::{VectorBase, self};
-use space_usage::SpaceUsage;
-use storage::BlockType;
+use crate::internal::vector_base::{VectorBase, self};
+use crate::space_usage::SpaceUsage;
+use crate::storage::BlockType;
 use super::traits::*;
 
 /// Uncompressed vector of bits.
@@ -228,7 +228,7 @@ impl<Block: BlockType> fmt::Binary for BitVector<Block> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         for bit in self {
             let bit = if bit {"1"} else {"0"};
-            try!(formatter.write_str(bit));
+            formatter.write_str(bit)?;
         }
 
         Ok(())
@@ -302,7 +302,7 @@ impl<'a, Block: BlockType + 'a> IntoIterator for &'a BitVector<Block> {
 
 #[cfg(test)]
 mod test {
-    use bit_vec::*;
+    use crate::bit_vec::*;
 
     macro_rules! assert_bv {
         ($expected:expr, $actual:expr) => {
@@ -347,8 +347,8 @@ mod test {
         let bv0: BitVector = BitVector::with_fill(20, false);
         let bv1: BitVector = BitVector::with_fill(20, true);
 
-        assert_eq!(false, bv0.get_bit(3));
-        assert_eq!(true, bv1.get_bit(3));
+        assert!(!bv0.get_bit(3));
+        assert!(bv1.get_bit(3));
 
         assert_bv!("00000000000000000000", bv0);
         assert_bv!("11111111111111111111", bv1);
@@ -374,9 +374,9 @@ mod test {
         bit_vector.push_bit(false);
         assert_eq!(3, bit_vector.bit_len());
         assert_eq!(1, bit_vector.block_len());
-        assert_eq!(true, bit_vector.get_bit(0));
-        assert_eq!(false, bit_vector.get_bit(1));
-        assert_eq!(false, bit_vector.get_bit(2));
+        assert!(bit_vector.get_bit(0));
+        assert!(!bit_vector.get_bit(1));
+        assert!(!bit_vector.get_bit(2));
     }
 
     #[test]
@@ -427,12 +427,12 @@ mod test {
     fn push_block_get_bit() {
         let mut bit_vector: BitVector = BitVector::new();
         bit_vector.push_block(0b10101);
-        assert_eq!(true, bit_vector.get_bit(0));
-        assert_eq!(false, bit_vector.get_bit(1));
-        assert_eq!(true, bit_vector.get_bit(2));
-        assert_eq!(false, bit_vector.get_bit(3));
-        assert_eq!(true, bit_vector.get_bit(4));
-        assert_eq!(false, bit_vector.get_bit(5));
+        assert!(bit_vector.get_bit(0));
+        assert!(!bit_vector.get_bit(1));
+        assert!(bit_vector.get_bit(2));
+        assert!(!bit_vector.get_bit(3));
+        assert!(bit_vector.get_bit(4));
+        assert!(!bit_vector.get_bit(5));
     }
 
     #[test]
@@ -444,11 +444,11 @@ mod test {
         bit_vector.set_bit(2, false);
         bit_vector.set_bit(3, true);
         bit_vector.set_bit(4, false);
-        assert_eq!(true, bit_vector.get_bit(0));
-        assert_eq!(true, bit_vector.get_bit(1));
-        assert_eq!(false, bit_vector.get_bit(2));
-        assert_eq!(true, bit_vector.get_bit(3));
-        assert_eq!(false, bit_vector.get_bit(4));
+        assert!(bit_vector.get_bit(0));
+        assert!(bit_vector.get_bit(1));
+        assert!(!bit_vector.get_bit(2));
+        assert!(bit_vector.get_bit(3));
+        assert!(!bit_vector.get_bit(4));
     }
 
     #[test]

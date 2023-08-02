@@ -1,10 +1,10 @@
 use std::fmt;
 
 use super::*;
-use bit_vec::{BitVec, BitVecMut};
-use internal::vector_base::{VectorBase, self};
-use space_usage::SpaceUsage;
-use storage::BlockType;
+use crate::bit_vec::{BitVec, BitVecMut};
+use crate::internal::vector_base::{VectorBase, self};
+use crate::space_usage::SpaceUsage;
+use crate::storage::BlockType;
 
 /// Uncompressed vector of *k*-bit unsigned integers.
 ///
@@ -40,8 +40,8 @@ impl<Block: BlockType> IntVector<Block> {
     fn create(element_bits: usize, base: VectorBase<Block>) -> Self {
         Self::check_element_bits(element_bits);
         IntVector {
-            element_bits: element_bits,
-            base: base,
+            element_bits,
+            base,
         }
     }
 
@@ -410,11 +410,11 @@ impl<Block> fmt::Debug for IntVector<Block>
         where Block: BlockType + fmt::Debug {
 
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        try!(write!(formatter, "IntVector {{ element_bits: {}, elements: {{ ",
-                    self.element_bits()));
+        write!(formatter, "IntVector {{ element_bits: {}, elements: {{ ",
+                    self.element_bits())?;
 
         for element in self {
-            try!(write!(formatter, "{:?}, ", element));
+            write!(formatter, "{:?}, ", element)?;
         }
 
         write!(formatter, "}} }}")
@@ -433,8 +433,8 @@ impl<A: BlockType> SpaceUsage for IntVector<A> {
 
 #[cfg(test)]
 mod test {
-    use int_vec::{IntVector, IntVec, IntVecMut};
-    use bit_vec::*;
+    use crate::int_vec::{IntVector, IntVec, IntVecMut};
+    use crate::bit_vec::*;
 
     #[test]
     fn create_empty() {

@@ -1,8 +1,8 @@
 use std::mem;
 
 use super::*;
-use internal::errors::*;
-use stream::*;
+use crate::internal::errors::*;
+use crate::stream::*;
 
 /// A Fibonacci code.
 pub struct Fibonacci;
@@ -44,7 +44,7 @@ impl UniversalCode for Fibonacci {
         // Having to compute fib.i when we really just need fib.i_1
         // means that this gives up on smaller numbers than it needs to.
         while fib.i <= value {
-            try!(fib.next());
+            fib.next()?;
         }
 
         // Now fib.i_1 is the largest Fibonacci number <= value
@@ -62,7 +62,7 @@ impl UniversalCode for Fibonacci {
         }
 
         while let Some(bit) = stack.pop() {
-            try!(sink.write_bit(bit));
+            sink.write_bit(bit)?;
         }
 
         Ok(())
@@ -73,7 +73,7 @@ impl UniversalCode for Fibonacci {
         let mut fib = Fib::new();
         let mut previous = false;
 
-        while let Some(bit) = try!(source.read_bit()) {
+        while let Some(bit) = source.read_bit()? {
             if bit && previous {
                 return Ok(Some(result));
             }
@@ -82,7 +82,7 @@ impl UniversalCode for Fibonacci {
                 result += fib.i;
             }
 
-            try!(fib.next());
+            fib.next()?;
             previous = bit;
         }
 
@@ -98,8 +98,8 @@ impl UniversalCode for Fibonacci {
 mod test {
     use std::collections::VecDeque;
     use quickcheck::quickcheck;
-    use coding::*;
-    use coding::properties;
+    use crate::coding::*;
+    use crate::coding::properties;
 
     #[test]
     fn enc234() {

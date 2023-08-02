@@ -7,9 +7,9 @@ use std::mem;
 use byteorder::{ByteOrder, ReadBytesExt, WriteBytesExt};
 use num_traits::{One, PrimInt, ToPrimitive};
 
-use bit_vec::{BitVec, BitVecMut};
-use rank::{BitRankSupport, RankSupport};
-use space_usage::SpaceUsage;
+use crate::bit_vec::{BitVec, BitVecMut};
+use crate::rank::{BitRankSupport, RankSupport};
+use crate::space_usage::SpaceUsage;
 
 /// Types that can be used for `IntVector` and `BitVector` storage.
 ///
@@ -179,7 +179,7 @@ pub trait BlockType: PrimInt + BitVec + BitVecMut + BitRankSupport +
     #[inline]
     fn get_bits(self, start: usize, len: usize) -> Self {
         assert!(start + len <= Self::nbits(),
-                "Block::get_bits: out of bounds");;
+                "Block::get_bits: out of bounds");
 
         if len == 0 { return Self::zero(); }
 
@@ -505,4 +505,3 @@ mod test {
         quickcheck(prop as fn(u64, u64) -> TestResult);
     }
 }
-

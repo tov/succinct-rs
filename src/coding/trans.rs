@@ -1,6 +1,6 @@
 use super::*;
-use internal::errors::*;
-use stream::*;
+use crate::internal::errors::*;
+use crate::stream::*;
 
 /// Lifts any code by adding one to each encoded value, and subtracting
 /// one from each decoded value.

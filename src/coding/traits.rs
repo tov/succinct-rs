@@ -1,6 +1,6 @@
 pub use std::io::Result;
 
-use stream::*;
+use crate::stream::*;
 
 /// A universal code lets us encode arbitrary sized integers in a
 /// self-delimiting code.
