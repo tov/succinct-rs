@@ -82,7 +82,7 @@ pub fn select1_raw(r: usize, x: u64) -> usize {
     let mut s = x - ((x & 0xAAAA_AAAA_AAAA_AAAA) >> 1);
     s = (s & 0x3333_3333_3333_3333) + ((s >> 2) & 0x3333_3333_3333_3333);
     s = ((s + (s >> 4)) & 0x0F0F_0F0F_0F0F_0F0F).wrapping_mul(L8);
-    let b = (le8(s, r.wrapping_mul(L8)) >> 7).wrapping_mul(L8)>> 53 & !7;
+    let b = (le8(s, r.wrapping_mul(L8)) >> 7).wrapping_mul(L8)>> 53;
     let l = r - ((s << 8).wrapping_shr(b as u32) & 0xFF);
     s = (u_nz8((x.wrapping_shr(b as u32) & 0xFF)
                        .wrapping_mul(L8) & 0x8040_2010_0804_0201) >> 7)
